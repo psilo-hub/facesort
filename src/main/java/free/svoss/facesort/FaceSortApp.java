@@ -31,6 +31,8 @@ import javafx.stage.Stage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * JavaFX application entry point for Face Sort.
@@ -47,6 +49,7 @@ public class FaceSortApp extends Application {
     private ConfigModel config;
     private Database database;
     private FaceAiService faceAiService;
+    private ImportService importService;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -76,8 +79,13 @@ public class FaceSortApp extends Application {
             return;
         }
 
-        // 5. Services.
-        ImportService importService = new ImportService(imageDao, faceDao, faceAiService, config);
+        // 5. Services. One FaceAI service per import worker; the shared
+        //    faceAiService stays dedicated to the other services.
+        List<FaceAiService> importAiServices = new ArrayList<>();
+        for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
+            importAiServices.add(new FaceAiService(config));
+        }
+        importService = new ImportService(imageDao, faceDao, importAiServices, config);
         ClusteringService clusteringService = new ClusteringService(faceAiService, faceDao, config);
         NamingService namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, config);
         FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao);
@@ -114,6 +122,9 @@ public class FaceSortApp extends Application {
 
     @Override
     public void stop() throws Exception {
+        if (importService != null) {
+            importService.close();
+        }
         if (faceAiService != null) {
             faceAiService.close();
         }

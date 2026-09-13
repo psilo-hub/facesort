@@ -4,6 +4,7 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.util.EmbeddingUtils;
 import free.svoss.tools.faceai.DetectedFace;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,11 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end import tests over an in-memory database and a fake engine that
- * reports exactly one qualifying face per image.
+ * End-to-end import tests over an in-memory database and fake engines that
+ * report exactly one qualifying face per image. Covers the single-engine
+ * (sequential) path and the parallel multi-engine path.
  */
 class ImportServiceTest {
 
@@ -98,6 +105,173 @@ class ImportServiceTest {
         }
         assertTrue(ImageIO.write(image, "png", file.toFile()), "PNG write must succeed");
     }
+
+    // ------------------------------------------------------------------
+    // Fake engines for the parallel tests
+    // ------------------------------------------------------------------
+
+    private static final float[] TEST_EMBEDDING = {1, 0, 0, 0, 0, 0, 0, 0};
+
+    private static DetectedFace[] testFaces() {
+        return new DetectedFace[]{new DetectedFace(10, 10, 100, 100, 0.95f)};
+    }
+
+    /** Engine that records how many images it analysed. */
+    private static class CountingEngine implements FaceAiService.Engine {
+
+        private final AtomicInteger detectCalls = new AtomicInteger();
+        private final DetectedFace[] faces;
+        private final float[] embedding;
+
+        CountingEngine(DetectedFace[] faces, float[] embedding) {
+            this.faces = faces;
+            this.embedding = embedding;
+        }
+
+        int detectCalls() {
+            return detectCalls.get();
+        }
+
+        @Override
+        public DetectedFace[] detectFaces(BufferedImage image) {
+            detectCalls.incrementAndGet();
+            return faces;
+        }
+
+        @Override
+        public float[] getEmbedding(BufferedImage image) {
+            return embedding;
+        }
+
+        @Override
+        public double calcSimilarity(float[] left, float[] right) {
+            return EmbeddingUtils.cosineSimilarity(left, right);
+        }
+
+        @Override
+        public float[] calcAverage(List<float[]> embeddings) {
+            float[] average = new float[embeddings.get(0).length];
+            for (float[] vector : embeddings) {
+                for (int i = 0; i < average.length; i++) {
+                    average[i] += vector[i];
+                }
+            }
+            for (int i = 0; i < average.length; i++) {
+                average[i] /= embeddings.size();
+            }
+            return average;
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
+    /**
+     * Engine that forces the worker threads to arrive at a common barrier
+     * inside {@link #detectFaces}, proving the import is running concurrently.
+     * The {@code active}/{@code overlapSeen} counters are shared by every
+     * engine so that concurrency is measured across workers, not per engine.
+     */
+    private static final class BarrierEngine extends CountingEngine {
+
+        private final CyclicBarrier barrier;
+        private final AtomicInteger active;
+        private final AtomicInteger overlapSeen;
+
+        BarrierEngine(CyclicBarrier barrier, AtomicInteger active, AtomicInteger overlapSeen,
+                      DetectedFace[] faces, float[] embedding) {
+            super(faces, embedding);
+            this.barrier = barrier;
+            this.active = active;
+            this.overlapSeen = overlapSeen;
+        }
+
+        /** True when more than one worker was inside detectFaces at once. */
+        boolean overlapSeen() {
+            return overlapSeen.get() > 0;
+        }
+
+        @Override
+        public DetectedFace[] detectFaces(BufferedImage image) {
+            int concurrent = active.incrementAndGet();
+            if (concurrent > 1) {
+                overlapSeen.set(1);
+            }
+            try {
+                barrier.await(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new RuntimeException("Workers did not meet at the barrier", e);
+            } finally {
+                active.decrementAndGet();
+            }
+            return super.detectFaces(image);
+        }
+    }
+
+    /**
+     * Engine whose face detection takes a configurable amount of time. Used to
+     * verify that {@code importFolder} joins every worker before it returns:
+     * when the method returns, no worker may still be inside {@code detectFaces}
+     * and the database must already contain the full import.
+     */
+    private static final class SleepEngine extends CountingEngine {
+
+        private final long delayMs;
+        private final AtomicInteger active = new AtomicInteger();
+        private final AtomicInteger maxActive = new AtomicInteger();
+
+        SleepEngine(long delayMs) {
+            super(testFaces(), TEST_EMBEDDING);
+            this.delayMs = delayMs;
+        }
+
+        @Override
+        public DetectedFace[] detectFaces(BufferedImage image) {
+            int concurrent = active.incrementAndGet();
+            maxActive.accumulateAndGet(concurrent, Math::max);
+            try {
+                if (delayMs > 0) {
+                    Thread.sleep(delayMs);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                active.decrementAndGet();
+            }
+            return super.detectFaces(image);
+        }
+    }
+
+    /** Builds a service that spreads work over the given engines. */
+    private ImportService parallelService(int threads, CountingEngine... engines) {
+        List<FaceAiService> services = new ArrayList<>();
+        for (CountingEngine engine : engines) {
+            services.add(new FaceAiService(engine));
+        }
+        ConfigModel config = config();
+        config.setMaxImportThreads(threads);
+        return new ImportService(imageDao, faceDao, services, config);
+    }
+
+    private static CountingEngine countingEngine() {
+        return new CountingEngine(testFaces(), TEST_EMBEDDING);
+    }
+
+    private static BarrierEngine barrierEngine(CyclicBarrier barrier, AtomicInteger active,
+                                               AtomicInteger overlapSeen) {
+        return new BarrierEngine(barrier, active, overlapSeen, testFaces(), TEST_EMBEDDING);
+    }
+
+    /** Parses "Started|Completed N/M: file.png" into N. */
+    private static int parseCompleted(String summary) {
+        String[] parts = summary.split("\\s+");
+        return Integer.parseInt(parts[1].substring(0, parts[1].indexOf('/')));
+    }
+
+    // ------------------------------------------------------------------
+    // Existing sequential tests
+    // ------------------------------------------------------------------
 
     @Test
     void importFolder_addsImagesFacesAndThumbnails() throws Exception {
@@ -234,5 +408,151 @@ class ImportServiceTest {
             assertEquals(1, result.newImages());
             assertEquals(0, result.errors());
         }
+    }
+
+    // ------------------------------------------------------------------
+    // New parallel tests
+    // ------------------------------------------------------------------
+
+    @Test
+    void importFolder_usesConfiguredThreadCountAndImportsEverything() throws Exception {
+        Path dir = createPhotos(6);
+        CountingEngine engineA = countingEngine();
+        CountingEngine engineB = countingEngine();
+        CountingEngine engineC = countingEngine();
+        try (ImportService service = parallelService(3, engineA, engineB, engineC)) {
+            ImportService.ImportResult result = service.importFolder(dir, null);
+
+            assertFalse(result.wasCancelled());
+            assertEquals(6, result.totalFiles());
+            assertEquals(6, result.processed());
+            assertEquals(6, result.newImages());
+            assertEquals(6, result.newFaces());
+            assertEquals(0, result.newPaths());
+            assertEquals(0, result.skipped());
+            assertEquals(0, result.errors());
+
+            assertEquals(6, imageDao.getAllHashes().size());
+            assertEquals(6, faceDao.findUnnamed().size());
+            for (String hash : imageDao.getAllHashes()) {
+                assertTrue(imageDao.hasThumbnail(hash));
+                assertNotNull(imageDao.getThumbnail(hash));
+            }
+        }
+        assertTrue(engineA.detectCalls() > 0, "every configured engine must be used");
+        assertTrue(engineB.detectCalls() > 0, "every configured engine must be used");
+        assertTrue(engineC.detectCalls() > 0, "every configured engine must be used");
+    }
+
+    @Test
+    void importFolder_runsFilesConcurrently() throws Exception {
+        Path dir = createPhotos(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger overlapSeen = new AtomicInteger();
+        BarrierEngine engineA = barrierEngine(barrier, active, overlapSeen);
+        BarrierEngine engineB = barrierEngine(barrier, active, overlapSeen);
+        try (ImportService service = parallelService(2, engineA, engineB)) {
+            ImportService.ImportResult result = service.importFolder(dir, null);
+
+            // Both workers must have been inside detectFaces at the same time,
+            // which is only possible when the import runs in parallel.
+            assertTrue(engineA.overlapSeen() || engineB.overlapSeen());
+            assertEquals(2, result.processed());
+            assertEquals(2, result.newImages());
+            assertEquals(0, result.errors());
+            assertEquals(2, imageDao.getAllHashes().size());
+        }
+    }
+
+    @Test
+    void importFolder_parallelCancellationKeepsStateConsistent() throws Exception {
+        Path dir = createPhotos(6);
+        AtomicInteger seen = new AtomicInteger();
+        CountingEngine engineA = countingEngine();
+        CountingEngine engineB = countingEngine();
+        CountingEngine engineC = countingEngine();
+        try (ImportService service = parallelService(3, engineA, engineB, engineC)) {
+            ImportService.ImportResult result = service.importFolder(dir,
+                    summary -> seen.set(parseCompleted(summary)),
+                    () -> seen.get() >= 3);
+
+            assertTrue(result.wasCancelled());
+            assertEquals(6, result.totalFiles());
+            assertTrue(result.processed() >= 3, "at least the first three files must be processed");
+            assertTrue(result.processed() <= 5, "cancellation must stop before the last file");
+            assertEquals(result.processed(), result.newImages());
+            assertEquals(result.processed(), result.newFaces());
+            assertEquals(0, result.errors());
+
+            // Whatever was committed before cancellation must be consistent.
+            assertEquals(result.processed(), imageDao.getAllHashes().size());
+            assertEquals(result.processed(), faceDao.findUnnamed().size());
+            for (String hash : imageDao.getAllHashes()) {
+                assertTrue(imageDao.hasThumbnail(hash));
+                assertNotNull(imageDao.getThumbnail(hash));
+            }
+        }
+    }
+
+    @Test
+    void importFolder_parallelDuplicateContentRecordsNewPathWithoutErrors() throws Exception {
+        Path dir = createPhotos(1);
+        CountingEngine engineA = countingEngine();
+        CountingEngine engineB = countingEngine();
+        try (ImportService service = parallelService(2, engineA, engineB)) {
+            service.importFolder(dir, null);
+
+            Path copyDir = Files.createDirectory(tempDir.resolve("dup-copies"));
+            Files.copy(dir.resolve("photo0.png"), copyDir.resolve("same.png"));
+            ImportService.ImportResult result = service.importFolder(copyDir, null);
+
+            assertFalse(result.wasCancelled());
+            assertEquals(1, result.totalFiles());
+            assertEquals(1, result.processed());
+            assertEquals(0, result.newImages());
+            assertEquals(1, result.newPaths());
+            assertEquals(0, result.newFaces());
+            assertEquals(0, result.errors());
+            assertEquals(1, imageDao.getAllHashes().size());
+        }
+    }
+
+    @Test
+    void defaultConfig_hasFourImportThreads() {
+        assertEquals(4, new ConfigModel().getMaxImportThreads());
+        assertEquals(4, ConfigModel.DEFAULT_MAX_IMPORT_THREADS);
+    }
+
+    @Test
+    void importFolder_returnsOnlyAfterAllWorkersFinished() throws Exception {
+        Path dir = createPhotos(6);
+        SleepEngine e1 = new SleepEngine(40);
+        SleepEngine e2 = new SleepEngine(40);
+        ConfigModel c = config();
+        c.setMaxImportThreads(2);
+        long start = System.nanoTime();
+        ImportService.ImportResult result;
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                List.of(new FaceAiService(e1), new FaceAiService(e2)), c)) {
+            result = service.importFolder(dir, null);
+        }
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        // Contract: importFolder returns only when every worker finished.
+        assertEquals(6, result.totalFiles());
+        assertEquals(6, result.processed());
+        assertEquals(0, result.errors());
+        assertEquals(0, e1.active.get() + e2.active.get(),
+                "no worker may still run after importFolder returns");
+        assertEquals(6, imageDao.getAllHashes().size());
+        assertEquals(6, faceDao.findUnnamed().size());
+        for (String hash : imageDao.getAllHashes()) {
+            assertTrue(imageDao.hasThumbnail(hash));
+        }
+
+        // Parallelism sanity: 6 files x 40ms across 2 workers must not serialize (~240ms ideal).
+        assertTrue(elapsedMs < 1500,
+                "import ran too long; workers likely serialized: " + elapsedMs + "ms");
     }
 }

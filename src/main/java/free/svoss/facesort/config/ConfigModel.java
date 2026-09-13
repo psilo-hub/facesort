@@ -13,6 +13,8 @@ public class ConfigModel {
 
     public static final int DEFAULT_THUMBNAIL_SIZE = 256;
     public static final int DEFAULT_MAX_IMPORT_THREADS = 4;
+    /** Hard upper bound for parallel import worker threads. */
+    public static final int MAX_IMPORT_THREADS = 16;
     public static final String DEFAULT_DB_NAME = "facesort.db";
 
     private String lastImportFolder = "";

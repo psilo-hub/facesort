@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -41,6 +42,7 @@ public class SettingsView extends BorderPane {
     private final Spinner<Integer> knnK = intSpinner(1, 100, 1);
     private final TextField faceaiCacheDir = new TextField();
     private final Spinner<Integer> thumbnailSize = intSpinner(64, 1024, 32);
+    private final Spinner<Integer> maxImportThreads = intSpinner(1, ConfigModel.MAX_IMPORT_THREADS, 1);
 
     private final Label statusLabel = new Label("");
 
@@ -80,6 +82,10 @@ public class SettingsView extends BorderPane {
         faceaiCacheDir.setPromptText("Leave blank for the default cache location");
 
         addRow(grid, row, "Thumbnail size:", thumbnailSize);
+
+        addRow(grid, ++row, "Max import threads:", maxImportThreads);
+        maxImportThreads.setTooltip(new Tooltip(
+                "Number of parallel workers used when importing images; applies to the next import."));
 
         Button saveButton = new Button("Save");
         saveButton.setDefaultButton(true);
@@ -122,6 +128,7 @@ public class SettingsView extends BorderPane {
         knnK.getValueFactory().setValue(config.getKnnK());
         faceaiCacheDir.setText(config.getFaceaiCacheDir() == null ? "" : config.getFaceaiCacheDir());
         thumbnailSize.getValueFactory().setValue(config.getThumbnailSize());
+        maxImportThreads.getValueFactory().setValue(config.getMaxImportThreads());
     }
 
     /**
@@ -139,6 +146,7 @@ public class SettingsView extends BorderPane {
         String cacheDir = faceaiCacheDir.getText().trim();
         config.setFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir);
         config.setThumbnailSize(thumbnailSize.getValue());
+        config.setMaxImportThreads(maxImportThreads.getValue());
 
         try {
             AppConfig.save(configPath, config);
@@ -164,6 +172,7 @@ public class SettingsView extends BorderPane {
         config.setKnnK(defaults.getKnnK());
         config.setFaceaiCacheDir(defaults.getFaceaiCacheDir());
         config.setThumbnailSize(defaults.getThumbnailSize());
+        config.setMaxImportThreads(defaults.getMaxImportThreads());
         populateFromConfig();
         statusLabel.setText("Defaults loaded - press Save to persist");
     }

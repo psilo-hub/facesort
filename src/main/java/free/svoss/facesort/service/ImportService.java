@@ -16,11 +16,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,8 +44,11 @@ import java.util.logging.Logger;
  *   <li>Generates a thumbnail if one is not already stored.</li>
  * </ol>
  *
- * <p>Each file is processed independently; errors are counted but do not abort
- * the overall import.</p>
+ * <p>Files are processed concurrently by a pool of worker threads, each with
+ * its own {@link FaceAiService} (face models are not thread-safe). All database
+ * access is serialized through a single lock because the shared SQLite
+ * connection is not thread-safe either. Each file is processed independently;
+ * errors are counted but do not abort the overall import.</p>
  */
 public class ImportService implements AutoCloseable {
 
@@ -56,11 +67,19 @@ public class ImportService implements AutoCloseable {
 
     private final ImageDao imageDao;
     private final FaceDao faceDao;
-    private final FaceAiService faceAiService;
+    private final List<FaceAiService> faceAiServices;
     private final ConfigModel config;
 
     /**
-     * Creates an import service.
+     * Serializes every database access. The shared SQLite connection used by
+     * the DAOs is not thread-safe, so all DAO calls must happen under this
+     * lock even though the files themselves are processed in parallel.
+     */
+    private final Object dbLock = new Object();
+
+    /**
+     * Creates an import service that processes files sequentially through a
+     * single {@link FaceAiService}.
      *
      * @param imageDao      DAO for the images and image_paths tables
      * @param faceDao       DAO for the faces table
@@ -69,10 +88,29 @@ public class ImportService implements AutoCloseable {
      */
     public ImportService(ImageDao imageDao, FaceDao faceDao,
                          FaceAiService faceAiService, ConfigModel config) {
-        this.imageDao = imageDao;
-        this.faceDao = faceDao;
-        this.faceAiService = faceAiService;
-        this.config = config;
+        this(imageDao, faceDao, List.of(faceAiService), config);
+    }
+
+    /**
+     * Creates an import service that processes files in parallel. One worker
+     * thread is started per configured import thread, and each worker uses its
+     * own {@link FaceAiService} from the given list, so at most
+     * {@code faceAiServices.size()} workers can run concurrently.
+     *
+     * @param imageDao      DAO for the images and image_paths tables
+     * @param faceDao       DAO for the faces table
+     * @param faceAiServices one face service per parallel worker (must not be empty)
+     * @param config        application configuration (detection thresholds, etc.)
+     */
+    public ImportService(ImageDao imageDao, FaceDao faceDao,
+                         List<FaceAiService> faceAiServices, ConfigModel config) {
+        this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
+        this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
+        if (faceAiServices == null || faceAiServices.isEmpty()) {
+            throw new IllegalArgumentException("faceAiServices must not be empty");
+        }
+        this.faceAiServices = List.copyOf(faceAiServices);
+        this.config = Objects.requireNonNull(config, "config");
     }
 
     /**
@@ -91,7 +129,10 @@ public class ImportService implements AutoCloseable {
      * Recursively imports all supported image files from the given folder.
      *
      * <p>The import stops between files as soon as {@code cancelled} reports
-     * {@code true}; files already processed remain in the database.</p>
+     * {@code true}; files already processed remain in the database. When
+     * multiple workers are active, the run may complete the files that were
+     * already in flight, so the reported {@code processed} count can exceed
+     * the number of files completed by the time cancellation is noticed.</p>
      *
      * @param folder    the root directory to scan
      * @param progress  listener for progress messages (may be {@code null})
@@ -102,83 +143,164 @@ public class ImportService implements AutoCloseable {
      */
     public ImportResult importFolder(Path folder, ProgressListener progress,
                                      BooleanSupplier cancelled) throws IOException {
-        int newImages = 0;
-        int newPaths = 0;
-        int newFaces = 0;
-        int skipped = 0;
-        int errors = 0;
-        int processed = 0;
-
         List<Path> imageFiles = collectImageFiles(folder, cancelled);
+        if (imageFiles.isEmpty()) {
+            return new ImportResult(0, 0, 0, 0, 0, 0, 0,
+                    cancelled != null && cancelled.getAsBoolean());
+        }
         int total = imageFiles.size();
+
+        int threads = Math.min(Math.max(1, config.getMaxImportThreads()), faceAiServices.size());
 
         int minBbox = config.getMinBoundingBoxSize();
         double minConfidence = config.getMinConfidence();
         int maxFacesPerImage = config.getMaxFacesPerImage();
         String criteriaJson = buildCriteriaJson(minBbox, minConfidence, maxFacesPerImage);
 
-        for (int i = 0; i < total; i++) {
-            if (cancelled != null && cancelled.getAsBoolean()) {
-                break;
-            }
-            Path file = imageFiles.get(i);
+        AtomicInteger nextFile = new AtomicInteger();
+        AtomicInteger newImages = new AtomicInteger();
+        AtomicInteger newPaths = new AtomicInteger();
+        AtomicInteger newFaces = new AtomicInteger();
+        AtomicInteger skipped = new AtomicInteger();
+        AtomicInteger errors = new AtomicInteger();
+        AtomicInteger processed = new AtomicInteger();
+        AtomicBoolean stopped = new AtomicBoolean();
 
-            if (progress != null) {
-                progress.onProgress(String.format(Locale.ROOT,
-                        "Processing %d/%d: %s", i + 1, total, file.getFileName()));
+        AtomicInteger workerIds = new AtomicInteger();
+        ExecutorService pool = Executors.newFixedThreadPool(threads, runnable -> {
+            Thread thread = new Thread(runnable,
+                    "import-worker-" + workerIds.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        });
+        List<Future<?>> futures = new ArrayList<>();
+        try {
+            for (int w = 0; w < threads; w++) {
+                final FaceAiService service = faceAiServices.get(w % faceAiServices.size());
+                futures.add(pool.submit(() -> runWorker(service, imageFiles, total, criteriaJson,
+                        minBbox, minConfidence, maxFacesPerImage, progress, cancelled,
+                        nextFile, newImages, newPaths, newFaces, skipped, errors,
+                        processed, stopped)));
             }
-
-            try {
-                FileResult result = processFile(file, criteriaJson,
-                        minBbox, minConfidence, maxFacesPerImage);
-                if (result.newImage) {
-                    newImages++;
-                }
-                if (result.newPath) {
-                    newPaths++;
-                }
-                if (result.skipped) {
-                    skipped++;
-                }
-                newFaces += result.facesAdded;
-            } catch (Exception e) {
-                LOG.log(Level.WARNING, "Error processing file: " + file, e);
-                errors++;
-            }
-            processed++;
+        } finally {
+            pool.shutdown();
+            awaitWorkerCompletion(futures);
         }
 
-        boolean wasCancelled = cancelled != null && cancelled.getAsBoolean();
-        return new ImportResult(total, newImages, newPaths, newFaces, skipped, errors,
-                processed, wasCancelled);
+        boolean wasCancelled = stopped.get()
+                || (cancelled != null && cancelled.getAsBoolean());
+        return new ImportResult(total, newImages.get(), newPaths.get(), newFaces.get(),
+                skipped.get(), errors.get(), processed.get(), wasCancelled);
+    }
+
+    /**
+     * Single worker loop: pulls file indices from the shared counter until the
+     * import is cancelled or all files are processed.
+     */
+    private void runWorker(FaceAiService service, List<Path> imageFiles, int total,
+                           String criteriaJson, int minBbox, double minConfidence,
+                           int maxFacesPerImage, ProgressListener progress,
+                           BooleanSupplier cancelled, AtomicInteger nextFile,
+                           AtomicInteger newImages, AtomicInteger newPaths,
+                           AtomicInteger newFaces, AtomicInteger skipped,
+                           AtomicInteger errors, AtomicInteger processed,
+                           AtomicBoolean stopped) {
+        for (int i = nextFile.getAndIncrement(); i < total; i = nextFile.getAndIncrement()) {
+            if (cancelled != null && cancelled.getAsBoolean()) {
+                stopped.set(true);
+                return;
+            }
+            Path file = imageFiles.get(i);
+            int index = i + 1;
+            reportProgress(progress, String.format(Locale.ROOT,
+                    "Started %d/%d: %s", index, total, file.getFileName()));
+            try {
+                FileResult result = processFile(file, criteriaJson, minBbox, minConfidence,
+                        maxFacesPerImage, service);
+                if (result.newImage) {
+                    newImages.incrementAndGet();
+                }
+                if (result.newPath) {
+                    newPaths.incrementAndGet();
+                }
+                if (result.skipped) {
+                    skipped.incrementAndGet();
+                }
+                newFaces.addAndGet(result.facesAdded);
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "Error processing file: " + file, e);
+                errors.incrementAndGet();
+            }
+            processed.incrementAndGet();
+            reportProgress(progress, String.format(Locale.ROOT,
+                    "Completed %d/%d: %s", index, total, file.getFileName()));
+        }
+    }
+
+    private static void reportProgress(ProgressListener progress, String message) {
+        if (progress != null) {
+            synchronized (progress) {
+                progress.onProgress(message);
+            }
+        }
+    }
+
+    /**
+     * Blocks until every worker future completes. Unbounded: {@code importFolder}
+     * must not report completion while workers are still importing. An interruption
+     * (JVM shutdown) stops the join and returns the current aggregate; a worker
+     * that dies unexpectedly is logged and the remaining workers are still joined.
+     */
+    private static void awaitWorkerCompletion(List<Future<?>> futures) {
+        for (Future<?> future : futures) {
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (ExecutionException e) {
+                LOG.log(Level.SEVERE, "Import worker failed unexpectedly", e.getCause());
+            }
+        }
     }
 
     /**
      * Processes a single image file: detect faces, store new records, record paths.
      */
     private FileResult processFile(Path file, String criteriaJson,
-                                   int minBbox, double minConfidence, int maxFacesPerImage)
-            throws Exception {
+                                   int minBbox, double minConfidence, int maxFacesPerImage,
+                                   FaceAiService service) throws Exception {
 
         String hash = HashUtils.hashFile(file);
         String absolutePath = file.toAbsolutePath().toString();
 
-        // Check if this image hash is already known
-        if (imageDao.exists(hash)) {
-            List<String> existingPaths = imageDao.getPaths(hash);
-            if (existingPaths.contains(absolutePath)) {
-                // Image + path already known — skip entirely
-                return FileResult.skipped();
+        // ---- Known-image branch: one synchronized unit ----
+        boolean knownImage;
+        boolean needThumbnail;
+        synchronized (dbLock) {
+            if (imageDao.exists(hash)) {
+                List<String> existingPaths = imageDao.getPaths(hash);
+                if (existingPaths.contains(absolutePath)) {
+                    return FileResult.skipped();
+                }
+                imageDao.addPath(hash, absolutePath);
+                needThumbnail = !imageDao.hasThumbnail(hash);
+                knownImage = true;
+            } else {
+                knownImage = false;
+                needThumbnail = false;
             }
-            // Known image, new path — record it and ensure thumbnail exists
-            imageDao.addPath(hash, absolutePath);
-            generateThumbnailIfAbsent(hash, file);
+        }
+        if (knownImage) {
+            if (needThumbnail) {
+                generateThumbnailIfAbsent(hash, file);
+            }
             return FileResult.newPath();
         }
 
-        // New image: read, detect, store
+        // ---- New-image branch: heavy work outside the lock ----
         BufferedImage image = ImageUtils.readImage(file);
-        DetectedFace[] allFaces = faceAiService.detectFaces(image);
+        DetectedFace[] allFaces = service.detectFaces(image);
 
         // Filter faces by criteria
         List<DetectedFace> qualifying = Arrays.stream(allFaces)
@@ -187,26 +309,22 @@ public class ImportService implements AutoCloseable {
                 .limit(maxFacesPerImage)
                 .toList();
 
-        // Insert image row (detection_ts = now, face_count = qualifying size)
-        imageDao.insert(hash, System.currentTimeMillis(), criteriaJson, qualifying.size());
-        imageDao.addPath(hash, absolutePath);
-
-        // Process each qualifying face
+        // Encode face sub-images before touching the database
+        List<FaceRecord> faceRecords = new ArrayList<>();
         int facesAdded = 0;
         for (DetectedFace face : qualifying) {
             try {
                 BufferedImage faceCrop = face.crop(image);
-                float[] embedding = faceAiService.getEmbedding(faceCrop);
+                float[] embedding = service.getEmbedding(faceCrop);
 
                 // Downsize the crop and encode as JPEG for storage
                 BufferedImage downsized = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
                 byte[] subImageJpg = ImageUtils.toJpegBytes(downsized, SUB_IMAGE_JPEG_QUALITY);
 
-                FaceRecord faceRecord = new FaceRecord(
+                faceRecords.add(new FaceRecord(
                         0, hash,
                         face.x(), face.y(), face.width(), face.height(),
-                        face.confidence(), embedding, subImageJpg, null);
-                faceDao.insert(faceRecord);
+                        face.confidence(), embedding, subImageJpg, null));
                 facesAdded++;
             } catch (Exception e) {
                 LOG.log(Level.WARNING,
@@ -214,27 +332,89 @@ public class ImportService implements AutoCloseable {
             }
         }
 
-        // Generate thumbnail for the full image
-        generateThumbnailIfAbsent(hash, file);
+        // ---- One synchronized commit unit ----
+        synchronized (dbLock) {
+            try {
+                imageDao.insert(hash, System.currentTimeMillis(), criteriaJson,
+                        faceRecords.size());
+            } catch (SQLException e) {
+                // Another worker imported the same content first: record only
+                // the additional path for this file.
+                if (!imageDao.exists(hash)) {
+                    throw e;
+                }
+                List<String> existingPaths = imageDao.getPaths(hash);
+                if (!existingPaths.contains(absolutePath)) {
+                    imageDao.addPath(hash, absolutePath);
+                }
+                if (!imageDao.hasThumbnail(hash)) {
+                    generateThumbnailIfAbsent(hash, file);
+                }
+                return FileResult.newPath();
+            }
+            imageDao.addPath(hash, absolutePath);
+            for (FaceRecord faceRecord : faceRecords) {
+                faceDao.insert(faceRecord);
+            }
+        }
+
+        // Generate thumbnail for the full image (reusing the loaded image)
+        generateThumbnailIfAbsent(hash, image);
 
         return FileResult.newImage(facesAdded);
     }
 
     /**
      * Generates a JPEG thumbnail for the image if one is not already stored.
+     * Database lookups and writes are serialized; image encoding happens
+     * outside the lock.
+     *
+     * @param hash  content hash of the image
+     * @param image already-loaded image to derive the thumbnail from
+     */
+    private void generateThumbnailIfAbsent(String hash, BufferedImage image) throws Exception {
+        if (thumbnailPresent(hash)) {
+            return;
+        }
+        byte[] thumbJpg = encodeThumbnail(image);
+        saveThumbnailIfAbsent(hash, thumbJpg);
+    }
+
+    /**
+     * Generates a JPEG thumbnail for the image if one is not already stored.
+     * Database lookups and writes are serialized; decoding the image and
+     * encoding the thumbnail happen outside the lock.
      *
      * @param hash content hash of the image
      * @param file path to the image file on disk
      */
     private void generateThumbnailIfAbsent(String hash, Path file) throws Exception {
-        if (imageDao.hasThumbnail(hash)) {
+        if (thumbnailPresent(hash)) {
             return;
         }
         BufferedImage image = ImageUtils.readImage(file);
+        byte[] thumbJpg = encodeThumbnail(image);
+        saveThumbnailIfAbsent(hash, thumbJpg);
+    }
+
+    private boolean thumbnailPresent(String hash) throws SQLException {
+        synchronized (dbLock) {
+            return imageDao.hasThumbnail(hash);
+        }
+    }
+
+    private void saveThumbnailIfAbsent(String hash, byte[] thumbJpg) throws SQLException {
+        synchronized (dbLock) {
+            if (!imageDao.hasThumbnail(hash)) {
+                imageDao.saveThumbnail(hash, thumbJpg);
+            }
+        }
+    }
+
+    private byte[] encodeThumbnail(BufferedImage image) throws IOException {
         int thumbSize = config.getThumbnailSize();
         BufferedImage thumbnail = ImageUtils.downsize(image, thumbSize);
-        byte[] thumbJpg = ImageUtils.toJpegBytes(thumbnail, 0.85f);
-        imageDao.saveThumbnail(hash, thumbJpg);
+        return ImageUtils.toJpegBytes(thumbnail, SUB_IMAGE_JPEG_QUALITY);
     }
 
     // ---- File collection ----
@@ -303,7 +483,21 @@ public class ImportService implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
-        faceAiService.close();
+        Exception failure = null;
+        for (FaceAiService service : faceAiServices) {
+            try {
+                service.close();
+            } catch (Exception e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     // ---- Public inner types ----
