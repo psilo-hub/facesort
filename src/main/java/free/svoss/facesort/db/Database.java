@@ -1,0 +1,126 @@
+package free.svoss.facesort.db;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.nio.file.Path;
+
+/**
+ * Manages SQLite database connection and schema initialization.
+ */
+public class Database implements AutoCloseable {
+
+    private final Connection connection;
+
+    /**
+     * Opens or creates a database at the given path.
+     * Enables foreign keys and initializes the schema.
+     */
+    public Database(Path dbPath) throws SQLException {
+        String url = "jdbc:sqlite:" + dbPath.toAbsolutePath();
+        this.connection = DriverManager.getConnection(url);
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("PRAGMA foreign_keys = ON");
+        }
+        initializeSchema();
+    }
+
+    /**
+     * Opens an in-memory database (for testing).
+     */
+    public static Database inMemory() throws SQLException {
+        Database db = new Database();
+        return db;
+    }
+
+    private Database() throws SQLException {
+        this.connection = DriverManager.getConnection("jdbc:sqlite::memory:");
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("PRAGMA foreign_keys = ON");
+        }
+        initializeSchema();
+    }
+
+    /**
+     * Returns the raw JDBC connection.
+     */
+    public Connection getConnection() {
+        return connection;
+    }
+
+    private void initializeSchema() throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS images (
+                    hash            TEXT PRIMARY KEY,
+                    detection_ts    INTEGER,
+                    criteria_json   TEXT,
+                    face_count      INTEGER DEFAULT 0
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS image_paths (
+                    hash  TEXT NOT NULL,
+                    path  TEXT NOT NULL,
+                    PRIMARY KEY (hash, path),
+                    FOREIGN KEY (hash) REFERENCES images(hash) ON DELETE CASCADE
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS thumbnails (
+                    hash        TEXT PRIMARY KEY,
+                    jpg_data    BLOB NOT NULL,
+                    FOREIGN KEY (hash) REFERENCES images(hash) ON DELETE CASCADE
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS names (
+                    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS faces (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    image_hash      TEXT NOT NULL,
+                    bbox_x          INTEGER NOT NULL,
+                    bbox_y          INTEGER NOT NULL,
+                    bbox_w          INTEGER NOT NULL,
+                    bbox_h          INTEGER NOT NULL,
+                    confidence      REAL NOT NULL,
+                    embedding       BLOB NOT NULL,
+                    sub_image_jpg   BLOB NOT NULL,
+                    name_id         INTEGER,
+                    FOREIGN KEY (image_hash) REFERENCES images(hash) ON DELETE CASCADE,
+                    FOREIGN KEY (name_id) REFERENCES names(id) ON DELETE SET NULL,
+                    UNIQUE (image_hash, bbox_x, bbox_y, bbox_w, bbox_h)
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS not_dupes (
+                    name_id_a  INTEGER NOT NULL,
+                    name_id_b  INTEGER NOT NULL,
+                    PRIMARY KEY (name_id_a, name_id_b),
+                    FOREIGN KEY (name_id_a) REFERENCES names(id) ON DELETE CASCADE,
+                    FOREIGN KEY (name_id_b) REFERENCES names(id) ON DELETE CASCADE
+                )
+                """);
+
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
+        }
+    }
+
+    @Override
+    public void close() throws SQLException {
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
+        }
+    }
+}

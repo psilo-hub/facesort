@@ -1,0 +1,266 @@
+package free.svoss.facesort.ui;
+
+import free.svoss.facesort.config.AppConfig;
+import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.service.ImportService;
+
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Window;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+
+/**
+ * The Import tab: pick a folder, run the import pipeline, watch progress.
+ *
+ * <p>The view owns no business logic; it delegates all work to
+ * {@link ImportService}. Importing runs on a background thread via a
+ * {@link Task}, progress messages are forwarded to the log area on the
+ * JavaFX application thread, and the summary {@link ImportService.ImportResult}
+ * is displayed in the status label when the run finishes.</p>
+ *
+ * <p>While an import runs, a Stop button can request cancellation: the service
+ * honors it between files and during folder scanning, and already-imported rows
+ * are kept.</p>
+ */
+public class ImportView extends BorderPane {
+
+    private final ImportService importService;
+    private final ConfigModel config;
+
+    private final TextField folderField = new TextField();
+    private final Button browseButton = new Button("Browse...");
+    private final Button importButton = new Button("Import");
+    private final Button stopButton = new Button("Stop");
+    private final ProgressBar progressBar = new ProgressBar(0);
+    private final TextArea logArea = new TextArea();
+    private final Label statusLabel = new Label("Ready.");
+
+    private volatile boolean cancelRequested;
+
+    /**
+     * Creates the Import tab.
+     *
+     * @param importService the import pipeline; must not be null
+     * @param config        application configuration used to remember the last
+     *                      import folder; must not be null
+     */
+    public ImportView(ImportService importService, ConfigModel config) {
+        this.importService = importService;
+        this.config = config;
+        buildUi();
+        restoreLastFolder();
+    }
+
+    /**
+     * Builds the folder picker, import/stop buttons, progress bar, log and status.
+     */
+    private void buildUi() {
+        // Top: folder selection + import/stop buttons
+        Label folderLabel = new Label("Folder:");
+        folderField.setPromptText("Select a folder of photos");
+        HBox.setHgrow(folderField, Priority.ALWAYS);
+        browseButton.setOnAction(e -> onBrowse());
+        importButton.setDefaultButton(true);
+        importButton.setOnAction(e -> onImport());
+        stopButton.setDisable(true);
+        stopButton.setOnAction(e -> onStop());
+
+        HBox topBar = new HBox(8, folderLabel, folderField, browseButton, importButton, stopButton);
+        topBar.setPadding(new Insets(10));
+        topBar.setAlignment(Pos.CENTER_LEFT);
+
+        // Center: log area with progress bar above it
+        logArea.setEditable(false);
+        logArea.setWrapText(true);
+        logArea.setPromptText("Import log will appear here.");
+        VBox.setVgrow(logArea, Priority.ALWAYS);
+
+        progressBar.setMaxWidth(Double.MAX_VALUE);
+        VBox center = new VBox(6, progressBar, logArea);
+        center.setPadding(new Insets(0, 10, 10, 10));
+
+        // Bottom: status summary
+        statusLabel.setWrapText(true);
+        BorderPane.setMargin(statusLabel, new Insets(0, 10, 10, 10));
+
+        setTop(topBar);
+        setCenter(center);
+        setBottom(statusLabel);
+    }
+
+    /**
+     * Restores the last import folder from the configuration, if any.
+     */
+    private void restoreLastFolder() {
+        String last = config.getLastImportFolder();
+        if (last != null && !last.isBlank()) {
+            folderField.setText(last);
+        }
+    }
+
+    /**
+     * Opens a directory chooser and stores the selection in the folder field.
+     */
+    private void onBrowse() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select Photo Folder");
+        String current = folderField.getText();
+        if (current != null && !current.isBlank()) {
+            Path path = Path.of(current);
+            if (Files.isDirectory(path)) {
+                chooser.setInitialDirectory(path.toFile());
+            }
+        }
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        java.io.File selected = chooser.showDialog(owner);
+        if (selected != null) {
+            folderField.setText(selected.getAbsolutePath());
+        }
+    }
+
+    /**
+     * Starts the import in the background when the Import button is pressed.
+     */
+    private void onImport() {
+        Path folder = Path.of(folderField.getText().trim());
+        if (!Files.isDirectory(folder)) {
+            statusLabel.setText("Please pick a valid folder first.");
+            return;
+        }
+        startImport(folder);
+    }
+
+    /**
+     * Requests the running import to stop as soon as the current image is done.
+     */
+    private void onStop() {
+        cancelRequested = true;
+        stopButton.setDisable(true);
+        appendLog("Stop requested - finishing the current image...");
+    }
+
+    /**
+     * Runs the import pipeline on a background thread, streaming progress
+     * messages to the log area and showing the summary when complete.
+     *
+     * @param folder the root directory to scan
+     */
+    private void startImport(Path folder) {
+        rememberFolder(folder);
+        cancelRequested = false;
+
+        setBusy(true);
+        statusLabel.setText("Scanning...");
+        progressBar.setProgress(-1);
+        appendLog("Importing from: " + folder.toAbsolutePath());
+
+        Task<ImportService.ImportResult> task = new Task<>() {
+            @Override
+            protected ImportService.ImportResult call() throws Exception {
+                return importService.importFolder(folder, message ->
+                        Platform.runLater(() -> appendLog(message)), () -> cancelRequested);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ImportService.ImportResult result = task.getValue();
+            setBusy(false);
+            cancelRequested = false;
+            if (result.wasCancelled()) {
+                progressBar.setProgress(result.totalFiles() > 0
+                        ? (double) result.processed() / result.totalFiles() : 0);
+                statusLabel.setText(String.format(Locale.ROOT,
+                        "Import stopped after %d of %d images.",
+                        result.processed(), result.totalFiles()));
+                appendLog("Import stopped.");
+            } else {
+                progressBar.setProgress(1);
+                statusLabel.setText(formatSummary(result));
+                appendLog("Import finished.");
+            }
+        });
+
+        task.setOnFailed(e -> {
+            setBusy(false);
+            cancelRequested = false;
+            progressBar.setProgress(0);
+            Throwable error = task.getException();
+            if (error instanceof IOException) {
+                statusLabel.setText("Import failed: " + error.getMessage());
+            } else {
+                statusLabel.setText("Import failed: " + error);
+            }
+            appendLog("Import failed: " + error);
+        });
+
+        Thread thread = new Thread(task, "import-worker");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
+     * Disables the picker and import controls (and re-enables Stop) while a
+     * scan runs; restores them when the run finishes.
+     *
+     * @param busy {@code true} while a scan is running
+     */
+    private void setBusy(boolean busy) {
+        browseButton.setDisable(busy);
+        importButton.setDisable(busy);
+        folderField.setDisable(busy);
+        stopButton.setDisable(!busy);
+    }
+
+    /**
+     * Remembers the chosen folder in the config and persists it.
+     *
+     * @param folder the folder being imported
+     */
+    private void rememberFolder(Path folder) {
+        config.setLastImportFolder(folder.toAbsolutePath().toString());
+        try {
+            AppConfig.save(Path.of(AppConfig.DEFAULT_CONFIG_FILE), config);
+        } catch (IOException e) {
+            // Remembering the folder is best-effort; do not fail the import.
+            appendLog("Could not save config: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Appends a line to the log area (must be called on the FX thread).
+     *
+     * @param line the message to append
+     */
+    private void appendLog(String line) {
+        logArea.appendText(line + System.lineSeparator());
+    }
+
+    /**
+     * Formats the import summary as a single status line.
+     *
+     * @param result the import result
+     * @return a human-readable summary string
+     */
+    private static String formatSummary(ImportService.ImportResult result) {
+        return String.format(Locale.ROOT,
+                "Total: %d, New images: %d, New paths: %d, New faces: %d, Skipped: %d, Errors: %d",
+                result.totalFiles(), result.newImages(), result.newPaths(),
+                result.newFaces(), result.skipped(), result.errors());
+    }
+}

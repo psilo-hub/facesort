@@ -1,0 +1,159 @@
+package free.svoss.facesort.config;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * Serializable settings model for the Face Sort application.
+ *
+ * <p>The field names match the keys written to {@code config/facesort-config.json}.
+ * All fields have defaults so the application works out of the box when the
+ * config file is absent or partially filled in.</p>
+ */
+public class ConfigModel {
+
+    public static final int DEFAULT_THUMBNAIL_SIZE = 256;
+    public static final int DEFAULT_MAX_IMPORT_THREADS = 4;
+    public static final String DEFAULT_DB_NAME = "facesort.db";
+
+    private String lastImportFolder = "";
+
+    // Face detection criteria
+    @JsonProperty("minBoundingBoxSize")
+    private int minBoundingBoxSize = 80;
+    @JsonProperty("minConfidence")
+    private double minConfidence = 0.8;
+    @JsonProperty("maxFacesPerImage")
+    private int maxFacesPerImage = 10;
+
+    // Clustering
+    @JsonProperty("clusteringThreshold")
+    private double clusteringThreshold = 0.5;
+    @JsonProperty("hnswM")
+    private int hnswM = 16;
+    @JsonProperty("hnswEfConstruction")
+    private int hnswEfConstruction = 200;
+    @JsonProperty("hnswEfSearch")
+    private int hnswEfSearch = 100;
+    @JsonProperty("knnK")
+    private int knnK = 20;
+
+    // FaceAI model cache
+    @JsonProperty("faceaiCacheDir")
+    private String faceaiCacheDir;
+
+    // App settings
+    @JsonProperty("thumbnailSize")
+    private int thumbnailSize = DEFAULT_THUMBNAIL_SIZE;
+    @JsonProperty("maxImportThreads")
+    private int maxImportThreads = DEFAULT_MAX_IMPORT_THREADS;
+    @JsonProperty("dbName")
+    private String dbName = DEFAULT_DB_NAME;
+
+    public ConfigModel() {
+        // No-arg constructor required by Jackson for deserialization.
+    }
+
+    public String getLastImportFolder() {
+        return lastImportFolder;
+    }
+
+    public void setLastImportFolder(String lastImportFolder) {
+        this.lastImportFolder = lastImportFolder;
+    }
+
+    public int getMinBoundingBoxSize() {
+        return minBoundingBoxSize;
+    }
+
+    public void setMinBoundingBoxSize(int minBoundingBoxSize) {
+        this.minBoundingBoxSize = minBoundingBoxSize;
+    }
+
+    public double getMinConfidence() {
+        return minConfidence;
+    }
+
+    public void setMinConfidence(double minConfidence) {
+        this.minConfidence = minConfidence;
+    }
+
+    public int getMaxFacesPerImage() {
+        return maxFacesPerImage;
+    }
+
+    public void setMaxFacesPerImage(int maxFacesPerImage) {
+        this.maxFacesPerImage = maxFacesPerImage;
+    }
+
+    public double getClusteringThreshold() {
+        return clusteringThreshold;
+    }
+
+    public void setClusteringThreshold(double clusteringThreshold) {
+        this.clusteringThreshold = clusteringThreshold;
+    }
+
+    public int getHnswM() {
+        return hnswM;
+    }
+
+    public void setHnswM(int hnswM) {
+        this.hnswM = hnswM;
+    }
+
+    public int getHnswEfConstruction() {
+        return hnswEfConstruction;
+    }
+
+    public void setHnswEfConstruction(int hnswEfConstruction) {
+        this.hnswEfConstruction = hnswEfConstruction;
+    }
+
+    public int getHnswEfSearch() {
+        return hnswEfSearch;
+    }
+
+    public void setHnswEfSearch(int hnswEfSearch) {
+        this.hnswEfSearch = hnswEfSearch;
+    }
+
+    public int getKnnK() {
+        return knnK;
+    }
+
+    public void setKnnK(int knnK) {
+        this.knnK = knnK;
+    }
+
+    public String getFaceaiCacheDir() {
+        return faceaiCacheDir;
+    }
+
+    public void setFaceaiCacheDir(String faceaiCacheDir) {
+        this.faceaiCacheDir = faceaiCacheDir;
+    }
+
+    public int getThumbnailSize() {
+        return thumbnailSize;
+    }
+
+    public void setThumbnailSize(int thumbnailSize) {
+        this.thumbnailSize = thumbnailSize;
+    }
+
+    public int getMaxImportThreads() {
+        return maxImportThreads;
+    }
+
+    public void setMaxImportThreads(int maxImportThreads) {
+        this.maxImportThreads = maxImportThreads;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public void setDbName(String dbName) {
+        this.dbName = dbName;
+    }
+}

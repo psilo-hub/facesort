@@ -1,0 +1,126 @@
+package free.svoss.facesort.service;
+
+import free.svoss.facesort.db.Database;
+import free.svoss.facesort.db.FaceDao;
+import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.SimilarityResult;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.sql.SQLException;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Behavioral tests for {@link FaceToNameService}: ranking unnamed faces by
+ * similarity to a name's average embedding, and batch tagging.
+ */
+class FaceToNameServiceTest {
+
+    private Database db;
+    private FaceDao faceDao;
+    private NameDao nameDao;
+    private FaceToNameService service;
+
+    @BeforeEach
+    void setUp() throws SQLException {
+        db = Database.inMemory();
+        faceDao = new FaceDao(db.getConnection());
+        nameDao = new NameDao(db.getConnection());
+        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao);
+    }
+
+    @AfterEach
+    void tearDown() throws SQLException {
+        db.close();
+    }
+
+    private long addImageAndFace(String imageHash, float[] embedding, Long nameId) throws SQLException {
+        new ImageDao(db.getConnection()).insert(imageHash, 0, "{}", 1);
+        return faceDao.insert(new FaceRecord(
+                0, imageHash, 10, 10, 80, 80, 0.9, embedding, new byte[]{1}, nameId));
+    }
+
+    private static float[] xLike() {
+        return new float[]{1, 0, 0, 0, 0, 0, 0, 0};
+    }
+
+    private static float[] yLike() {
+        return new float[]{0, 1, 0, 0, 0, 0, 0, 0};
+    }
+
+    @Test
+    void findUnnamedForName_ranksMostSimilarUnnamedFaceFirst() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        long close = addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", yLike(), null);
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10);
+
+        assertEquals(2, results.size());
+        assertEquals(close, results.get(0).faceRecord().id());
+        assertTrue(results.get(0).similarity() >= results.get(1).similarity(),
+                "results must be sorted by descending similarity");
+    }
+
+    @Test
+    void findUnnamedForName_respectsLimit() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", yLike(), null);
+
+        List<SimilarityResult> limited = service.findUnnamedForName(alice, 1);
+
+        assertEquals(1, limited.size());
+    }
+
+    @Test
+    void findUnnamedForName_emptyWhenNameHasNoFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgU1", xLike(), null);
+
+        assertTrue(service.findUnnamedForName(alice, 10).isEmpty());
+    }
+
+    @Test
+    void findUnnamedForName_nonPositiveLimitReturnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgU1", xLike(), null);
+
+        assertTrue(service.findUnnamedForName(alice, 0).isEmpty());
+        assertTrue(service.findUnnamedForName(alice, -1).isEmpty());
+    }
+
+    @Test
+    void tagFaces_assignsNameToMultipleFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long f1 = addImageAndFace("imgU1", xLike(), null);
+        long f2 = addImageAndFace("imgU2", xLike(), null);
+
+        service.tagFaces(List.of(f1, f2), alice);
+
+        assertEquals(2, faceDao.findByNameId(alice).size());
+        assertTrue(faceDao.findUnnamed().isEmpty());
+    }
+
+    @Test
+    void getAllNames_returnsNamesFromDatabase() throws SQLException {
+        nameDao.insert("Bob");
+        nameDao.insert("Alice");
+
+        List<free.svoss.facesort.model.NameRecord> names = service.getAllNames();
+
+        assertEquals(2, names.size());
+        assertEquals("Alice", names.get(0).name());
+        assertEquals("Bob", names.get(1).name());
+    }
+}

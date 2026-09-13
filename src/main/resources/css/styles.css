@@ -1,0 +1,137 @@
+/*
+ * Application-wide styles for the Face Sort application.
+ */
+
+.root {
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 14px;
+}
+
+/* ---- Face thumbnails ---- */
+
+.face-thumbnail {
+    -fx-border-color: #dddddd;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-background-color: white;
+    -fx-padding: 2px;
+}
+
+.face-thumbnail.selected {
+    -fx-border-color: #4a90d9;
+    -fx-border-width: 3px;
+}
+
+/* ---- Tab panes ---- */
+
+.tab-pane {
+    -fx-padding: 8px;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 6px 6px 0 6px;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-padding: 12px;
+}
+
+.tab-label {
+    -fx-padding: 6px 16px;
+}
+
+/* ---- Name cards (View grid items) ---- */
+
+.name-card {
+    -fx-alignment: center;
+    -fx-padding: 8px;
+    -fx-border-color: #cccccc;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-background-color: white;
+    -fx-spacing: 6px;
+}
+
+.name-card:hover {
+    -fx-border-color: #4a90d9;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(74, 144, 217, 0.35), 8, 0, 0, 2);
+}
+
+.name-card .name-label {
+    -fx-font-weight: bold;
+}
+
+.name-card .count-label {
+    -fx-text-fill: #666666;
+}
+
+/* ---- Buttons ---- */
+
+.button {
+    -fx-padding: 6px 14px;
+    -fx-background-radius: 4px;
+}
+
+.button.primary {
+    -fx-background-color: #4a90d9;
+    -fx-text-fill: white;
+}
+
+.button.primary:hover {
+    -fx-background-color: #3a7bc8;
+}
+
+.button.primary:pressed {
+    -fx-background-color: #3269a8;
+}
+
+/* ---- Face grids ---- */
+
+.grid-of-faces {
+    -fx-hgap: 10px;
+    -fx-vgap: 10px;
+    -fx-padding: 8px;
+}
+
+/* ---- Scroll panes ---- */
+
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ---- Face candidates (Face Name tab) ---- */
+
+.candidate-card {
+    -fx-background-color: #f8f8fc;
+    -fx-background-radius: 6;
+    -fx-border-color: #dddddd;
+    -fx-border-radius: 6;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+    -fx-cursor: hand;
+    -fx-alignment: top-center;
+    -fx-spacing: 4px;
+}
+
+.candidate-card:hover {
+    -fx-border-color: #4a90d9;
+}
+
+.candidate-card.selected {
+    -fx-background-color: #e8f0fb;
+    -fx-border-color: #4a90d9;
+    -fx-border-width: 2px;
+}
+
+.candidate-card .candidate-check {
+    -fx-text-fill: #4a90d9;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
