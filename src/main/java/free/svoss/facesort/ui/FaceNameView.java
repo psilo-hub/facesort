@@ -192,8 +192,6 @@ public class FaceNameView extends BorderPane {
             VBox card = new VBox(4);
             card.setAlignment(Pos.TOP_CENTER);
             card.setPadding(new Insets(4));
-            card.setStyle("-fx-background-color: #f8f8fc; -fx-background-radius: 6;"
-                    + " -fx-border-color: #ddd; -fx-border-radius: 6;");
             card.setUserData(face.id());
             card.getStyleClass().add("candidate-card");
 
