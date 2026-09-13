@@ -12,6 +12,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
@@ -72,6 +73,19 @@ public class FaceNameView extends BorderPane {
      */
     private void buildUi() {
         nameList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        nameList.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(NameRecord name, boolean empty) {
+                super.updateItem(name, empty);
+                if (empty || name == null) {
+                    setText(null);
+                } else if (name.faceCount() <= 0) {
+                    setText(name.name());
+                } else {
+                    setText(name.name() + " (" + name.faceCount() + ")");
+                }
+            }
+        });
         nameList.setPrefWidth(220);
         nameList.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldName, newName) -> {
