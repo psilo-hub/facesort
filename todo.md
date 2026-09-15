@@ -18,7 +18,7 @@
 
 ## Phase 2: GitHub Actions Workflow
 
-- [ ] 14. Create `.github/workflows/build.yml` with matrix builds and release job
+- [x] 14. Create `.github/workflows/build.yml` with matrix builds and release job
 
 ## Phase 3: Final Verification
 

@@ -1,0 +1,83 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-fat:
+    name: Build fat jar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: mvn -B package -DskipTests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: facesort-fat
+          path: target/facesort-1.0-SNAPSHOT.jar
+          if-no-files-found: error
+
+  build-platform:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-latest
+            javafx-platform: linux
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+            javafx-platform: linux-aarch64
+          - platform: mac-aarch64
+            os: macos-latest
+            javafx-platform: mac-aarch64
+          - platform: mac-x86_64
+            os: macos-13
+            javafx-platform: mac
+          - platform: win-x86_64
+            os: windows-latest
+            javafx-platform: win
+          - platform: win-aarch64
+            os: windows-11-arm
+            javafx-platform: win-aarch64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build platform jar
+        run: mvn -B package -P${{ matrix.platform }} -Djavafx.platform=${{ matrix.javafx-platform }} -DskipTests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: facesort-${{ matrix.platform }}
+          path: target/facesort-1.0-SNAPSHOT-${{ matrix.platform }}.jar
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [ build-fat, build-platform ]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          files: artifacts/*
+          generate_release_notes: true
