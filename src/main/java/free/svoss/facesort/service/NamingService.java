@@ -83,6 +83,25 @@ public final class NamingService {
     }
 
     /**
+     * Returns up to {@code limit} random unnamed faces, for review-and-tag
+     * browsing.
+     *
+     * @param limit maximum number of faces; must not be negative
+     * @return the random sample, never {@code null}; faces are unnamed
+     * @throws IllegalArgumentException if {@code limit} is negative
+     * @throws SQLException             if the database operation fails
+     */
+    public List<FaceRecord> findRandomUnnamed(int limit) throws SQLException {
+        if (limit < 0) {
+            throw new IllegalArgumentException("limit must not be negative");
+        }
+        if (limit == 0) {
+            return List.of();
+        }
+        return faceDao.findRandomUnnamed(limit);
+    }
+
+    /**
      * Returns the id of the name, creating it if it does not exist yet.
      *
      * <p>The input is trimmed before lookup so accidental leading/trailing

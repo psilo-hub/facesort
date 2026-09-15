@@ -80,6 +80,41 @@ class FaceDaoTest {
     }
 
     @Test
+    void findRandomUnnamed_returnsOnlyUnnamedFaces() throws Exception {
+        insertImage("img1");
+        long nameId = nameDao.insert("Alice");
+        insertFace("img1", 0, 0, new float[]{1.0f}, nameId);
+        insertFace("img1", 20, 0, new float[]{2.0f}, null);
+        insertFace("img1", 40, 0, new float[]{3.0f}, null);
+
+        List<FaceRecord> random = faceDao.findRandomUnnamed(10);
+
+        assertEquals(2, random.size(), "only the unnamed faces are returned");
+        assertTrue(random.stream().allMatch(f -> f.nameId() == null));
+    }
+
+    @Test
+    void findRandomUnnamed_respectsLimit() throws Exception {
+        insertImage("img1");
+        for (int i = 0; i < 5; i++) {
+            insertFace("img1", i * 20, 0, new float[]{1.0f}, null);
+        }
+
+        List<FaceRecord> random = faceDao.findRandomUnnamed(3);
+
+        assertEquals(3, random.size());
+    }
+
+    @Test
+    void findRandomUnnamed_nonPositiveLimitReturnsNoFaces() throws Exception {
+        insertImage("img1");
+        insertFace("img1", 0, 0, new float[]{1.0f}, null);
+
+        assertTrue(faceDao.findRandomUnnamed(0).isEmpty());
+        assertTrue(faceDao.findRandomUnnamed(-1).isEmpty());
+    }
+
+    @Test
     void assignName_updatesFaceAndMovesBetweenQueries() throws Exception {
         insertImage("img1");
         long faceId = insertFace("img1", 0, 0, new float[]{1.0f}, null);

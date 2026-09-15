@@ -19,6 +19,7 @@ import free.svoss.facesort.ui.FaceNameView;
 import free.svoss.facesort.ui.ImportView;
 import free.svoss.facesort.ui.MainWindow;
 import free.svoss.facesort.ui.NameFaceView;
+import free.svoss.facesort.ui.RandomNameView;
 import free.svoss.facesort.ui.SettingsView;
 import free.svoss.facesort.ui.ViewView;
 import javafx.application.Application;
@@ -38,7 +39,7 @@ import java.util.List;
  * JavaFX application entry point for Face Sort.
  *
  * <p>Loads configuration, opens the database, builds the DAO layer, creates
- * every service, wires the six views into the main tab window and shows it.
+ * every service, wires the views into the main tab window and shows it.
  * If face recognition initialization fails, an error dialog is shown and the
  * application exits gracefully.</p>
  */
@@ -95,15 +96,17 @@ public class FaceSortApp extends Application {
         // 6. Views.
         ImportView importView = new ImportView(importService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
+        RandomNameView randomNameView = new RandomNameView(namingService);
         FaceNameView faceNameView = new FaceNameView(faceToNameService);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
         SettingsView settingsView = new SettingsView(config, configPath);
 
-        // 7. Main window with the six tabs.
+        // 7. Main window with the seven tabs.
         MainWindow mainWindow = new MainWindow(
                 new Tab("Import", importView),
                 new Tab("Name Face", nameFaceView),
+                new Tab("Random Tag", randomNameView),
                 new Tab("Face Name", faceNameView),
                 new Tab("Deduplicate", dedupeView),
                 new Tab("View", viewView),

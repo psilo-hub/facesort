@@ -93,6 +93,33 @@ public class FaceDao {
     }
 
     /**
+     * Returns up to {@code limit} unnamed faces chosen at random.
+     *
+     * <p>A non-positive limit yields an empty list (SQLite would otherwise
+     * interpret a negative LIMIT as "unbounded").</p>
+     *
+     * @param limit maximum number of faces to return; must not be negative
+     * @return up to {@code limit} random unnamed faces
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findRandomUnnamed(int limit) throws SQLException {
+        if (limit <= 0) {
+            return List.of();
+        }
+        List<FaceRecord> faces = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
+                + "FROM faces WHERE name_id IS NULL ORDER BY RANDOM() LIMIT ?")) {
+            ps.setInt(1, limit);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                faces.add(mapRow(rs));
+            }
+        }
+        return faces;
+    }
+
+    /**
      * Returns all faces with a given name_id.
      */
     public List<FaceRecord> findByNameId(long nameId) throws SQLException {
