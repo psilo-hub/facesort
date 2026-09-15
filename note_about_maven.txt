@@ -1,0 +1,1 @@
+use the -Djavafx.platform=win flag when building on a mobile device.
