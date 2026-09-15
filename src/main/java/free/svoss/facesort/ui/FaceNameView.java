@@ -42,7 +42,7 @@ import java.util.Locale;
  * {@link FaceToNameService}. Queries run on background {@link Task}s so the
  * UI stays responsive.</p>
  */
-public class FaceNameView extends BorderPane {
+public class FaceNameView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int CANDIDATE_LIMIT = 30;
@@ -65,7 +65,7 @@ public class FaceNameView extends BorderPane {
     public FaceNameView(FaceToNameService faceToNameService) {
         this.faceToNameService = faceToNameService;
         buildUi();
-        loadNames();
+        loadNames(false);
     }
 
     /**
@@ -119,8 +119,13 @@ public class FaceNameView extends BorderPane {
 
     /**
      * Loads all names into the list in the background.
+     *
+     * @param refreshActiveName whether to reload the candidates for the
+     *                          currently active name afterwards (used by
+     *                          {@link #refresh()} when a tab switch may have
+     *                          made the cached face counts stale)
      */
-    private void loadNames() {
+    private void loadNames(boolean refreshActiveName) {
         statusLabel.setText("Loading names...");
 
         setTask(new Task<List<NameRecord>>() {
@@ -133,16 +138,38 @@ public class FaceNameView extends BorderPane {
         activeTask.setOnSucceeded(e -> {
             @SuppressWarnings("unchecked")
             List<NameRecord> names = (List<NameRecord>) activeTask.getValue();
-            nameList.setItems(FXCollections.observableArrayList(names));
-            statusLabel.setText(names.isEmpty()
-                    ? "No names yet — import photos and tag some faces first."
-                    : "Select a name to see similar unnamed faces.");
+            applyNames(names);
+            if (refreshActiveName && activeName != null) {
+                selectName(activeName); // reload candidates for the still-active name
+            }
         });
 
         activeTask.setOnFailed(e ->
                 handleFailure("Could not load names", activeTask.getException()));
 
         startTask("facename-name-loader");
+    }
+
+    /**
+     * Applies the loaded names to the list and updates the status text.
+     *
+     * @param names the names loaded from the database
+     */
+    private void applyNames(List<NameRecord> names) {
+        nameList.setItems(FXCollections.observableArrayList(names));
+        statusLabel.setText(names.isEmpty()
+                ? "No names yet — import photos and tag some faces first."
+                : "Select a name to see similar unnamed faces.");
+    }
+
+    /**
+     * Reloads the name list and, when a name is currently active, the
+     * candidate faces for it. Called by the tab window when this tab is
+     * selected.
+     */
+    @Override
+    public void refresh() {
+        loadNames(true);
     }
 
     /**

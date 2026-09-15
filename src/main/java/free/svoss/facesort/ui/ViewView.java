@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  * {@link ViewService}. Queries run on background {@link Task}s so the UI
  * stays responsive, and database errors are surfaced in an error dialog.</p>
  */
-public class ViewView extends BorderPane {
+public class ViewView extends BorderPane implements Refreshable {
 
     private static final Logger LOG = Logger.getLogger(ViewView.class.getName());
     private static final double NAME_THUMBNAIL_SIZE = 120.0;
@@ -51,6 +51,8 @@ public class ViewView extends BorderPane {
 
     private Task<?> activeTask;
     private boolean imagesMode;
+    private long activeNameId;
+    private String activeNameText = "";
 
     /**
      * Creates the view tab.
@@ -94,6 +96,8 @@ public class ViewView extends BorderPane {
      */
     private void loadNames() {
         imagesMode = false;
+        activeNameId = 0;
+        activeNameText = "";
         setBusy(true);
         statusLabel.setText("Loading names...");
 
@@ -128,6 +132,20 @@ public class ViewView extends BorderPane {
     }
 
     /**
+     * Reloads the current view: the name grid when browsing names, or the
+     * image grid of the still-active name. Called by the tab window when this
+     * tab is selected, so counts reflect other tabs' changes.
+     */
+    @Override
+    public void refresh() {
+        if (imagesMode && activeNameText != null && !activeNameText.isBlank()) {
+            openNameImages(activeNameId, activeNameText);
+        } else {
+            loadNames();
+        }
+    }
+
+    /**
      * Loads the images for the given name and shows them as a thumbnail grid.
      *
      * @param nameId      id of the name
@@ -135,6 +153,8 @@ public class ViewView extends BorderPane {
      */
     private void openNameImages(long nameId, String displayName) {
         imagesMode = true;
+        activeNameId = nameId;
+        activeNameText = displayName;
         setBusy(true);
         statusLabel.setText("Loading images for '" + displayName + "'...");
 

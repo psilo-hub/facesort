@@ -39,7 +39,7 @@ import java.util.Locale;
  * delegated to {@link NamingService}. Queries run on background
  * {@link Task}s so the UI stays responsive.</p>
  */
-public class NameFaceView extends BorderPane {
+public class NameFaceView extends BorderPane implements Refreshable {
 
     private static final double REPRESENTATIVE_SIZE = 180.0;
     private static final double CANDIDATE_SIZE = 110.0;
@@ -143,6 +143,16 @@ public class NameFaceView extends BorderPane {
         });
 
         startTask("nameface-cluster-loader");
+    }
+
+    /**
+     * Reloads the clusters of unnamed faces. Called by the tab window when
+     * this tab is selected, so newly tagged faces are reflected. The walk
+     * restarts at the largest cluster.
+     */
+    @Override
+    public void refresh() {
+        loadClusters();
     }
 
     /**
