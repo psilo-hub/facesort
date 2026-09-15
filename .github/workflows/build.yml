@@ -45,9 +45,6 @@ jobs:
           - platform: win-x86_64
             os: windows-latest
             javafx-platform: win
-          - platform: win-aarch64
-            os: windows-11-arm
-            javafx-platform: win-aarch64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
