@@ -45,7 +45,7 @@ jobs:
             os: macos-latest
             javafx-platform: mac-aarch64
           - platform: mac-x86_64
-            os: macos-13
+            os: macos-15-intel
             javafx-platform: mac
           - platform: win-x86_64
             os: windows-latest
