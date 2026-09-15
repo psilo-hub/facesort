@@ -62,7 +62,7 @@ jobs:
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
       - name: Build platform jar
-        run: mvn -B package -P${{ matrix.platform }} -Djavafx.platform=${{ matrix.javafx-platform }} -DskipTests
+        run: mvn -B package -P${{ matrix.platform }} "-Djavafx.platform=${{ matrix.javafx-platform }}" -DskipTests
       - uses: actions/upload-artifact@v4
         with:
           name: facesort-${{ matrix.platform }}
