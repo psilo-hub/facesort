@@ -11,8 +11,8 @@ jobs:
     name: Build fat jar
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -22,7 +22,7 @@ jobs:
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
       - run: mvn -B package -DskipTests
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: facesort-fat
           path: target/facesort-1.0-SNAPSHOT.jar
@@ -51,8 +51,8 @@ jobs:
             os: windows-latest
             javafx-platform: win
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -63,7 +63,7 @@ jobs:
           mvn -B install -DskipTests -f faceai-deps/pom.xml
       - name: Build platform jar
         run: mvn -B package -P${{ matrix.platform }} "-Djavafx.platform=${{ matrix.javafx-platform }}" -DskipTests
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: facesort-${{ matrix.platform }}
           path: target/facesort-1.0-SNAPSHOT-${{ matrix.platform }}.jar
@@ -77,7 +77,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts/
           merge-multiple: true
