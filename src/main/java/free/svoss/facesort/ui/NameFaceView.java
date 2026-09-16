@@ -303,7 +303,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
         if (clusters.isEmpty()) {
             clusterLabel.setText("All clusters named.");
         } else {
-            clusterIndex = -1;
+            clusterIndex--;
             showNextCluster();
         }
     }
