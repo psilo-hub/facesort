@@ -60,6 +60,13 @@ class NamingServiceTest {
                 new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, nameId));
     }
 
+    private long addFaceWithEmbedding(String imageHash, float[] embedding) throws SQLException {
+        new ImageDao(db.getConnection()).insert(imageHash, 0, "{}", 1);
+        return faceDao.insert(new FaceRecord(
+                0, imageHash, 10, 10, 80, 80, 0.9,
+                embedding, new byte[]{1}, null));
+    }
+
     @Test
     void findRandomUnnamed_onlyReturnsUnnamedFacesAndHonorsLimit() throws SQLException {
         long alice = nameDao.insert("Alice");
@@ -138,5 +145,50 @@ class NamingServiceTest {
         List<SimilarityResult> results = service.findSimilarUnnamed(refId, 10);
 
         assertEquals(2, results.size());
+    }
+
+    @Test
+    void rankSimilar_ranksCandidatesMostSimilarFirstAndSkipsReference() throws SQLException {
+        long refId = addFaceWithEmbedding("imgRef", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        long closeId = addFaceWithEmbedding("imgClose", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        long farId = addFaceWithEmbedding("imgFar", new float[]{0, 1, 0, 0, 0, 0, 0, 0});
+
+        FaceRecord reference = faceDao.findById(refId).orElseThrow();
+        FaceRecord close = faceDao.findById(closeId).orElseThrow();
+        FaceRecord far = faceDao.findById(farId).orElseThrow();
+
+        List<SimilarityResult> results =
+                service.rankSimilar(reference, List.of(far, reference, close), 10);
+
+        assertEquals(2, results.size());
+        assertEquals(closeId, results.get(0).faceRecord().id());
+        assertEquals(farId, results.get(1).faceRecord().id());
+        assertTrue(results.stream().noneMatch(r -> r.faceRecord().id() == refId));
+    }
+
+    @Test
+    void rankSimilar_honorsLimit() throws SQLException {
+        long refId = addFaceWithEmbedding("imgRef", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        addFaceWithEmbedding("imgA", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        addFaceWithEmbedding("imgB", new float[]{0, 1, 0, 0, 0, 0, 0, 0});
+
+        FaceRecord reference = faceDao.findById(refId).orElseThrow();
+
+        List<SimilarityResult> results =
+                service.rankSimilar(reference, faceDao.findUnnamed(), 1);
+
+        assertEquals(1, results.size());
+    }
+
+    @Test
+    void rankSimilar_negativeLimitThrows() throws SQLException {
+        long refId = addFaceWithEmbedding("imgRef", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        long closeId = addFaceWithEmbedding("imgClose", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+
+        FaceRecord reference = faceDao.findById(refId).orElseThrow();
+        FaceRecord close = faceDao.findById(closeId).orElseThrow();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.rankSimilar(reference, List.of(close), 0));
     }
 }

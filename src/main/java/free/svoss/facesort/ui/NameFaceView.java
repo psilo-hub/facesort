@@ -58,6 +58,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private List<ClusteringService.Cluster> clusters;
     private int clusterIndex = -1;
     private Task<?> activeTask;
+    private long candidateRepId = -1;
 
     /**
      * Creates the naming tab.
@@ -156,9 +157,20 @@ public class NameFaceView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Moves to the next cluster, wrapping the representative into view.
+     * Moves to the next cluster, wrapping the representative into view and
+     * previewing the cluster's other faces.
      */
     private void showNextCluster() {
+        showNextCluster(true);
+    }
+
+    /**
+     * Moves to the next cluster, wrapping the representative into view.
+     *
+     * @param loadCandidates whether to preview the cluster's other faces in the
+     *                       candidates grid
+     */
+    private void showNextCluster(boolean loadCandidates) {
         if (clusters == null || clusters.isEmpty()) {
             return;
         }
@@ -171,6 +183,51 @@ public class NameFaceView extends BorderPane implements Refreshable {
         setImage(representativeView, cluster.representative());
         nameField.clear();
         candidatesPane.getChildren().clear();
+        if (loadCandidates) {
+            loadClusterCandidates(cluster);
+        }
+    }
+
+    /**
+     * Populates the candidates grid with the current cluster's other faces,
+     * most similar to the representative first, so the whole cluster is visible
+     * before the user types a name.
+     *
+     * @param cluster the cluster being displayed
+     */
+    private void loadClusterCandidates(ClusteringService.Cluster cluster) {
+        FaceRecord representative = cluster.representative();
+        candidateRepId = representative.id();
+        List<FaceRecord> members = cluster.faces().stream()
+                .filter(face -> face.id() != representative.id())
+                .toList();
+        if (members.isEmpty()) {
+            return;
+        }
+
+        setTask(new Task<List<SimilarityResult>>() {
+            @Override
+            protected List<SimilarityResult> call() {
+                return namingService.rankSimilar(representative, members, CANDIDATE_LIMIT);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            @SuppressWarnings("unchecked")
+            List<SimilarityResult> similar =
+                    (List<SimilarityResult>) activeTask.getValue();
+            if (candidateRepId == representative.id()) {
+                showCandidates(similar);
+            }
+        });
+
+        activeTask.setOnFailed(e -> {
+            if (candidateRepId == representative.id()) {
+                handleFailure("Could not rank cluster faces", activeTask.getException());
+            }
+        });
+
+        startTask("nameface-cluster-candidates");
     }
 
     /**
@@ -208,6 +265,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             statusLabel.setText("Tagged as '" + name + "'. " + similar.size()
                     + " similar face(s) suggested.");
             removeCluster(representative.id());
+            candidateRepId = -1;
             showCandidates(similar);
         });
 
@@ -304,7 +362,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             clusterLabel.setText("All clusters named.");
         } else {
             clusterIndex--;
-            showNextCluster();
+            showNextCluster(false);
         }
     }
 

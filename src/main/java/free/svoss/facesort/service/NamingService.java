@@ -176,4 +176,47 @@ public final class NamingService {
         }
         return new ArrayList<>(results.subList(0, limit));
     }
+
+    /**
+     * Ranks a fixed list of candidate faces by similarity to a reference face,
+     * returning at most {@code limit} results in descending order. The
+     * reference face itself is skipped. Used by the UI to preview the other
+     * faces of the current cluster before the representative is tagged.
+     *
+     * @param reference  the reference face (e.g. the current cluster representative)
+     * @param candidates the candidate faces to rank; the reference is excluded
+     * @param limit      maximum number of results; must be positive
+     * @return the most similar candidates sorted by descending similarity,
+     *         never {@code null}
+     * @throws IllegalArgumentException if {@code limit} is not positive
+     * @throws NullPointerException     if {@code reference} or {@code candidates}
+     *                                  is null
+     */
+    public List<SimilarityResult> rankSimilar(FaceRecord reference,
+                                              List<FaceRecord> candidates,
+                                              int limit) {
+        Objects.requireNonNull(reference, "reference");
+        Objects.requireNonNull(candidates, "candidates");
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+
+        List<SimilarityResult> results = new ArrayList<>();
+        for (FaceRecord candidate : candidates) {
+            if (candidate.id() == reference.id()) {
+                continue;
+            }
+            double similarity = faceAiService.calcSimilarity(
+                    reference.embedding(), candidate.embedding());
+            results.add(new SimilarityResult(candidate, similarity));
+        }
+
+        // SimilarityResult sorts by descending similarity.
+        Collections.sort(results);
+
+        if (results.size() <= limit) {
+            return results;
+        }
+        return new ArrayList<>(results.subList(0, limit));
+    }
 }
