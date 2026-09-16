@@ -43,6 +43,7 @@ public class SettingsView extends BorderPane {
     private final TextField faceaiCacheDir = new TextField();
     private final Spinner<Integer> thumbnailSize = intSpinner(64, 1024, 32);
     private final Spinner<Integer> maxImportThreads = intSpinner(1, ConfigModel.MAX_IMPORT_THREADS, 1);
+    private final Spinner<Double> minNameSimilarity = doubleSpinner(0.0, 1.0, 0.05);
 
     private final Label statusLabel = new Label("");
 
@@ -87,6 +88,11 @@ public class SettingsView extends BorderPane {
         maxImportThreads.setTooltip(new Tooltip(
                 "Number of parallel workers used when importing images; applies to the next import."));
 
+        addRow(grid, ++row, "Min similarity for adding to a name:", minNameSimilarity);
+        minNameSimilarity.setTooltip(new Tooltip(
+                "When adding faces to an existing name, only faces whose similarity "
+                        + "to the name's average embedding is at least this value are offered."));
+
         Button saveButton = new Button("Save");
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> onSave());
@@ -129,6 +135,7 @@ public class SettingsView extends BorderPane {
         faceaiCacheDir.setText(config.getFaceaiCacheDir() == null ? "" : config.getFaceaiCacheDir());
         thumbnailSize.getValueFactory().setValue(config.getThumbnailSize());
         maxImportThreads.getValueFactory().setValue(config.getMaxImportThreads());
+        minNameSimilarity.getValueFactory().setValue(config.getMinNameSimilarity());
     }
 
     /**
@@ -147,6 +154,7 @@ public class SettingsView extends BorderPane {
         config.setFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir);
         config.setThumbnailSize(thumbnailSize.getValue());
         config.setMaxImportThreads(maxImportThreads.getValue());
+        config.setMinNameSimilarity(minNameSimilarity.getValue());
 
         try {
             AppConfig.save(configPath, config);
@@ -173,6 +181,7 @@ public class SettingsView extends BorderPane {
         config.setFaceaiCacheDir(defaults.getFaceaiCacheDir());
         config.setThumbnailSize(defaults.getThumbnailSize());
         config.setMaxImportThreads(defaults.getMaxImportThreads());
+        config.setMinNameSimilarity(defaults.getMinNameSimilarity());
         populateFromConfig();
         statusLabel.setText("Defaults loaded - press Save to persist");
     }

@@ -16,6 +16,8 @@ public class ConfigModel {
     /** Hard upper bound for parallel import worker threads. */
     public static final int MAX_IMPORT_THREADS = 16;
     public static final String DEFAULT_DB_NAME = "facesort.db";
+    /** Minimum similarity for adding a face to an existing name. */
+    public static final double DEFAULT_MIN_NAME_SIMILARITY = 0.75;
 
     private String lastImportFolder = "";
 
@@ -50,6 +52,8 @@ public class ConfigModel {
     private int maxImportThreads = DEFAULT_MAX_IMPORT_THREADS;
     @JsonProperty("dbName")
     private String dbName = DEFAULT_DB_NAME;
+    @JsonProperty("minNameSimilarity")
+    private double minNameSimilarity = DEFAULT_MIN_NAME_SIMILARITY;
 
     public ConfigModel() {
         // No-arg constructor required by Jackson for deserialization.
@@ -157,5 +161,13 @@ public class ConfigModel {
 
     public void setDbName(String dbName) {
         this.dbName = dbName;
+    }
+
+    public double getMinNameSimilarity() {
+        return minNameSimilarity;
+    }
+
+    public void setMinNameSimilarity(double minNameSimilarity) {
+        this.minNameSimilarity = minNameSimilarity;
     }
 }

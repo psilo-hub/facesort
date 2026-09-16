@@ -1,5 +1,6 @@
 package free.svoss.facesort.service;
 
+import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.model.FaceRecord;
@@ -24,6 +25,7 @@ public class FaceToNameService {
     private final FaceAiService faceAiService;
     private final FaceDao faceDao;
     private final NameDao nameDao;
+    private final ConfigModel config;
 
     /**
      * Creates the service.
@@ -31,11 +33,14 @@ public class FaceToNameService {
      * @param faceAiService engine for embedding math; must not be null
      * @param faceDao       data access for faces; must not be null
      * @param nameDao       data access for names; must not be null
+     * @param config        application settings; must not be null
      */
-    public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao) {
+    public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
+                             ConfigModel config) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
+        this.config = Objects.requireNonNull(config, "config");
     }
 
     /**
@@ -54,7 +59,9 @@ public class FaceToNameService {
      *
      * <p>The average embedding is computed over all faces currently tagged with
      * {@code nameId}. If the name has no faces (or none with embeddings), the
-     * result is empty and no average is computed.</p>
+     * result is empty and no average is computed. Candidates whose similarity
+     * falls below {@link ConfigModel#getMinNameSimilarity()} never qualify, so
+     * faces that are not similar enough cannot be added to an existing name.</p>
      *
      * @param nameId id of the reference name
      * @param limit  maximum number of results; values &le; 0 yield an empty list
@@ -76,11 +83,14 @@ public class FaceToNameService {
             embeddings.add(face.embedding());
         }
         float[] average = faceAiService.calcAverage(embeddings);
+        double cutoff = config.getMinNameSimilarity();
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord candidate : faceDao.findUnnamed()) {
-            results.add(new SimilarityResult(candidate,
-                    faceAiService.calcSimilarity(average, candidate.embedding())));
+            double similarity = faceAiService.calcSimilarity(average, candidate.embedding());
+            if (similarity >= cutoff) {
+                results.add(new SimilarityResult(candidate, similarity));
+            }
         }
 
         // SimilarityResult orders descending by similarity.

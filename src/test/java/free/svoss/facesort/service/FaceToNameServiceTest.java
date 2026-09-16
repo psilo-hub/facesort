@@ -1,5 +1,6 @@
 package free.svoss.facesort.service;
 
+import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -26,13 +27,16 @@ class FaceToNameServiceTest {
     private FaceDao faceDao;
     private NameDao nameDao;
     private FaceToNameService service;
+    private ConfigModel config;
 
     @BeforeEach
     void setUp() throws SQLException {
         db = Database.inMemory();
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
-        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao);
+        config = new ConfigModel();
+        config.setMinNameSimilarity(0.0); // no cutoff by default in these tests
+        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, config);
     }
 
     @AfterEach
@@ -80,6 +84,23 @@ class FaceToNameServiceTest {
         List<SimilarityResult> limited = service.findUnnamedForName(alice, 1);
 
         assertEquals(1, limited.size());
+    }
+
+    @Test
+    void findUnnamedForName_filtersBelowCutoff() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        long close = addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", yLike(), null);
+
+        config.setMinNameSimilarity(0.75);
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10);
+
+        assertEquals(1, results.size());
+        assertEquals(close, results.get(0).faceRecord().id());
+        assertTrue(results.get(0).similarity() >= 0.75,
+                "result must meet the similarity cutoff");
     }
 
     @Test
