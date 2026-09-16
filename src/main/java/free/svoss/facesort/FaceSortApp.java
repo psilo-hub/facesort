@@ -88,7 +88,7 @@ public class FaceSortApp extends Application {
         }
         importService = new ImportService(imageDao, faceDao, importAiServices, config);
         ClusteringService clusteringService = new ClusteringService(faceAiService, faceDao, config);
-        NamingService namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, config);
+        NamingService namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, config);
         FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao);
         DeduplicationService dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao);
         ViewService viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao);

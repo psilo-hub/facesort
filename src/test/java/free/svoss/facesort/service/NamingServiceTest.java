@@ -45,7 +45,7 @@ class NamingServiceTest {
         service = new NamingService(
                 new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao, config),
                 new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, config);
+                faceDao, nameDao, new ImageDao(db.getConnection()), config);
     }
 
     @AfterEach
@@ -208,5 +208,26 @@ class NamingServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.rankSimilar(reference, List.of(close), 0));
+    }
+
+    @Test
+    void findImagePaths_returnsStoredPathsForImage() throws SQLException {
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        imageDao.insert("imgP", 0, "{}", 1);
+        imageDao.addPath("imgP", "/photos/north.jpg");
+        imageDao.addPath("imgP", "/photos/dupe.jpg");
+
+        // The image_paths table has PRIMARY KEY (hash, path) and getPaths has
+        // no ORDER BY, so row order is unspecified (SQLite scans via the
+        // (hash, path) index). Assert content, not order.
+        List<String> paths = service.findImagePaths("imgP");
+        assertEquals(2, paths.size());
+        assertTrue(paths.contains("/photos/north.jpg"));
+        assertTrue(paths.contains("/photos/dupe.jpg"));
+    }
+
+    @Test
+    void findImagePaths_unknownHashReturnsEmpty() throws SQLException {
+        assertTrue(service.findImagePaths("missing").isEmpty());
     }
 }

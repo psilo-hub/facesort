@@ -12,6 +12,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
@@ -207,6 +208,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
             thumb.setFitHeight(THUMBNAIL_SIZE);
             thumb.setPreserveRatio(true);
             thumb.setSmooth(true);
+            installPathTooltip(thumb, face);
 
             Label idLabel = new Label("id " + face.id());
             idLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
@@ -306,6 +308,35 @@ public class RandomNameView extends BorderPane implements Refreshable {
         } else {
             view.setImage(null);
         }
+    }
+
+    /**
+     * Installs a hover tooltip showing the on-disk paths of the face's source
+     * image. The paths are looked up asynchronously on a daemon thread so the
+     * UI stays responsive; the tooltip shows progress and fallback states.
+     *
+     * @param thumb the image view to attach the tooltip to
+     * @param face  the face whose source image paths should be shown
+     */
+    private void installPathTooltip(ImageView thumb, FaceRecord face) {
+        Tooltip tooltip = new Tooltip("Loading image path…");
+        Tooltip.install(thumb, tooltip);
+        Task<List<String>> lookup = new Task<>() {
+            @Override
+            protected List<String> call() throws SQLException {
+                return namingService.findImagePaths(face.imageHash());
+            }
+        };
+        lookup.setOnSucceeded(e -> {
+            List<String> paths = lookup.getValue();
+            tooltip.setText(paths.isEmpty()
+                    ? "No stored path for this image"
+                    : String.join(System.lineSeparator(), paths));
+        });
+        lookup.setOnFailed(e -> tooltip.setText("Image path unavailable"));
+        Thread thread = new Thread(lookup, "randomname-path-tooltip-" + face.id());
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /**

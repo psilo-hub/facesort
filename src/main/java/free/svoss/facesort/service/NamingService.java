@@ -2,6 +2,7 @@ package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
+import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
@@ -45,6 +46,7 @@ public final class NamingService {
     private final FaceAiService faceAiService;
     private final FaceDao faceDao;
     private final NameDao nameDao;
+    private final ImageDao imageDao;
     private final ConfigModel config;
 
     /**
@@ -54,6 +56,7 @@ public final class NamingService {
      * @param faceAiService     embedding similarity calculations
      * @param faceDao           access to the faces table
      * @param nameDao           access to the names table
+     * @param imageDao          access to the images and image_paths tables
      * @param config            application settings; reserved for tuning the
      *                          flow (e.g. similarity thresholds)
      */
@@ -61,11 +64,13 @@ public final class NamingService {
                          FaceAiService faceAiService,
                          FaceDao faceDao,
                          NameDao nameDao,
+                         ImageDao imageDao,
                          ConfigModel config) {
         this.clusteringService = Objects.requireNonNull(clusteringService, "clusteringService");
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
+        this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -80,6 +85,24 @@ public final class NamingService {
      */
     public List<ClusteringService.Cluster> getClusters() throws SQLException {
         return clusteringService.clusterUnnamed();
+    }
+
+    /**
+     * Returns all stored on-disk paths for the source image of a face.
+     *
+     * <p>An image may be reachable through several paths when the same file
+     * exists at multiple locations, so the returned list can contain more than
+     * one entry. It is empty when the image was never imported from disk or
+     * its paths have been removed, in which case the UI shows a fallback
+     * message instead.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return the stored paths, never {@code null}; possibly empty
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public List<String> findImagePaths(String imageHash) throws SQLException {
+        return imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"));
     }
 
     /**

@@ -14,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
@@ -186,6 +187,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
                 "Cluster %d of %d — %d face(s)",
                 clusterIndex + 1, clusters.size(), cluster.faces().size()));
         setImage(representativeView, cluster.representative());
+        installPathTooltip(representativeView, cluster.representative());
         nameField.clear();
         candidatesPane.getChildren().clear();
         if (loadCandidates) {
@@ -352,6 +354,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             thumb.setFitHeight(CANDIDATE_SIZE);
             thumb.setPreserveRatio(true);
             thumb.setSmooth(true);
+            installPathTooltip(thumb, face);
 
             Label sim = new Label(String.format(Locale.ROOT, "%.0f%%",
                     candidate.similarity() * 100));
@@ -432,6 +435,35 @@ public class NameFaceView extends BorderPane implements Refreshable {
         } else {
             view.setImage(null);
         }
+    }
+
+    /**
+     * Installs a hover tooltip showing the on-disk paths of the face's source
+     * image. The paths are looked up asynchronously on a daemon thread so the
+     * UI stays responsive; the tooltip shows progress and fallback states.
+     *
+     * @param thumb the image view to attach the tooltip to
+     * @param face  the face whose source image paths should be shown
+     */
+    private void installPathTooltip(ImageView thumb, FaceRecord face) {
+        Tooltip tooltip = new Tooltip("Loading image path…");
+        Tooltip.install(thumb, tooltip);
+        Task<List<String>> lookup = new Task<>() {
+            @Override
+            protected List<String> call() throws SQLException {
+                return namingService.findImagePaths(face.imageHash());
+            }
+        };
+        lookup.setOnSucceeded(e -> {
+            List<String> paths = lookup.getValue();
+            tooltip.setText(paths.isEmpty()
+                    ? "No stored path for this image"
+                    : String.join(System.lineSeparator(), paths));
+        });
+        lookup.setOnFailed(e -> tooltip.setText("Image path unavailable"));
+        Thread thread = new Thread(lookup, "nameface-path-tooltip-" + face.id());
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /**
