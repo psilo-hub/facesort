@@ -11,11 +11,13 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
@@ -55,6 +57,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final Label namedFacesLabel = new Label("");
     private final FlowPane namedFacesPane = new FlowPane(10, 10);
     private final Label unnamedLabel = new Label("Most similar unnamed faces:");
+    private final CheckBox excludeOtherNamesBox =
+            new CheckBox("Exclude faces closer to another name");
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button("Tag selected");
 
@@ -101,6 +105,20 @@ public class FaceNameView extends BorderPane implements Refreshable {
         tagSelectedButton.setDisable(true);
         tagSelectedButton.setOnAction(e -> onTagSelected());
 
+        Tooltip exclusionTip = new Tooltip("Only show faces that are at least as similar "
+                + "to the selected name as to any other name's average embedding.\n\n"
+                + "When checked, faces that are more similar to another name's average "
+                + "face than to the selected name's are hidden, so only faces whose best "
+                + "match is the selected name are shown.");
+        exclusionTip.setWrapText(true);
+        exclusionTip.setMaxWidth(420);
+        excludeOtherNamesBox.setTooltip(exclusionTip);
+        excludeOtherNamesBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+            if (activeName != null) {
+                selectName(activeName);
+            }
+        });
+
         VBox left = new VBox(6,
                 new Label("Names:"),
                 nameList,
@@ -112,6 +130,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 namedFacesLabel,
                 namedFacesPane,
                 unnamedLabel,
+                excludeOtherNamesBox,
                 candidatesPane);
         center.setPadding(new Insets(10));
 
@@ -201,7 +220,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 List<SimilarityResult> named =
                         faceToNameService.findMostSimilarNamed(name.id(), NAMED_LIMIT);
                 List<SimilarityResult> candidates =
-                        faceToNameService.findUnnamedForName(name.id(), CANDIDATE_LIMIT);
+                        faceToNameService.findUnnamedForName(
+                                name.id(), CANDIDATE_LIMIT, excludeOtherNamesBox.isSelected());
                 return new NameContent(named, candidates);
             }
         });

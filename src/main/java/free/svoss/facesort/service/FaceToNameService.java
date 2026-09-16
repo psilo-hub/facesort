@@ -10,7 +10,9 @@ import free.svoss.facesort.model.SimilarityResult;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -57,11 +59,8 @@ public class FaceToNameService {
      * Returns the top {@code limit} unnamed faces most similar to the average
      * embedding of the given name, sorted by similarity descending.
      *
-     * <p>The average embedding is computed over all faces currently tagged with
-     * {@code nameId}. If the name has no faces (or none with embeddings), the
-     * result is empty and no average is computed. Candidates whose similarity
-     * falls below {@link ConfigModel#getMinNameSimilarity()} never qualify, so
-     * faces that are not similar enough cannot be added to an existing name.</p>
+     * <p>Equivalent to {@link #findUnnamedForName(long, int, boolean)} with
+     * {@code excludeCloserToOtherNames} set to {@code false}.</p>
      *
      * @param nameId id of the reference name
      * @param limit  maximum number of results; values &le; 0 yield an empty list
@@ -69,6 +68,36 @@ public class FaceToNameService {
      * @throws SQLException on database error
      */
     public List<SimilarityResult> findUnnamedForName(long nameId, int limit) throws SQLException {
+        return findUnnamedForName(nameId, limit, false);
+    }
+
+    /**
+     * Returns the top {@code limit} unnamed faces most similar to the average
+     * embedding of the given name, sorted by similarity descending.
+     *
+     * <p>The average embedding is computed over all faces currently tagged with
+     * {@code nameId}. If the name has no faces (or none with embeddings), the
+     * result is empty and no average is computed. Candidates whose similarity
+     * falls below {@link ConfigModel#getMinNameSimilarity()} never qualify, so
+     * faces that are not similar enough cannot be added to an existing name.</p>
+     *
+     * <p>When {@code excludeCloserToOtherNames} is {@code true}, each candidate
+     * is additionally compared against the average embedding of every other
+     * name; a candidate is dropped whenever it is strictly more similar to
+     * another name's average than to {@code nameId}'s average, so only faces
+     * whose best match is the selected name are offered.</p>
+     *
+     * @param nameId                     id of the reference name
+     * @param limit                      maximum number of results; values &le; 0
+     *                                   yield an empty list
+     * @param excludeCloserToOtherNames  whether to hide faces that are closer to
+     *                                   another name's average embedding than to
+     *                                   the selected name's
+     * @return matching faces as {@link SimilarityResult}, descending by similarity
+     * @throws SQLException on database error
+     */
+    public List<SimilarityResult> findUnnamedForName(long nameId, int limit,
+                                                     boolean excludeCloserToOtherNames) throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
@@ -78,25 +107,86 @@ public class FaceToNameService {
             return List.of();
         }
 
-        List<float[]> embeddings = new ArrayList<>(namedFaces.size());
-        for (FaceRecord face : namedFaces) {
-            embeddings.add(face.embedding());
-        }
-        float[] average = faceAiService.calcAverage(embeddings);
+        float[] average = averageOf(namedFaces);
         double cutoff = config.getMinNameSimilarity();
+
+        Map<Long, float[]> otherAverages = excludeCloserToOtherNames
+                ? averageOfOtherNames(nameId) : Map.of();
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord candidate : faceDao.findUnnamed()) {
             double similarity = faceAiService.calcSimilarity(average, candidate.embedding());
-            if (similarity >= cutoff) {
-                results.add(new SimilarityResult(candidate, similarity));
+            if (similarity < cutoff) {
+                continue;
             }
+            if (excludeCloserToOtherNames
+                    && isCloserToAnotherName(candidate, similarity, otherAverages)) {
+                continue;
+            }
+            results.add(new SimilarityResult(candidate, similarity));
         }
 
         // SimilarityResult orders descending by similarity.
         Collections.sort(results);
 
         return results.size() <= limit ? results : new ArrayList<>(results.subList(0, limit));
+    }
+
+    /**
+     * Returns the average embedding of all faces tagged with the given name,
+     * or an empty map when no other name has any tagged faces.
+     *
+     * @param nameId the name to skip (the currently selected name)
+     * @return a mapping of every other name id to its average embedding
+     * @throws SQLException on database error
+     */
+    private Map<Long, float[]> averageOfOtherNames(long nameId) throws SQLException {
+        Map<Long, float[]> averages = new HashMap<>();
+        for (NameRecord other : nameDao.findAll()) {
+            if (other.id() == nameId) {
+                continue;
+            }
+            List<FaceRecord> faces = faceDao.findByNameId(other.id());
+            if (faces.isEmpty()) {
+                continue;
+            }
+            averages.put(other.id(), averageOf(faces));
+        }
+        return averages;
+    }
+
+    /**
+     * Tells whether the given candidate is strictly more similar to any other
+     * name's average embedding than to the selected name's.
+     *
+     * @param candidate              the unnamed face being checked
+     * @param similarityToSelected   the candidate's similarity to the selected name
+     * @param otherAverages          other names' average embeddings
+     * @return {@code true} if some other name matches the candidate more closely
+     */
+    private boolean isCloserToAnotherName(FaceRecord candidate, double similarityToSelected,
+                                          Map<Long, float[]> otherAverages) {
+        for (float[] otherAverage : otherAverages.values()) {
+            if (faceAiService.calcSimilarity(otherAverage, candidate.embedding())
+                    > similarityToSelected) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Computes the component-wise average embedding of the given faces.
+     *
+     * @param faces the faces to average; must not be empty
+     * @return the average embedding
+     */
+    private float[] averageOf(List<FaceRecord> faces) {
+        List<float[]> embeddings = new ArrayList<>(faces.size());
+        for (FaceRecord face : faces) {
+            embeddings.add(face.embedding());
+        }
+        return faceAiService.calcAverage(embeddings);
     }
 
     /**
@@ -123,11 +213,7 @@ public class FaceToNameService {
             return List.of();
         }
 
-        List<float[]> embeddings = new ArrayList<>(namedFaces.size());
-        for (FaceRecord face : namedFaces) {
-            embeddings.add(face.embedding());
-        }
-        float[] average = faceAiService.calcAverage(embeddings);
+        float[] average = averageOf(namedFaces);
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord face : namedFaces) {

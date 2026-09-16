@@ -122,6 +122,53 @@ class FaceToNameServiceTest {
     }
 
     @Test
+    void findUnnamedForName_excludesFacesCloserToAnotherName() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        addImageAndFace("imgB2", yLike(), bob);
+        long closeToAlice = addImageAndFace(
+                "imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", new float[]{0.1f, 0.9f, 0, 0, 0, 0, 0, 0}, null);
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10, true);
+
+        assertEquals(1, results.size());
+        assertEquals(closeToAlice, results.get(0).faceRecord().id());
+    }
+
+    @Test
+    void findUnnamedForName_exclusionDoesNothingWhenOnlyOneNameExists() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        long close = addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10, true);
+
+        assertEquals(1, results.size());
+        assertEquals(close, results.get(0).faceRecord().id());
+    }
+
+    @Test
+    void findUnnamedForName_exclusionKeepsEquallySimilarFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        addImageAndFace("imgB2", yLike(), bob);
+        long closeToBoth = addImageAndFace("imgU1", new float[]{1, 1, 0, 0, 0, 0, 0, 0}, null);
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10, true);
+
+        assertEquals(1, results.size());
+        assertEquals(closeToBoth, results.get(0).faceRecord().id());
+    }
+
+    @Test
     void findMostSimilarNamed_ranksTaggedFacesBySimilarityToAverage() throws SQLException {
         long alice = nameDao.insert("Alice");
         long best = addImageAndFace("imgA1", xLike(), alice);
