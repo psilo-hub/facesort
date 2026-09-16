@@ -1,6 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 import free.svoss.facesort.service.ClusteringService;
 import free.svoss.facesort.service.NamingService;
@@ -26,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * The "Put a name to a face" tab (IMPLEMENTATION_PLAN.md 6.4).
@@ -51,6 +53,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private final Label clusterLabel = new Label("");
     private final ImageView representativeView = new ImageView();
     private final TextField nameField = new TextField();
+    private final Label nameExistsLabel = new Label("");
     private final Button tagButton = new Button("Tag");
     private final Button nextButton = new Button("Next cluster");
     private final FlowPane candidatesPane = new FlowPane(10, 10);
@@ -86,9 +89,11 @@ public class NameFaceView extends BorderPane implements Refreshable {
         tagButton.setOnAction(e -> onTagRepresentative());
         nextButton.setOnAction(e -> showNextCluster());
 
-        HBox nameRow = new HBox(8, new Label("Name:"), nameField, tagButton, nextButton);
+        HBox nameRow = new HBox(8, new Label("Name:"), nameField, nameExistsLabel, tagButton, nextButton);
         nameRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(nameField, Priority.ALWAYS);
+        nameExistsLabel.setWrapText(true);
+        nameField.textProperty().addListener((obs, oldText, newText) -> checkNameExists());
 
         VBox content = new VBox(10,
                 clusterLabel,
@@ -228,6 +233,53 @@ public class NameFaceView extends BorderPane implements Refreshable {
         });
 
         startTask("nameface-cluster-candidates");
+    }
+
+    /**
+     * Checks the name typed into the field against existing names and shows
+     * the outcome in the adjacent label. Runs on a background task and ignores
+     * stale results once the field changes again.
+     */
+    private void checkNameExists() {
+        if (nameField.isDisabled()) {
+            return;
+        }
+        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        if (name.isEmpty()) {
+            nameExistsLabel.setText("");
+            nameExistsLabel.setStyle("");
+            return;
+        }
+
+        setTask(new Task<Optional<NameRecord>>() {
+            @Override
+            protected Optional<NameRecord> call() throws SQLException {
+                return namingService.findName(name);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            String current = nameField.getText() == null ? "" : nameField.getText().trim();
+            if (!name.equals(current)) {
+                return; // user kept typing; ignore the stale result
+            }
+            @SuppressWarnings("unchecked")
+            Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
+            if (existing.isPresent()) {
+                nameExistsLabel.setText("Name already exists ("
+                        + existing.get().faceCount() + " face(s))");
+                nameExistsLabel.setStyle("-fx-text-fill: #c9302c;");
+            } else {
+                nameExistsLabel.setText("New name");
+                nameExistsLabel.setStyle("-fx-text-fill: #3c763d;");
+            }
+        });
+
+        activeTask.setOnFailed(e -> {
+            // name lookup failing should not block tagging
+        });
+
+        startTask("nameface-name-exists");
     }
 
     /**

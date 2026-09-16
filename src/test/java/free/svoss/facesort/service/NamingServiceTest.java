@@ -126,6 +126,24 @@ class NamingServiceTest {
     }
 
     @Test
+    void findName_returnsExistingRecordWithFaceCount() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", alice);
+        addImageAndFace("imgA2", alice);
+
+        java.util.Optional<free.svoss.facesort.model.NameRecord> found = service.findName("  Alice  ");
+
+        assertTrue(found.isPresent());
+        assertEquals(alice, found.get().id());
+        assertEquals(2, found.get().faceCount());
+    }
+
+    @Test
+    void findName_returnsEmptyForUnknownName() throws SQLException {
+        assertTrue(service.findName("Nobody").isEmpty());
+    }
+
+    @Test
     void tagFace_assignsNameAndHidesFaceFromUnnamed() throws SQLException {
         long alice = nameDao.insert("Alice");
         long faceId = addImageAndFace("imgU1", null);

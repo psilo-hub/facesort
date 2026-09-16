@@ -126,6 +126,20 @@ public final class NamingService {
     }
 
     /**
+     * Returns the existing name record for the given display name, or empty
+     * when the name has not been created yet. The lookup is trimmed and the
+     * record carries the current face count.
+     *
+     * @param name the display name; must not be null or blank
+     * @return the existing record, or empty if the name is new
+     * @throws NullPointerException if {@code name} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public Optional<NameRecord> findName(String name) throws SQLException {
+        return nameDao.findByName(Objects.requireNonNull(name, "name").trim());
+    }
+
+    /**
      * Assigns the given name to the given face.
      *
      * @param faceId id of the face to tag

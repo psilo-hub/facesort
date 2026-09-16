@@ -1,6 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.NamingService;
 
 import javafx.concurrent.Task;
@@ -24,6 +25,7 @@ import java.io.ByteArrayInputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The "Random Tag" tab.
@@ -46,6 +48,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
 
     private final Label statusLabel = new Label("");
     private final TextField nameField = new TextField();
+    private final Label nameExistsLabel = new Label("");
     private final Button tagSelectedButton = new Button("Tag selected");
     private final Button nextButton = new Button("Next");
     private final FlowPane facesPane = new FlowPane(10, 10);
@@ -74,8 +77,10 @@ public class RandomNameView extends BorderPane implements Refreshable {
         nextButton.setOnAction(e -> loadSample());
 
         HBox.setHgrow(nameField, Priority.ALWAYS);
+        nameExistsLabel.setWrapText(true);
+        nameField.textProperty().addListener((obs, oldText, newText) -> checkNameExists());
         HBox controls = new HBox(8,
-                new Label("Name:"), nameField, tagSelectedButton, nextButton);
+                new Label("Name:"), nameField, nameExistsLabel, tagSelectedButton, nextButton);
         controls.setAlignment(Pos.CENTER_LEFT);
         controls.setPadding(new Insets(10));
 
@@ -124,6 +129,53 @@ public class RandomNameView extends BorderPane implements Refreshable {
         });
 
         startTask("random-sample-loader");
+    }
+
+    /**
+     * Checks the name typed into the field against existing names and shows
+     * the outcome in the adjacent label. Runs on a background task and ignores
+     * stale results once the field changes again.
+     */
+    private void checkNameExists() {
+        if (nameField.isDisabled()) {
+            return;
+        }
+        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        if (name.isEmpty()) {
+            nameExistsLabel.setText("");
+            nameExistsLabel.setStyle("");
+            return;
+        }
+
+        setTask(new Task<Optional<NameRecord>>() {
+            @Override
+            protected Optional<NameRecord> call() throws SQLException {
+                return namingService.findName(name);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            String current = nameField.getText() == null ? "" : nameField.getText().trim();
+            if (!name.equals(current)) {
+                return; // user kept typing; ignore the stale result
+            }
+            @SuppressWarnings("unchecked")
+            Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
+            if (existing.isPresent()) {
+                nameExistsLabel.setText("Name already exists ("
+                        + existing.get().faceCount() + " face(s))");
+                nameExistsLabel.setStyle("-fx-text-fill: #c9302c;");
+            } else {
+                nameExistsLabel.setText("New name");
+                nameExistsLabel.setStyle("-fx-text-fill: #3c763d;");
+            }
+        });
+
+        activeTask.setOnFailed(e -> {
+            // name lookup failing should not block tagging
+        });
+
+        startTask("randomname-name-exists");
     }
 
     /**
