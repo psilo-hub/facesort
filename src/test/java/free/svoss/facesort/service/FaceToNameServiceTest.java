@@ -101,6 +101,54 @@ class FaceToNameServiceTest {
     }
 
     @Test
+    void findMostSimilarNamed_ranksTaggedFacesBySimilarityToAverage() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long best = addImageAndFace("imgA1", xLike(), alice);
+        long worst = addImageAndFace("imgA2", yLike(), alice);
+        addImageAndFace("imgA3", xLike(), alice);
+
+        List<SimilarityResult> results = service.findMostSimilarNamed(alice, 10);
+
+        assertEquals(3, results.size());
+        assertTrue(results.stream().noneMatch(r -> r.faceRecord().nameId() == null));
+        assertTrue(results.stream().allMatch(r -> r.faceRecord().nameId() == alice));
+        assertTrue(results.stream().allMatch(r -> r.similarity() >= 0));
+        assertEquals(best, results.get(0).faceRecord().id());
+        assertEquals(worst, results.get(2).faceRecord().id());
+        assertTrue(results.get(0).similarity() >= results.get(1).similarity()
+                        && results.get(1).similarity() >= results.get(2).similarity(),
+                "results must be sorted by descending similarity");
+    }
+
+    @Test
+    void findMostSimilarNamed_respectsLimit() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgA3", yLike(), alice);
+
+        List<SimilarityResult> limited = service.findMostSimilarNamed(alice, 2);
+
+        assertEquals(2, limited.size());
+    }
+
+    @Test
+    void findMostSimilarNamed_emptyWhenNameHasNoFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        assertTrue(service.findMostSimilarNamed(alice, 10).isEmpty());
+    }
+
+    @Test
+    void findMostSimilarNamed_nonPositiveLimitReturnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+
+        assertTrue(service.findMostSimilarNamed(alice, 0).isEmpty());
+        assertTrue(service.findMostSimilarNamed(alice, -1).isEmpty());
+    }
+
+    @Test
     void tagFaces_assignsNameToMultipleFaces() throws SQLException {
         long alice = nameDao.insert("Alice");
         long f1 = addImageAndFace("imgU1", xLike(), null);

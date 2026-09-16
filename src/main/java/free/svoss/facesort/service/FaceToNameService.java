@@ -90,6 +90,48 @@ public class FaceToNameService {
     }
 
     /**
+     * Returns the top {@code limit} faces already tagged with the given name
+     * that are most similar to the name's average embedding, sorted by
+     * descending similarity.
+     *
+     * <p>The average embedding is computed over all faces currently tagged with
+     * {@code nameId}; each of those faces is then scored against that average.
+     * If the name has no faces, the result is empty.</p>
+     *
+     * @param nameId id of the name whose tagged faces should be ranked
+     * @param limit  maximum number of results; values &le; 0 yield an empty list
+     * @return the name's tagged faces as {@link SimilarityResult}, descending by similarity
+     * @throws SQLException on database error
+     */
+    public List<SimilarityResult> findMostSimilarNamed(long nameId, int limit) throws SQLException {
+        if (limit <= 0) {
+            return List.of();
+        }
+
+        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
+        if (namedFaces.isEmpty()) {
+            return List.of();
+        }
+
+        List<float[]> embeddings = new ArrayList<>(namedFaces.size());
+        for (FaceRecord face : namedFaces) {
+            embeddings.add(face.embedding());
+        }
+        float[] average = faceAiService.calcAverage(embeddings);
+
+        List<SimilarityResult> results = new ArrayList<>();
+        for (FaceRecord face : namedFaces) {
+            results.add(new SimilarityResult(face,
+                    faceAiService.calcSimilarity(average, face.embedding())));
+        }
+
+        // SimilarityResult orders descending by similarity.
+        Collections.sort(results);
+
+        return results.size() <= limit ? results : new ArrayList<>(results.subList(0, limit));
+    }
+
+    /**
      * Tags multiple faces with the given name.
      *
      * @param faceIds ids of the faces to tag; must not be null

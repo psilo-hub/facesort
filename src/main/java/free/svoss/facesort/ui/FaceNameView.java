@@ -46,11 +46,15 @@ public class FaceNameView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int CANDIDATE_LIMIT = 30;
+    private static final int NAMED_LIMIT = 5;
 
     private final FaceToNameService faceToNameService;
 
     private final Label statusLabel = new Label("");
     private final ListView<NameRecord> nameList = new ListView<>();
+    private final Label namedFacesLabel = new Label("");
+    private final FlowPane namedFacesPane = new FlowPane(10, 10);
+    private final Label unnamedLabel = new Label("Most similar unnamed faces:");
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button("Tag selected");
 
@@ -104,9 +108,14 @@ public class FaceNameView extends BorderPane implements Refreshable {
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
-        candidatesPane.setPadding(new Insets(10));
+        VBox center = new VBox(8,
+                namedFacesLabel,
+                namedFacesPane,
+                unnamedLabel,
+                candidatesPane);
+        center.setPadding(new Insets(10));
 
-        ScrollPane scroll = new ScrollPane(candidatesPane);
+        ScrollPane scroll = new ScrollPane(center);
         scroll.setFitToWidth(true);
 
         statusLabel.setWrapText(true);
@@ -173,37 +182,63 @@ public class FaceNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Loads the most similar unnamed faces for the selected name.
+     * Loads the faces already tagged with the selected name (most similar to
+     * the average first) together with the most similar unnamed faces.
      *
      * @param name the selected name record
      */
     private void selectName(NameRecord name) {
         activeName = name;
         statusLabel.setText("Loading similar faces for '" + name.name() + "'...");
+        namedFacesLabel.setText("");
+        namedFacesPane.getChildren().clear();
         candidatesPane.getChildren().clear();
         tagSelectedButton.setDisable(true);
 
-        setTask(new Task<List<SimilarityResult>>() {
+        setTask(new Task<NameContent>() {
             @Override
-            protected List<SimilarityResult> call() throws SQLException {
-                return faceToNameService.findUnnamedForName(name.id(), CANDIDATE_LIMIT);
+            protected NameContent call() throws SQLException {
+                List<SimilarityResult> named =
+                        faceToNameService.findMostSimilarNamed(name.id(), NAMED_LIMIT);
+                List<SimilarityResult> candidates =
+                        faceToNameService.findUnnamedForName(name.id(), CANDIDATE_LIMIT);
+                return new NameContent(named, candidates);
             }
         });
 
         activeTask.setOnSucceeded(e -> {
             @SuppressWarnings("unchecked")
-            List<SimilarityResult> similar =
-                    (List<SimilarityResult>) activeTask.getValue();
-            showCandidates(similar);
-            statusLabel.setText(similar.isEmpty()
+            NameContent content = (NameContent) activeTask.getValue();
+            showNamedFaces(name, content.namedFaces());
+            showCandidates(content.candidates());
+            statusLabel.setText(content.candidates().isEmpty()
                     ? "No unnamed faces similar to '" + name.name() + "'."
-                    : similar.size() + " similar unnamed face(s) for '" + name.name() + "'.");
+                    : content.candidates().size()
+                    + " similar unnamed face(s) for '" + name.name() + "'.");
         });
 
         activeTask.setOnFailed(e ->
                 handleFailure("Could not load similar faces", activeTask.getException()));
 
         startTask("facename-similar-loader");
+    }
+
+    /**
+     * Renders the faces already tagged with the selected name, most similar to
+     * the name's average embedding first. Shows up to {@link #NAMED_LIMIT}.
+     *
+     * @param name  the selected name record
+     * @param named the ranked tagged faces
+     */
+    private void showNamedFaces(NameRecord name, List<SimilarityResult> named) {
+        namedFacesPane.getChildren().clear();
+        if (named.isEmpty()) {
+            namedFacesLabel.setText("No faces tagged with '" + name.name() + "' yet.");
+            return;
+        }
+        namedFacesLabel.setText("Faces tagged with '" + name.name()
+                + "', most similar to the average:");
+        renderCards(namedFacesPane, named, false);
     }
 
     /**
@@ -214,7 +249,20 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void showCandidates(List<SimilarityResult> similar) {
         candidatesPane.getChildren().clear();
-        for (SimilarityResult candidate : similar) {
+        renderCards(candidatesPane, similar, true);
+    }
+
+    /**
+     * Renders similarity-ranked face cards into the given pane. When
+     * {@code selectable} is true each card toggles its selected look so the
+     * user can batch-tag.
+     *
+     * @param pane       the pane to populate
+     * @param results    the ranked faces
+     * @param selectable whether cards can be selected for tagging
+     */
+    private void renderCards(FlowPane pane, List<SimilarityResult> results, boolean selectable) {
+        for (SimilarityResult candidate : results) {
             FaceRecord face = candidate.faceRecord();
             VBox card = new VBox(4);
             card.setAlignment(Pos.TOP_CENTER);
@@ -234,8 +282,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
             sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
             card.getChildren().addAll(thumb, sim);
-            card.setOnMouseClicked(e -> toggleSelected(card));
-            candidatesPane.getChildren().add(card);
+            if (selectable) {
+                card.setOnMouseClicked(e -> toggleSelected(card));
+            }
+            pane.getChildren().add(card);
         }
     }
 
@@ -363,5 +413,11 @@ public class FaceNameView extends BorderPane implements Refreshable {
             alert.initOwner(window);
         }
         alert.showAndWait();
+    }
+
+    /** Result bundle for a selected name: its best tagged faces and the
+     *  best unnamed candidates. */
+    private record NameContent(List<SimilarityResult> namedFaces,
+                               List<SimilarityResult> candidates) {
     }
 }
