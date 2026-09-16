@@ -1,11 +1,15 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.db.FaceDao;
+import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,6 +35,7 @@ public class DeduplicationService {
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final NotDupeDao notDupeDao;
+    private final ImageDao imageDao;
 
     /** Candidate pairs sorted by descending similarity; built lazily. */
     private List<DupeCandidate> candidates;
@@ -48,13 +53,15 @@ public class DeduplicationService {
      * @param faceDao       DAO for the faces table
      * @param nameDao       DAO for the names table
      * @param notDupeDao    DAO for the not_dupes table
+     * @param imageDao      DAO for the images and image_paths tables
      */
     public DeduplicationService(FaceAiService faceAiService, FaceDao faceDao,
-                                NameDao nameDao, NotDupeDao notDupeDao) {
+                                NameDao nameDao, NotDupeDao notDupeDao, ImageDao imageDao) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notDupeDao = Objects.requireNonNull(notDupeDao, "notDupeDao");
+        this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
     }
 
     /**
@@ -141,6 +148,46 @@ public class DeduplicationService {
      */
     public void skip(long nameIdA, long nameIdB) {
         skippedThisRun.add(key(nameIdA, nameIdB));
+    }
+
+    /**
+     * Tells whether the original file for the given image hash still exists on
+     * disk.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if at least one stored path exists on disk
+     * @throws SQLException if the database operation fails
+     */
+    public boolean isOriginalAvailable(String imageHash) throws SQLException {
+        return ViewService.firstExistingPath(
+                imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"))).isPresent();
+    }
+
+    /**
+     * Opens the original file of the source image for a face in the operating
+     * system default viewer.
+     *
+     * <p>The first still-existing stored path for the image is used. Returns
+     * {@code false} without side effects when no stored path exists on disk or
+     * when the desktop platform does not support opening files.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if the file was handed to the default viewer
+     * @throws IOException  if the default viewer cannot open the file
+     * @throws SQLException on database access failure
+     */
+    public boolean openOriginal(String imageHash) throws IOException, SQLException {
+        Optional<Path> existing = ViewService.firstExistingPath(
+                imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash")));
+        if (existing.isEmpty()) {
+            return false;
+        }
+        if (!Desktop.isDesktopSupported()
+                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            return false;
+        }
+        Desktop.getDesktop().open(existing.get().toFile());
+        return true;
     }
 
     /**

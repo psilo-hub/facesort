@@ -2,11 +2,15 @@ package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
+import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Implements the "Put a face to a name" flow (IMPLEMENTATION_PLAN.md section 6.5).
@@ -27,6 +32,7 @@ public class FaceToNameService {
     private final FaceAiService faceAiService;
     private final FaceDao faceDao;
     private final NameDao nameDao;
+    private final ImageDao imageDao;
     private final ConfigModel config;
 
     /**
@@ -35,13 +41,15 @@ public class FaceToNameService {
      * @param faceAiService engine for embedding math; must not be null
      * @param faceDao       data access for faces; must not be null
      * @param nameDao       data access for names; must not be null
+     * @param imageDao      data access for images and image_paths; must not be null
      * @param config        application settings; must not be null
      */
     public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
-                             ConfigModel config) {
+                             ImageDao imageDao, ConfigModel config) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
+        this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -239,5 +247,50 @@ public class FaceToNameService {
         for (Long faceId : faceIds) {
             faceDao.assignName(faceId, nameId);
         }
+    }
+
+    /**
+     * Tells whether the original file for the given image hash still exists on
+     * disk.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if at least one stored path exists on disk
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public boolean isOriginalAvailable(String imageHash) throws SQLException {
+        for (String path : imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"))) {
+            if (java.nio.file.Files.exists(java.nio.file.Path.of(path))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Opens the original file of the source image for a face in the operating
+     * system default viewer.
+     *
+     * <p>The first still-existing stored path for the image is used. Returns
+     * {@code false} without side effects when no stored path exists on disk or
+     * when the desktop platform does not support opening files.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if the file was handed to the default viewer
+     * @throws IOException  if the default viewer cannot open the file
+     * @throws SQLException on database access failure
+     */
+    public boolean openOriginal(String imageHash) throws IOException, SQLException {
+        List<String> paths = imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"));
+        Optional<Path> existing = ViewService.firstExistingPath(paths);
+        if (existing.isEmpty()) {
+            return false;
+        }
+        if (!Desktop.isDesktopSupported()
+                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            return false;
+        }
+        Desktop.getDesktop().open(existing.get().toFile());
+        return true;
     }
 }

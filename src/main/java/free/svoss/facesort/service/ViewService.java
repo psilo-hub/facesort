@@ -130,6 +130,17 @@ public class ViewService {
     }
 
     /**
+     * Tells whether an original file for the given image still exists on disk.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if at least one stored path exists on disk
+     * @throws SQLException on database access failure
+     */
+    public boolean isOriginalAvailable(String hash) throws SQLException {
+        return firstExistingPath(imageDao.getPaths(hash)).isPresent();
+    }
+
+    /**
      * Returns the first path in the list that still exists on disk.
      *
      * <p>Package-private for unit testing.</p>

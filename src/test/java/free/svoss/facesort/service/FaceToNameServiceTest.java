@@ -26,6 +26,7 @@ class FaceToNameServiceTest {
     private Database db;
     private FaceDao faceDao;
     private NameDao nameDao;
+    private ImageDao imageDao;
     private FaceToNameService service;
     private ConfigModel config;
 
@@ -34,9 +35,10 @@ class FaceToNameServiceTest {
         db = Database.inMemory();
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
+        imageDao = new ImageDao(db.getConnection());
         config = new ConfigModel();
         config.setMinNameSimilarity(0.0); // no cutoff by default in these tests
-        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, config);
+        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, imageDao, config);
     }
 
     @AfterEach

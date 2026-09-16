@@ -11,7 +11,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -25,6 +27,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
@@ -188,6 +191,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
                 clusterIndex + 1, clusters.size(), cluster.faces().size()));
         setImage(representativeView, cluster.representative());
         installPathTooltip(representativeView, cluster.representative());
+        installContextMenu(representativeView, cluster.representative());
         nameField.clear();
         candidatesPane.getChildren().clear();
         if (loadCandidates) {
@@ -364,6 +368,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             tag.setOnAction(e -> onTagCandidate(face.id()));
 
             card.getChildren().addAll(thumb, sim, tag);
+            installContextMenu(card, face);
             candidatesPane.getChildren().add(card);
         }
     }
@@ -464,6 +469,53 @@ public class NameFaceView extends BorderPane implements Refreshable {
         Thread thread = new Thread(lookup, "nameface-path-tooltip-" + face.id());
         thread.setDaemon(true);
         thread.start();
+    }
+
+    /**
+     * Installs a right-click context menu on a face thumbnail with an "Open
+     * Original" entry, grayed out while the source image is not available on
+     * disk.
+     *
+     * @param node the node to attach the menu to
+     * @param face the face whose source image should be openable
+     */
+    private void installContextMenu(javafx.scene.Node node, FaceRecord face) {
+        node.setOnContextMenuRequested(e -> {
+            MenuItem openOriginalItem = new MenuItem("Open Original");
+            openOriginalItem.setDisable(!isOriginalAvailable(face));
+            openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
+            new ContextMenu(openOriginalItem).show(node, e.getScreenX(), e.getScreenY());
+        });
+    }
+
+    /**
+     * Tells whether the original file of a face's source image exists on disk.
+     *
+     * @param face the face whose source image to check
+     * @return {@code true} if the original file is available
+     */
+    private boolean isOriginalAvailable(FaceRecord face) {
+        try {
+            return namingService.isOriginalAvailable(face.imageHash());
+        } catch (SQLException ex) {
+            statusLabel.setText("Could not check the original image.");
+            return false;
+        }
+    }
+
+    /**
+     * Opens the original file of a face's source image in the default viewer.
+     *
+     * @param hash content hash of the source image
+     */
+    private void openOriginal(String hash) {
+        try {
+            boolean opened = namingService.openOriginal(hash);
+            statusLabel.setText(opened ? "" : "Original file not found.");
+        } catch (IOException | SQLException ex) {
+            statusLabel.setText("Could not open the original image.");
+            handleFailure("Could not open the original image", ex);
+        }
     }
 
     /**

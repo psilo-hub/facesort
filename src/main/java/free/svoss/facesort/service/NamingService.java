@@ -8,6 +8,9 @@ import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -103,6 +106,51 @@ public final class NamingService {
      */
     public List<String> findImagePaths(String imageHash) throws SQLException {
         return imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"));
+    }
+
+    /**
+     * Tells whether the original file for the given image hash still exists on
+     * disk.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if at least one stored path exists on disk
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public boolean isOriginalAvailable(String imageHash) throws SQLException {
+        for (String path : findImagePaths(imageHash)) {
+            if (java.nio.file.Files.exists(java.nio.file.Path.of(path))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Opens the original file of the source image for a face in the operating
+     * system default viewer.
+     *
+     * <p>The first still-existing stored path for the image is used. Returns
+     * {@code false} without side effects when no stored path exists on disk or
+     * when the desktop platform does not support opening files.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if the file was handed to the default viewer
+     * @throws IOException  if the default viewer cannot open the file
+     * @throws SQLException on database access failure
+     */
+    public boolean openOriginal(String imageHash) throws IOException, SQLException {
+        Optional<Path> existing = ViewService.firstExistingPath(
+                findImagePaths(Objects.requireNonNull(imageHash, "imageHash")));
+        if (existing.isEmpty()) {
+            return false;
+        }
+        if (!Desktop.isDesktopSupported()
+                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            return false;
+        }
+        Desktop.getDesktop().open(existing.get().toFile());
+        return true;
     }
 
     /**

@@ -7,7 +7,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -248,7 +250,28 @@ public class ViewView extends BorderPane implements Refreshable {
 
         box.getChildren().addAll(view, caption);
         box.setOnMouseClicked(e -> openOriginal(hash));
+        box.setOnContextMenuRequested(e -> {
+            MenuItem openOriginalItem = new MenuItem("Open Original");
+            openOriginalItem.setDisable(!isOriginalAvailable(hash));
+            openOriginalItem.setOnAction(ev -> openOriginal(hash));
+            new ContextMenu(openOriginalItem).show(box, e.getScreenX(), e.getScreenY());
+        });
         return box;
+    }
+
+    /**
+     * Tells whether an original file for the given image exists on disk.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if the original file is available
+     */
+    private boolean isOriginalAvailable(String hash) {
+        try {
+            return viewService.isOriginalAvailable(hash);
+        } catch (SQLException ex) {
+            LOG.log(Level.WARNING, "Could not check original availability for " + hash, ex);
+            return false;
+        }
     }
 
     /**

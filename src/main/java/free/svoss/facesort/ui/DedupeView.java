@@ -8,7 +8,9 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
@@ -17,6 +19,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Optional;
@@ -188,6 +191,8 @@ public class DedupeView extends BorderPane {
         nameBLabel.setText(candidate.nameB());
         faceAView.setImage(toImage(candidate.repFaceA()));
         faceBView.setImage(toImage(candidate.repFaceB()));
+        installContextMenu(faceAView, candidate.repFaceA());
+        installContextMenu(faceBView, candidate.repFaceB());
         setDecisionEnabled(true);
     }
 
@@ -283,6 +288,8 @@ public class DedupeView extends BorderPane {
         nameBLabel.setText("");
         faceAView.setImage(null);
         faceBView.setImage(null);
+        installContextMenu(faceAView, null);
+        installContextMenu(faceBView, null);
         setDecisionEnabled(false);
         stopButton.setDisable(true);
         startButton.setDisable(false);
@@ -324,6 +331,58 @@ public class DedupeView extends BorderPane {
         view.setFitHeight(THUMBNAIL_SIZE);
         view.setPreserveRatio(true);
         view.setSmooth(true);
+    }
+
+    /**
+     * Installs a right-click context menu on a face thumbnail with an "Open
+     * Original" entry, grayed out while the source image is not available on
+     * disk.
+     *
+     * @param node the node to attach the menu to
+     * @param face the face whose source image should be openable
+     */
+    private void installContextMenu(javafx.scene.Node node, FaceRecord face) {
+        if (face == null) {
+            node.setOnContextMenuRequested(null);
+            return;
+        }
+        node.setOnContextMenuRequested(e -> {
+            MenuItem openOriginalItem = new MenuItem("Open Original");
+            openOriginalItem.setDisable(!isOriginalAvailable(face));
+            openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
+            new ContextMenu(openOriginalItem).show(node, e.getScreenX(), e.getScreenY());
+        });
+    }
+
+    /**
+     * Tells whether the original file of a face's source image exists on disk.
+     *
+     * @param face the face whose source image to check
+     * @return {@code true} if the original file is available
+     */
+    private boolean isOriginalAvailable(FaceRecord face) {
+        try {
+            return dedupService.isOriginalAvailable(face.imageHash());
+        } catch (SQLException ex) {
+            LOG.log(Level.WARNING, "Could not check original availability for "
+                    + face.imageHash(), ex);
+            return false;
+        }
+    }
+
+    /**
+     * Opens the original file of a face's source image in the default viewer.
+     *
+     * @param hash content hash of the source image
+     */
+    private void openOriginal(String hash) {
+        try {
+            boolean opened = dedupService.openOriginal(hash);
+            statusLabel.setText(opened ? "" : "Original file not found.");
+        } catch (IOException | SQLException ex) {
+            LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
+            showError("Could not open the original image", ex);
+        }
     }
 
     /**

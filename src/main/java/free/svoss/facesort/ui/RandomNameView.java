@@ -9,12 +9,15 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -23,6 +26,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -214,8 +218,60 @@ public class RandomNameView extends BorderPane implements Refreshable {
             idLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
             card.getChildren().addAll(thumb, idLabel);
-            card.setOnMouseClicked(e -> toggleSelected(card));
+            card.setOnMouseClicked(e -> {
+                if (e.getButton() == MouseButton.PRIMARY) {
+                    toggleSelected(card);
+                }
+            });
+            installContextMenu(card, face);
             facesPane.getChildren().add(card);
+        }
+    }
+
+    /**
+     * Installs a right-click context menu on a face card with an "Open
+     * Original" entry, grayed out while the source image is not available on
+     * disk.
+     *
+     * @param card the card to attach the menu to
+     * @param face the face whose source image should be openable
+     */
+    private void installContextMenu(VBox card, FaceRecord face) {
+        card.setOnContextMenuRequested(e -> {
+            MenuItem openOriginalItem = new MenuItem("Open Original");
+            openOriginalItem.setDisable(!isOriginalAvailable(face));
+            openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
+            new ContextMenu(openOriginalItem).show(card, e.getScreenX(), e.getScreenY());
+        });
+    }
+
+    /**
+     * Tells whether the original file of a face's source image exists on disk.
+     *
+     * @param face the face whose source image to check
+     * @return {@code true} if the original file is available
+     */
+    private boolean isOriginalAvailable(FaceRecord face) {
+        try {
+            return namingService.isOriginalAvailable(face.imageHash());
+        } catch (SQLException ex) {
+            statusLabel.setText("Could not check the original image.");
+            return false;
+        }
+    }
+
+    /**
+     * Opens the original file of a face's source image in the default viewer.
+     *
+     * @param hash content hash of the source image
+     */
+    private void openOriginal(String hash) {
+        try {
+            boolean opened = namingService.openOriginal(hash);
+            statusLabel.setText(opened ? "" : "Original file not found.");
+        } catch (IOException | SQLException ex) {
+            statusLabel.setText("Could not open the original image.");
+            handleFailure("Could not open the original image", ex);
         }
     }
 
