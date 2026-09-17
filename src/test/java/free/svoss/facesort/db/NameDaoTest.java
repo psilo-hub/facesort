@@ -86,6 +86,31 @@ class NameDaoTest {
     }
 
     @Test
+    void rename_updatesNameInDatabase() throws Exception {
+        long id = dao.insert("Alice");
+        dao.insert("Bob");
+
+        dao.rename(id, "Alicia");
+
+        assertEquals("Alicia", dao.findById(id).orElseThrow().name());
+        assertTrue(dao.findByName("Alice").isEmpty(), "old name must no longer exist");
+        assertEquals("Bob", dao.findByName("Bob").orElseThrow().name());
+    }
+
+    @Test
+    void rename_unknownId_throws() throws Exception {
+        assertThrows(SQLException.class, () -> dao.rename(999L, "Nobody"));
+    }
+
+    @Test
+    void rename_duplicateName_violatesUniqueConstraint() throws Exception {
+        long alice = dao.insert("Alice");
+        dao.insert("Bob");
+        assertThrows(SQLException.class, () -> dao.rename(alice, "Bob"),
+                "UNIQUE constraint on names.name must reject colliding renames");
+    }
+
+    @Test
     void count_tracksInsertsAndDeletes() throws Exception {
         assertEquals(0, dao.count());
         dao.insert("Alice");

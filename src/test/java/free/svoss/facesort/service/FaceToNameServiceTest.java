@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -240,5 +241,62 @@ class FaceToNameServiceTest {
         assertEquals(2, names.size());
         assertEquals("Alice", names.get(0).name());
         assertEquals("Bob", names.get(1).name());
+    }
+
+    @Test
+    void renameName_updatesNameAndKeepsFaceAssignments() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+
+        free.svoss.facesort.model.NameRecord renamed = service.renameName(alice, "Alicia");
+
+        assertEquals("Alicia", renamed.name());
+        assertEquals(alice, renamed.id());
+        assertEquals(2, renamed.faceCount());
+        assertEquals(2, faceDao.findByNameId(alice).size(),
+                "faces must stay assigned to the renamed name id");
+        assertTrue(nameDao.findByName("Alice").isEmpty(), "old name must not exist");
+    }
+
+    @Test
+    void renameName_trimsWhitespace() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        service.renameName(alice, "  Alicia  ");
+
+        assertEquals("Alicia", nameDao.findById(alice).orElseThrow().name());
+    }
+
+    @Test
+    void renameName_blankNameThrows() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        assertThrows(IllegalArgumentException.class, () -> service.renameName(alice, "   "));
+        assertThrows(NullPointerException.class, () -> service.renameName(alice, null));
+    }
+
+    @Test
+    void renameName_unknownNameThrows() {
+        assertThrows(IllegalArgumentException.class, () -> service.renameName(999L, "Nobody"));
+    }
+
+    @Test
+    void renameName_existingNameThrows() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        nameDao.insert("Bob");
+
+        assertThrows(IllegalArgumentException.class, () -> service.renameName(alice, "Bob"),
+                "a name may not be renamed to another name's label");
+    }
+
+    @Test
+    void renameName_sameNameIsNoOp() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        free.svoss.facesort.model.NameRecord renamed = service.renameName(alice, "  Alice  ");
+
+        assertEquals("Alice", renamed.name());
+        assertEquals(1, nameDao.count());
     }
 }

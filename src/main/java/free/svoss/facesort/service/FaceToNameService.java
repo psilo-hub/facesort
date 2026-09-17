@@ -250,6 +250,41 @@ public class FaceToNameService {
     }
 
     /**
+     * Renames a name, preserving its id, tagged faces and {not_dupes} links.
+     *
+     * <p>The new name is trimmed; blank names and names that already belong to a
+     * <em>different</em> name row are rejected, because {@code names.name} is
+     * unique. Renaming a name to itself (possibly with different surrounding
+     * whitespace) is a harmless no-op.</p>
+     *
+     * @param nameId  id of the name to rename
+     * @param newName the new display name; must not be blank
+     * @return the updated name record with its current face count
+     * @throws NullPointerException     if {@code newName} is null
+     * @throws IllegalArgumentException if {@code newName} is blank or already
+     *                                  used by another name
+     * @throws SQLException             on database access failure
+     */
+    public NameRecord renameName(long nameId, String newName) throws SQLException {
+        String trimmed = Objects.requireNonNull(newName, "newName").trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("name must not be blank");
+        }
+        NameRecord current = nameDao.findById(nameId)
+                .orElseThrow(() -> new IllegalArgumentException("Name not found: " + nameId));
+        if (trimmed.equals(current.name())) {
+            return current;
+        }
+        Optional<NameRecord> clash = nameDao.findByName(trimmed);
+        if (clash.isPresent() && clash.get().id() != nameId) {
+            throw new IllegalArgumentException("A name called '" + trimmed + "' already exists.");
+        }
+        nameDao.rename(nameId, trimmed);
+        return nameDao.findById(nameId)
+                .orElseThrow(() -> new SQLException("Could not reload renamed name"));
+    }
+
+    /**
      * Tells whether the original file for the given image hash still exists on
      * disk.
      *

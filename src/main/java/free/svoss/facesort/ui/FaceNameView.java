@@ -19,6 +19,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -65,6 +66,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
             new CheckBox("Exclude faces closer to another name");
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button("Tag selected");
+    private final Button renameButton = new Button("Rename...");
 
     private NameRecord activeName;
     private Task<?> activeTask;
@@ -109,6 +111,12 @@ public class FaceNameView extends BorderPane implements Refreshable {
         tagSelectedButton.setDisable(true);
         tagSelectedButton.setOnAction(e -> onTagSelected());
 
+        renameButton.setOnAction(e -> onRename());
+        renameButton.disableProperty().bind(
+                nameList.getSelectionModel().selectedItemProperty().isNull());
+        renameButton.setTooltip(tooltip("Rename the selected name. Faces already "
+                + "tagged with the name keep their assignments."));
+
         Tooltip exclusionTip = new Tooltip("Only show faces that are at least as similar "
                 + "to the selected name as to any other name's average embedding.\n\n"
                 + "When checked, faces that are more similar to another name's average "
@@ -126,7 +134,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
         VBox left = new VBox(6,
                 new Label("Names:"),
                 nameList,
-                tagSelectedButton);
+                tagSelectedButton,
+                renameButton);
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
@@ -428,6 +437,76 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 handleFailure("Could not tag faces", activeTask.getException()));
 
         startTask("facename-tagger");
+    }
+
+    /**
+     * Offers to rename the currently selected name. The rename runs on a
+     * background task and, on success, reloads the name list and the candidates
+     * for the (now renamed) active name.
+     */
+    private void onRename() {
+        if (activeName == null) {
+            return;
+        }
+        TextInputDialog dialog = new TextInputDialog(activeName.name());
+        dialog.setTitle("Rename");
+        dialog.setHeaderText("Rename '" + activeName.name() + "'");
+        dialog.setContentText("New name:");
+        Button okButton = (Button) dialog.getDialogPane().lookupButton(
+                javafx.scene.control.ButtonType.OK);
+        okButton.setText("Rename");
+
+        if (!dialog.showAndWait().isPresent()) {
+            return;
+        }
+        String newName = dialog.getEditor().getText().trim();
+        if (newName.isEmpty()) {
+            statusLabel.setText("The name cannot be empty.");
+            return;
+        }
+        if (newName.equals(activeName.name())) {
+            statusLabel.setText("The name is unchanged.");
+            return;
+        }
+
+        statusLabel.setText("Renaming to '" + newName + "'...");
+        setTask(new Task<NameRecord>() {
+            @Override
+            protected NameRecord call() throws SQLException {
+                return faceToNameService.renameName(activeName.id(), newName);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            activeName = (NameRecord) activeTask.getValue();
+            statusLabel.setText("Renamed to '" + activeName.name() + "'.");
+            loadNames(true); // refresh list and candidates for the renamed name
+        });
+
+        activeTask.setOnFailed(e -> {
+            Throwable error = activeTask.getException();
+            statusLabel.setText(error instanceof IllegalArgumentException
+                    ? error.getMessage()
+                    : "Could not rename the name.");
+            if (!(error instanceof IllegalArgumentException)) {
+                handleFailure("Could not rename the name", error);
+            }
+        });
+
+        startTask("facename-renamer");
+    }
+
+    /**
+     * Builds a wrapped tooltip for a control explanation.
+     *
+     * @param text the tooltip text
+     * @return a tooltip that wraps its text within a maximum width
+     */
+    private static Tooltip tooltip(String text) {
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.setWrapText(true);
+        tooltip.setMaxWidth(420);
+        return tooltip;
     }
 
     /**

@@ -85,6 +85,27 @@ public class NameDao {
     }
 
     /**
+     * Renames the name with the given id.
+     *
+     * @param id      id of the name to rename
+     * @param newName the new display name; must satisfy the UNIQUE constraint
+     *                on {@code names.name}
+     * @throws SQLException if the row does not exist, the name is blank, or the
+     *                      UNIQUE constraint is violated
+     */
+    public void rename(long id, String newName) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE names SET name = ? WHERE id = ?")) {
+            ps.setString(1, newName);
+            ps.setLong(2, id);
+            int updated = ps.executeUpdate();
+            if (updated == 0) {
+                throw new SQLException("No name with id " + id);
+            }
+        }
+    }
+
+    /**
      * Deletes a name by id. Cascades will handle not_dupes and set face name_ids to NULL.
      */
     public void delete(long id) throws SQLException {
