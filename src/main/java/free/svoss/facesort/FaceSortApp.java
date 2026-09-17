@@ -22,6 +22,7 @@ import free.svoss.facesort.ui.NameFaceView;
 import free.svoss.facesort.ui.RandomNameView;
 import free.svoss.facesort.ui.SettingsView;
 import free.svoss.facesort.ui.ViewView;
+import free.svoss.facesort.update.UpdateChecker;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -54,6 +55,9 @@ public class FaceSortApp extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
+        // 0. Background update check on a daemon thread; never blocks startup.
+        new UpdateChecker(Path.of("config")).startInBackground();
+
         // 1. Load configuration (falls back to defaults when the file is absent).
         Path configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
         config = AppConfig.load(configPath);

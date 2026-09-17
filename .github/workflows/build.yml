@@ -21,6 +21,11 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
+      - name: Install rawGitHubFetcher dependency
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/psilo-hub/rawGitHubFetcher.git rawgithubfetcher-deps
+          mvn -B install -DskipTests -f rawgithubfetcher-deps/pom.xml
       - run: mvn -B package -DskipTests
       - uses: actions/upload-artifact@v5
         with:
@@ -61,6 +66,11 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
+      - name: Install rawGitHubFetcher dependency
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/psilo-hub/rawGitHubFetcher.git rawgithubfetcher-deps
+          mvn -B install -DskipTests -f rawgithubfetcher-deps/pom.xml
       - name: Build platform jar
         run: mvn -B package -P${{ matrix.platform }} "-Djavafx.platform=${{ matrix.javafx-platform }}" -DskipTests
       - uses: actions/upload-artifact@v5

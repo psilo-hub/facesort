@@ -26,6 +26,13 @@
             <version>0.1.0</version>
         </dependency>
 
+        <!-- rawGitHubFetcher (locally installed) -->
+        <dependency>
+            <groupId>free.svoss.tools.rawGitHubFetcher</groupId>
+            <artifactId>rawGitHubFetcher</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
