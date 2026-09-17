@@ -164,6 +164,35 @@ class FaceDaoTest {
     }
 
     @Test
+    void untagFacesFromImage_clearsOnlyMatchingFacesOfThatImage() throws Exception {
+        insertImage("img1");
+        insertImage("img2");
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        insertFace("img1", 0, 0, new float[]{1.0f}, alice);
+        insertFace("img1", 20, 0, new float[]{2.0f}, alice);
+        insertFace("img1", 40, 0, new float[]{3.0f}, bob);
+        insertFace("img2", 0, 0, new float[]{4.0f}, alice);
+
+        int untagged = faceDao.untagFacesFromImage("img1", alice);
+
+        assertEquals(2, untagged, "only the two Alice faces of img1 are untagged");
+        assertEquals(1, faceDao.countByNameId(alice), "Alice face in img2 must stay tagged");
+        assertEquals(1, faceDao.countByNameId(bob), "Bob's face must stay tagged");
+        assertEquals(2, faceDao.findUnnamed().size());
+    }
+
+    @Test
+    void untagFacesFromImage_unknownHashUntagsNothing() throws Exception {
+        insertImage("img1");
+        long alice = nameDao.insert("Alice");
+        insertFace("img1", 0, 0, new float[]{1.0f}, alice);
+
+        assertEquals(0, faceDao.untagFacesFromImage("missing", alice));
+        assertEquals(1, faceDao.countByNameId(alice));
+    }
+
+    @Test
     void delete_removesFace() throws Exception {
         insertImage("img1");
         long faceId = insertFace("img1", 0, 0, new float[]{1.0f}, null);

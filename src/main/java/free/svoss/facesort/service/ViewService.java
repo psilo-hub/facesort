@@ -104,6 +104,20 @@ public class ViewService {
     }
 
     /**
+     * Removes the given name from every face of the given image, leaving those
+     * faces unnamed again.
+     *
+     * @param imageHash content hash of the image; must not be null
+     * @param nameId    the name to remove from the image's faces
+     * @return the number of faces that were untagged
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         on database access failure
+     */
+    public int untagFacesFromImage(String imageHash, long nameId) throws SQLException {
+        return faceDao.untagFacesFromImage(Objects.requireNonNull(imageHash, "imageHash"), nameId);
+    }
+
+    /**
      * Opens the original file of an image in the operating system default
      * viewer.
      *

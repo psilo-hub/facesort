@@ -254,7 +254,10 @@ public class ViewView extends BorderPane implements Refreshable {
             MenuItem openOriginalItem = new MenuItem("Open Original");
             openOriginalItem.setDisable(!isOriginalAvailable(hash));
             openOriginalItem.setOnAction(ev -> openOriginal(hash));
-            new ContextMenu(openOriginalItem).show(box, e.getScreenX(), e.getScreenY());
+            MenuItem untagItem = new MenuItem("Untag from '" + activeNameText + "'");
+            untagItem.setOnAction(ev -> untagFaces(hash));
+            new ContextMenu(openOriginalItem, untagItem)
+                    .show(box, e.getScreenX(), e.getScreenY());
         });
         return box;
     }
@@ -287,6 +290,37 @@ public class ViewView extends BorderPane implements Refreshable {
             LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
             handleFailure("Could not open the original image", ex);
         }
+    }
+
+    /**
+     * Untags every face in the given image that is currently tagged with the
+     * active name, then reloads the image grid so the image disappears from
+     * the list.
+     *
+     * @param hash content hash of the image
+     */
+    private void untagFaces(String hash) {
+        statusLabel.setText("Untagging faces in this image from '" + activeNameText + "'...");
+        setTask(new Task<Integer>() {
+            @Override
+            protected Integer call() throws SQLException {
+                return viewService.untagFacesFromImage(hash, activeNameId);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            int count = (Integer) activeTask.getValue();
+            statusLabel.setText("Untagged " + count + (count == 1 ? " face" : " faces")
+                    + " from '" + activeNameText + "'.");
+            openNameImages(activeNameId, activeNameText);
+        });
+
+        activeTask.setOnFailed(e -> {
+            statusLabel.setText("Could not untag faces.");
+            handleFailure("Could not untag faces", activeTask.getException());
+        });
+
+        startTask("view-untagger");
     }
 
     /**

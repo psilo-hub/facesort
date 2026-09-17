@@ -181,6 +181,24 @@ public class FaceDao {
     }
 
     /**
+     * Sets the name of every face of the given image that is tagged with the
+     * given name back to NULL, leaving those faces unnamed.
+     *
+     * @param imageHash content hash of the image; must not be null
+     * @param nameId    the name to remove from the image's faces
+     * @return the number of faces that were untagged
+     * @throws SQLException on database error
+     */
+    public int untagFacesFromImage(String imageHash, long nameId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE faces SET name_id = NULL WHERE image_hash = ? AND name_id = ?")) {
+            ps.setString(1, imageHash);
+            ps.setLong(2, nameId);
+            return ps.executeUpdate();
+        }
+    }
+
+    /**
      * Counts faces with a given name_id.
      */
     public int countByNameId(long nameId) throws SQLException {
