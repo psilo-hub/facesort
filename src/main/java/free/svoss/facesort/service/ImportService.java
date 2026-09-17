@@ -39,7 +39,10 @@ import java.util.logging.Logger;
  * <p>For each image file the service:
  * <ol>
  *   <li>Computes a SHA-256 content hash.</li>
- *   <li>If the image is new, runs face detection and stores qualifying faces.</li>
+ *   <li>If the image is new, runs face detection and stores qualifying faces.
+ *       Images larger than the configured detection dimension are scaled down
+ *       first so detection stays fast and cheap on high-resolution photos; the
+ *       resulting bounding boxes are mapped back to the original coordinates.</li>
  *   <li>If the image exists but from a new path, records the additional path.</li>
  *   <li>Generates a thumbnail if one is not already stored.</li>
  * </ol>
@@ -54,7 +57,9 @@ public class ImportService implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(ImportService.class.getName());
 
-    /** Maximum dimension (width or height) for face sub-image thumbnails. */
+    /** Maximum dimension (width or height) for face sub-image thumbnails. Face
+     * crops larger than this are downscaled before embedding and encoding, so
+     * the embedding model never sees unnecessarily large inputs. */
     private static final int SUB_IMAGE_MAX_DIM = 160;
 
     /** JPEG quality for face sub-image encoding. */
@@ -300,26 +305,36 @@ public class ImportService implements AutoCloseable {
 
         // ---- New-image branch: heavy work outside the lock ----
         BufferedImage image = ImageUtils.readImage(file);
-        DetectedFace[] allFaces = service.detectFaces(image);
 
-        // Filter faces by criteria
+        // High-resolution images are scaled down before detection so the neural
+        // network runs on a bounded input. Bounding boxes are mapped back to the
+        // original image coordinates afterwards.
+        int maxDetectionDimension = config.getMaxDetectionDimension();
+        double detectionScale = computeDetectionScale(image, maxDetectionDimension);
+        BufferedImage detectionImage = detectionScale < 1.0
+                ? ImageUtils.downsize(image, maxDetectionDimension)
+                : image;
+        DetectedFace[] allFaces = service.detectFaces(detectionImage);
+
+        // Filter faces by criteria, working in original image coordinates
         List<DetectedFace> qualifying = Arrays.stream(allFaces)
+                .map(face -> mapToOriginal(face, detectionScale))
                 .filter(f -> f.width() >= minBbox && f.height() >= minBbox)
                 .filter(f -> f.confidence() >= minConfidence)
                 .limit(maxFacesPerImage)
                 .toList();
 
-        // Encode face sub-images before touching the database
+        // Encode face sub-images before touching the database. Each face is
+        // cropped at full resolution but immediately downscaled so that neither
+        // embedding inference nor JPEG encoding ever processes a large crop.
         List<FaceRecord> faceRecords = new ArrayList<>();
         int facesAdded = 0;
         for (DetectedFace face : qualifying) {
             try {
                 BufferedImage faceCrop = face.crop(image);
-                float[] embedding = service.getEmbedding(faceCrop);
-
-                // Downsize the crop and encode as JPEG for storage
-                BufferedImage downsized = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
-                byte[] subImageJpg = ImageUtils.toJpegBytes(downsized, SUB_IMAGE_JPEG_QUALITY);
+                BufferedImage faceThumb = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
+                float[] embedding = service.getEmbedding(faceThumb);
+                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, SUB_IMAGE_JPEG_QUALITY);
 
                 faceRecords.add(new FaceRecord(
                         0, hash,
@@ -362,6 +377,46 @@ public class ImportService implements AutoCloseable {
         generateThumbnailIfAbsent(hash, image);
 
         return FileResult.newImage(facesAdded);
+    }
+
+    /**
+     * Computes the factor used to scale an image down for face detection.
+     * Returns {@code 1.0} when the image already fits within
+     * {@code maxDimension}.
+     *
+     * @param image        the full-resolution image
+     * @param maxDimension longest allowed side of the detection input
+     * @return the scale applied to the image ({@code 0 < scale <= 1})
+     */
+    private static double computeDetectionScale(BufferedImage image, int maxDimension) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width <= maxDimension && height <= maxDimension) {
+            return 1.0;
+        }
+        return Math.min((double) maxDimension / width, (double) maxDimension / height);
+    }
+
+    /**
+     * Maps a face detected on a scaled-down image back to the original image
+     * coordinates. When {@code scale} is {@code 1.0} the face is returned
+     * unchanged. Coordinates are rounded the same way {@link ImageUtils#crop}
+     * rounds them.
+     *
+     * @param face  the face detected on the scaled image
+     * @param scale the scale the image was downscaled by before detection
+     * @return an equivalent face in original image coordinates
+     */
+    private static DetectedFace mapToOriginal(DetectedFace face, double scale) {
+        if (scale >= 1.0) {
+            return face;
+        }
+        return new DetectedFace(
+                (int) Math.round(face.x() / scale),
+                (int) Math.round(face.y() / scale),
+                (int) Math.round(face.width() / scale),
+                (int) Math.round(face.height() / scale),
+                face.confidence());
     }
 
     /**

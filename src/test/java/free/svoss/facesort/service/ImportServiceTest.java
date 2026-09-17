@@ -4,6 +4,7 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.util.EmbeddingUtils;
 import free.svoss.tools.faceai.DetectedFace;
 import org.junit.jupiter.api.AfterEach;
@@ -164,6 +165,49 @@ class ImportServiceTest {
 
         @Override
         public void close() {
+        }
+    }
+
+    /**
+     * Engine that records the dimensions of every image offered to face
+     * detection and the largest face crop handed to embedding. Used to verify
+     * that high-resolution images are downscaled before detection and that
+     * embedding never sees oversized face crops.
+     */
+    private static final class RecordingEngine extends CountingEngine {
+
+        private int detectionWidth;
+        private int detectionHeight;
+        private final AtomicInteger maxEmbeddingDim = new AtomicInteger();
+
+        RecordingEngine(DetectedFace[] faces, float[] embedding) {
+            super(faces, embedding);
+        }
+
+        int detectionWidth() {
+            return detectionWidth;
+        }
+
+        int detectionHeight() {
+            return detectionHeight;
+        }
+
+        int maxEmbeddingDim() {
+            return maxEmbeddingDim.get();
+        }
+
+        @Override
+        public synchronized DetectedFace[] detectFaces(BufferedImage image) {
+            detectionWidth = image.getWidth();
+            detectionHeight = image.getHeight();
+            return super.detectFaces(image);
+        }
+
+        @Override
+        public synchronized float[] getEmbedding(BufferedImage image) {
+            int max = Math.max(image.getWidth(), image.getHeight());
+            maxEmbeddingDim.accumulateAndGet(max, Math::max);
+            return super.getEmbedding(image);
         }
     }
 
@@ -554,5 +598,77 @@ class ImportServiceTest {
         // Parallelism sanity: 6 files x 40ms across 2 workers must not serialize (~240ms ideal).
         assertTrue(elapsedMs < 1500,
                 "import ran too long; workers likely serialized: " + elapsedMs + "ms");
+    }
+
+    // ------------------------------------------------------------------
+    // High-resolution import tests
+    // ------------------------------------------------------------------
+
+    @Test
+    void importFolder_defaultMaxDetectionDimensionIsSane() {
+        assertEquals(1600, new ConfigModel().getMaxDetectionDimension());
+        assertEquals(1600, ConfigModel.DEFAULT_MAX_DETECTION_DIMENSION);
+    }
+
+    @Test
+    void importFolder_scalesDownHighResolutionImageBeforeDetection() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("hi-res"));
+        writePng(dir.resolve("large.png"), 1000, 800, Color.RED);
+
+        // A face reported in detection coordinates (scale factor 0.5 here).
+        RecordingEngine engine = new RecordingEngine(
+                new DetectedFace[]{new DetectedFace(100, 100, 200, 200, 0.95f)},
+                TEST_EMBEDDING);
+        ConfigModel config = config();
+        config.setMaxDetectionDimension(500);
+        ImportService.ImportResult result;
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                new FaceAiService(engine), config)) {
+            result = service.importFolder(dir, null);
+        }
+
+        assertEquals(1, result.newImages());
+        assertEquals(1, result.newFaces());
+        assertEquals(0, result.errors());
+        assertEquals(1, imageDao.getAllHashes().size());
+        assertTrue(imageDao.hasThumbnail(imageDao.getAllHashes().get(0)));
+
+        // Detection ran on the scaled-down image (1000x800 -> 500x400).
+        assertEquals(500, engine.detectionWidth());
+        assertEquals(400, engine.detectionHeight());
+
+        // Embedding never saw a face crop larger than the sub-image cap.
+        assertTrue(engine.maxEmbeddingDim() <= 160,
+                "embedding crop too large: " + engine.maxEmbeddingDim());
+
+        // Stored bounding box is mapped back to original coordinates:
+        // 100,100,200,200 at scale 0.5 -> 200,200,400,400.
+        List<FaceRecord> faces = faceDao.findUnnamed();
+        assertEquals(1, faces.size());
+        assertEquals(200, faces.get(0).bboxX());
+        assertEquals(200, faces.get(0).bboxY());
+        assertEquals(400, faces.get(0).bboxW());
+        assertEquals(400, faces.get(0).bboxH());
+    }
+
+    @Test
+    void importFolder_keepsSmallImagesAtNativeResolution() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("small"));
+        writePng(dir.resolve("small.png"), 200, 200, Color.GREEN);
+
+        RecordingEngine engine = new RecordingEngine(testFaces(), TEST_EMBEDDING);
+        ImportService.ImportResult result;
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                new FaceAiService(engine), config())) {
+            result = service.importFolder(dir, null);
+        }
+
+        assertEquals(0, result.errors());
+        assertEquals(1, result.newImages());
+        // Well below the default 1600px threshold: no downscaling.
+        assertEquals(200, engine.detectionWidth());
+        assertEquals(200, engine.detectionHeight());
+        // And the crop (80,80 at 10,10 -> 100px) is capped at 160 for embedding.
+        assertTrue(engine.maxEmbeddingDim() <= 160);
     }
 }

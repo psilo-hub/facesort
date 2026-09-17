@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class ConfigModel {
 
     public static final int DEFAULT_THUMBNAIL_SIZE = 256;
+    public static final int DEFAULT_MAX_DETECTION_DIMENSION = 1600;
     public static final int DEFAULT_MAX_IMPORT_THREADS = 4;
     /** Hard upper bound for parallel import worker threads. */
     public static final int MAX_IMPORT_THREADS = 16;
@@ -28,6 +29,10 @@ public class ConfigModel {
     private double minConfidence = 0.8;
     @JsonProperty("maxFacesPerImage")
     private int maxFacesPerImage = 10;
+
+    // Import performance
+    @JsonProperty("maxDetectionDimension")
+    private int maxDetectionDimension = DEFAULT_MAX_DETECTION_DIMENSION;
 
     // Clustering
     @JsonProperty("clusteringThreshold")
@@ -89,6 +94,14 @@ public class ConfigModel {
 
     public void setMaxFacesPerImage(int maxFacesPerImage) {
         this.maxFacesPerImage = maxFacesPerImage;
+    }
+
+    public int getMaxDetectionDimension() {
+        return maxDetectionDimension;
+    }
+
+    public void setMaxDetectionDimension(int maxDetectionDimension) {
+        this.maxDetectionDimension = maxDetectionDimension;
     }
 
     public double getClusteringThreshold() {

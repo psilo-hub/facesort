@@ -37,6 +37,7 @@ public class SettingsView extends BorderPane {
     private final Spinner<Integer> minBoundingBoxSize = intSpinner(20, 500, 10);
     private final Spinner<Double> minConfidence = doubleSpinner(0.1, 1.0, 0.05);
     private final Spinner<Integer> maxFacesPerImage = intSpinner(1, 100, 1);
+    private final Spinner<Integer> maxDetectionDimension = intSpinner(400, 4000, 100);
     private final Spinner<Double> clusteringThreshold = doubleSpinner(0.1, 1.0, 0.05);
     private final Spinner<Integer> hnswM = intSpinner(4, 128, 4);
     private final Spinner<Integer> hnswEfConstruction = intSpinner(50, 1000, 50);
@@ -149,6 +150,15 @@ public class SettingsView extends BorderPane {
                         + "default location or enter a path to control where models live.");
         faceaiCacheDir.setPromptText("Leave blank for the default cache location");
 
+        addRow(grid, row++, "Max detection size:", maxDetectionDimension,
+                "Largest width/height (in pixels) an image may have before it is "
+                        + "scaled down before face detection runs.\n\n"
+                        + "Default: " + defaults.getMaxDetectionDimension() + " px.\n\n"
+                        + "Higher values detect small or distant faces in huge photos more "
+                        + "reliably but use more memory and take much longer. Lower values "
+                        + "make detection fast and cheap on high-resolution photos at the "
+                        + "risk of missing very small faces.");
+
         addRow(grid, row, "Thumbnail size:", thumbnailSize,
                 "Maximum width/height (in pixels) of the full-image thumbnail stored "
                         + "for each imported image.\n\n"
@@ -242,6 +252,7 @@ public class SettingsView extends BorderPane {
         minBoundingBoxSize.getValueFactory().setValue(config.getMinBoundingBoxSize());
         minConfidence.getValueFactory().setValue(config.getMinConfidence());
         maxFacesPerImage.getValueFactory().setValue(config.getMaxFacesPerImage());
+        maxDetectionDimension.getValueFactory().setValue(config.getMaxDetectionDimension());
         clusteringThreshold.getValueFactory().setValue(config.getClusteringThreshold());
         hnswM.getValueFactory().setValue(config.getHnswM());
         hnswEfConstruction.getValueFactory().setValue(config.getHnswEfConstruction());
@@ -260,6 +271,7 @@ public class SettingsView extends BorderPane {
         config.setMinBoundingBoxSize(minBoundingBoxSize.getValue());
         config.setMinConfidence(minConfidence.getValue());
         config.setMaxFacesPerImage(maxFacesPerImage.getValue());
+        config.setMaxDetectionDimension(maxDetectionDimension.getValue());
         config.setClusteringThreshold(clusteringThreshold.getValue());
         config.setHnswM(hnswM.getValue());
         config.setHnswEfConstruction(hnswEfConstruction.getValue());
@@ -287,6 +299,7 @@ public class SettingsView extends BorderPane {
         config.setMinBoundingBoxSize(defaults.getMinBoundingBoxSize());
         config.setMinConfidence(defaults.getMinConfidence());
         config.setMaxFacesPerImage(defaults.getMaxFacesPerImage());
+        config.setMaxDetectionDimension(defaults.getMaxDetectionDimension());
         config.setClusteringThreshold(defaults.getClusteringThreshold());
         config.setHnswM(defaults.getHnswM());
         config.setHnswEfConstruction(defaults.getHnswEfConstruction());
