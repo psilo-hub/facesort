@@ -4,6 +4,7 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.tools.faceai.DetectedFace;
 import free.svoss.tools.faceai.FaceAI;
 import free.svoss.tools.faceai.FaceAIConfig;
+import free.svoss.tools.faceai.ModelDownloadListener;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -45,6 +46,38 @@ public class FaceAiService implements AutoCloseable {
      */
     FaceAiService(Engine engine) {
         this.engine = Objects.requireNonNull(engine, "engine");
+    }
+
+    /**
+     * Checks whether the FaceAI models are already present in the cache that the
+     * given settings resolve to.
+     *
+     * @param config application settings; must not be null
+     * @return {@code true} when no first-run download is required
+     */
+    public static boolean modelsDownloaded(ConfigModel config) {
+        try (FaceAI faceai = FaceAI.create(toFaceAIConfig(config))) {
+            return faceai.isModelsDownloaded();
+        }
+    }
+
+    /**
+     * Downloads the FaceAI models if they are not cached yet, reporting progress
+     * to the given listener. Models already cached are skipped without any
+     * listener events.
+     *
+     * @param config   application settings; must not be null
+     * @param listener download progress listener; must not be null
+     * @throws free.svoss.tools.faceai.FaceAIException if a download fails
+     */
+    public static void downloadModelsIfNecessary(
+            ConfigModel config, ModelDownloadListener listener) {
+        FaceAIConfig faceAIConfig = toFaceAIConfig(config).toBuilder()
+                .modelDownloadListener(listener)
+                .build();
+        try (FaceAI faceai = FaceAI.create(faceAIConfig)) {
+            faceai.downloadModelsIfNecessary();
+        }
     }
 
     /**
@@ -125,7 +158,7 @@ public class FaceAiService implements AutoCloseable {
      * @param config application settings; must not be null
      * @return the FaceAI configuration
      */
-    static FaceAIConfig toFaceAIConfig(ConfigModel config) {
+    public static FaceAIConfig toFaceAIConfig(ConfigModel config) {
         String cacheDir = config.getFaceaiCacheDir();
         if (cacheDir == null || cacheDir.isBlank()) {
             cacheDir = "";

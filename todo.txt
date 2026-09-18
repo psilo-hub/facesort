@@ -2,7 +2,7 @@
 
 2. In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images. (done)
 
-3. Model download progress
+3. Model download progress (done)
 
 4. Filter images by path
 

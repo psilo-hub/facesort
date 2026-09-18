@@ -135,3 +135,19 @@
     -fx-font-weight: bold;
     -fx-font-size: 14px;
 }
+
+/* ---- Model download frame (first start) ---- */
+
+.download-caption {
+    -fx-font-weight: bold;
+    -fx-text-fill: #555555;
+}
+
+.download-url {
+    -fx-text-fill: #1f6feb;
+    -fx-text-decoration: underline;
+}
+
+.download-destination {
+    -fx-text-fill: #333333;
+}

@@ -19,6 +19,7 @@ import free.svoss.facesort.ui.FaceNameView;
 import free.svoss.facesort.ui.FeedbackView;
 import free.svoss.facesort.ui.ImportView;
 import free.svoss.facesort.ui.MainWindow;
+import free.svoss.facesort.ui.ModelDownloadView;
 import free.svoss.facesort.ui.NameFaceView;
 import free.svoss.facesort.ui.RandomNameView;
 import free.svoss.facesort.ui.SettingsView;
@@ -26,6 +27,7 @@ import free.svoss.facesort.ui.ViewView;
 import free.svoss.facesort.update.UpdateChecker;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Tab;
@@ -44,28 +46,106 @@ import java.util.List;
  * every service, wires the views into the main tab window and shows it.
  * If face recognition initialization fails, an error dialog is shown and the
  * application exits gracefully.</p>
+ *
+ * <p>On the first start, when the FaceAI models have not been downloaded yet,
+ * a model-download frame is shown first so the user sees which file is being
+ * downloaded and where it is stored; the main window is built once the models
+ * are ready.</p>
  */
 public class FaceSortApp extends Application {
 
     private static final String APP_TITLE = "Face Sort";
+    private static final double DOWNLOAD_SCENE_WIDTH = 680;
+    private static final double DOWNLOAD_SCENE_HEIGHT = 520;
 
     private ConfigModel config;
+    private Path configPath;
     private Database database;
     private FaceAiService faceAiService;
     private ImportService importService;
 
     @Override
-    public void start(Stage primaryStage) throws Exception {
-        // 0. Load configuration (falls back to defaults when the file is absent).
-        Path configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
-        config = AppConfig.load(configPath);
+    public void start(Stage primaryStage) {
+        try {
+            // 0. Load configuration (falls back to defaults when the file is absent).
+            configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
+            config = AppConfig.load(configPath);
 
-        // 1. Background update check on a daemon thread; never blocks startup.
-        //    Skipped when the user disabled it in the settings.
-        if (config.isUpdateCheckEnabled()) {
-            new UpdateChecker(Path.of("config")).startInBackground();
+            // 1. Background update check on a daemon thread; never blocks startup.
+            //    Skipped when the user disabled it in the settings.
+            if (config.isUpdateCheckEnabled()) {
+                new UpdateChecker(Path.of("config")).startInBackground();
+            }
+
+            // 2. On the very first start the FaceAI models are not cached yet.
+            //    Download them first and show a frame so the user can watch progress.
+            if (FaceAiService.modelsDownloaded(config)) {
+                showMainWindow(primaryStage);
+            } else {
+                startModelDownload(primaryStage);
+            }
+        } catch (Exception e) {
+            showStartupError("Failed to start: " + e.getMessage(), e);
+            Platform.exit();
+        }
+    }
+
+    /**
+     * Shows the model-download frame and runs the FaceAI model download in the
+     * background. When it finishes the main window is built and shown; on
+     * failure an error dialog is shown and the application exits.
+     *
+     * @param primaryStage the primary stage to display the frame in
+     */
+    private void startModelDownload(Stage primaryStage) {
+        String destination = FaceAiService.toFaceAIConfig(config)
+                .resolvedCacheDir().getAbsolutePath();
+        ModelDownloadView downloadView = new ModelDownloadView(destination);
+
+        Scene downloadScene = new Scene(downloadView, DOWNLOAD_SCENE_WIDTH, DOWNLOAD_SCENE_HEIGHT);
+        var cssResource = getClass().getResource("/css/styles.css");
+        if (cssResource != null) {
+            downloadScene.getStylesheets().add(cssResource.toExternalForm());
         }
 
+        primaryStage.setTitle(APP_TITLE);
+        primaryStage.setScene(downloadScene);
+        primaryStage.show();
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                FaceAiService.downloadModelsIfNecessary(config, downloadView.listener());
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> {
+            try {
+                showMainWindow(primaryStage);
+            } catch (Exception ex) {
+                showStartupError("Failed to initialize the application: " + ex.getMessage(), ex);
+                Platform.exit();
+            }
+        });
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
+            showStartupError("Failed to download the FaceAI models: "
+                    + (error != null ? error.getMessage() : "unknown error"), error);
+            Platform.exit();
+        });
+
+        Thread thread = new Thread(task, "model-download");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
+     * Opens the database, wires up services and views, and shows the main tab
+     * window. Must be called on the JavaFX application thread.
+     *
+     * @param primaryStage the primary stage to display the main window in
+     */
+    private void showMainWindow(Stage primaryStage) throws Exception {
         // 2. Open the database under config/, creating the directory if needed.
         Path configDir = Path.of("config");
         Files.createDirectories(configDir);
@@ -79,7 +159,8 @@ public class FaceSortApp extends Application {
         NameDao nameDao = new NameDao(connection);
         NotDupeDao notDupeDao = new NotDupeDao(connection);
 
-        // 4. FaceAI engine. May download models on first run; fail with a dialog.
+        // 4. FaceAI engine. Models are already cached at this point (downloaded
+        //    on first start); they are loaded lazily on first use.
         try {
             faceAiService = new FaceAiService(config);
         } catch (Exception e) {

@@ -19,6 +19,9 @@ All notable changes to Face Sort will be documented in this file.
 - Setting to disable the automatic update check on startup.
 - Setting to configure the maximum number of images shown as candidates in
   the "Face Name" tab.
+- On first start, a model-download frame shows the file being downloaded
+  (its URL), where it is stored locally and a progress bar until the models
+  are ready.
 
 ### Changed
 - Optimized image import for large folders.
