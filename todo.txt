@@ -3,5 +3,3 @@
 2. Select range
 
 3. Export feature
-
-4. Proper readme
