@@ -4,7 +4,7 @@
 
 3. Model download progress (done)
 
-4. Filter images by path
+4. Filter images by path: In the "Random Tag" tab, and in the "Face Name" , it should be possible to filter the images shown. The user should be able to input a path (or path prefix). In the "Face Name" tab this should filter the "Most similar unnamed faces" that are shown.
 
 5. Select range
 
