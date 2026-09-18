@@ -5,20 +5,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Submits user feedback to web3forms.com.
  *
  * <p>The access key is a public key intended for client-side use, so embedding
  * it in the client application is safe. Feedback is sent as an
- * {@code application/x-www-form-urlencoded} POST; the submission is only treated
- * as successful when the endpoint answers with HTTP 200 and a body whose
- * {@code success} flag is {@code true}.</p>
+ * {@code application/json} POST, which is the content type web3forms requires
+ * for programmatic submissions so that it answers with a JSON payload; a
+ * submission is only treated as successful when the endpoint replies with
+ * HTTP 200 and a body whose {@code success} flag is {@code true}.</p>
  */
 public class FeedbackService {
 
@@ -58,14 +60,16 @@ public class FeedbackService {
      * @throws SubmissionException if the endpoint rejects the submission
      */
     public void submit(String type, String message) throws IOException, SubmissionException {
-        String form = "access_key=" + encode(ACCESS_KEY)
-                + "&botcheck="
-                + "&subject=" + encode(type)
-                + "&message=" + encode(message);
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("access_key", ACCESS_KEY);
+        payload.put("botcheck", "");
+        payload.put("subject", type);
+        payload.put("message", message);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(submitUrl))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(form, StandardCharsets.UTF_8))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(payload),
+                        StandardCharsets.UTF_8))
                 .build();
 
         HttpResponse<String> response;
@@ -77,8 +81,9 @@ public class FeedbackService {
         }
 
         if (response.statusCode() != 200 || !isSuccess(response.body())) {
-            throw new SubmissionException(
-                    "web3forms rejected the submission (HTTP " + response.statusCode() + ")");
+            String detail = serverMessage(response.body());
+            throw new SubmissionException("web3forms rejected the submission (HTTP "
+                    + response.statusCode() + ")" + (detail.isEmpty() ? "" : ": " + detail));
         }
     }
 
@@ -91,8 +96,21 @@ public class FeedbackService {
         }
     }
 
-    private static String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    private static String serverMessage(String jsonBody) {
+        try {
+            JsonNode root = JSON.readTree(jsonBody);
+            JsonNode rootMessage = root.path("message");
+            if (rootMessage.isTextual()) {
+                return rootMessage.asText();
+            }
+            JsonNode bodyMessage = root.path("body").path("message");
+            if (bodyMessage.isTextual()) {
+                return bodyMessage.asText();
+            }
+            return "";
+        } catch (Exception e) {
+            return jsonBody == null ? "" : jsonBody;
+        }
     }
 
     /**
