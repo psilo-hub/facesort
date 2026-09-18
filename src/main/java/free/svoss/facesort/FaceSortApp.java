@@ -16,6 +16,7 @@ import free.svoss.facesort.service.NamingService;
 import free.svoss.facesort.service.ViewService;
 import free.svoss.facesort.ui.DedupeView;
 import free.svoss.facesort.ui.FaceNameView;
+import free.svoss.facesort.ui.FeedbackView;
 import free.svoss.facesort.ui.ImportView;
 import free.svoss.facesort.ui.MainWindow;
 import free.svoss.facesort.ui.NameFaceView;
@@ -105,8 +106,9 @@ public class FaceSortApp extends Application {
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
         SettingsView settingsView = new SettingsView(config, configPath);
+        FeedbackView feedbackView = new FeedbackView();
 
-        // 7. Main window with the seven tabs.
+        // 7. Main window with the eight tabs.
         MainWindow mainWindow = new MainWindow(
                 new Tab("Import", importView),
                 new Tab("Name Face", nameFaceView),
@@ -114,7 +116,8 @@ public class FaceSortApp extends Application {
                 new Tab("Face Name", faceNameView),
                 new Tab("Deduplicate", dedupeView),
                 new Tab("View", viewView),
-                new Tab("Settings", settingsView));
+                new Tab("Settings", settingsView),
+                new Tab("Feedback", feedbackView));
 
         Scene scene = new Scene(mainWindow, 1200, 800);
         var cssResource = getClass().getResource("/css/styles.css");
