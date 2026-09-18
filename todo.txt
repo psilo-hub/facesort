@@ -1,13 +1,7 @@
-1. Settings ... disable update check (done)
+1. Bug fix: untag a face
 
-2. In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images. (done)
+2. Select range
 
-3. Model download progress (done)
+3. Export feature
 
-4. Filter images by path: In the "Random Tag" tab, and in the "Face Name" , it should be possible to filter the images shown. The user should be able to input a path (or path prefix). In the "Face Name" tab this should filter the "Most similar unnamed faces" that are shown. (done)
-
-5. Select range
-
-6. Export feature
-
-7. Proper readme
+4. Proper readme
