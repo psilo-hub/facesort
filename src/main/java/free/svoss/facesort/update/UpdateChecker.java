@@ -30,7 +30,7 @@ public final class UpdateChecker {
 
     private static final String CHANGELOG_RESOURCE = "/CHANGELOG.md";
     private static final String CHANGELOG_URL =
-            "https://raw.githubusercontent.com/psilo-hub/facesort/main/CHANGELOG.md";
+            "https://raw.githubusercontent.com/psilo-hub/facesort/refs/heads/main/src/main/resources/CHANGELOG.md";
 
     private final Path configDir;
 
