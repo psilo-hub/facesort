@@ -6,6 +6,7 @@ import free.svoss.facesort.config.ConfigModel;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
@@ -46,7 +47,9 @@ public class SettingsView extends BorderPane {
     private final TextField faceaiCacheDir = new TextField();
     private final Spinner<Integer> thumbnailSize = intSpinner(64, 1024, 32);
     private final Spinner<Integer> maxImportThreads = intSpinner(1, ConfigModel.MAX_IMPORT_THREADS, 1);
-    private final Spinner<Double> minNameSimilarity = doubleSpinner(0.0, 1.0, 0.05);
+    private final TextField minNameSimilarity = new TextField();
+    private final TextField faceNameMaxImages = new TextField();
+    private final CheckBox updateCheckEnabled = new CheckBox();
 
     private final Label statusLabel = new Label("");
 
@@ -184,6 +187,20 @@ public class SettingsView extends BorderPane {
                         + "additions. Lower values offer more candidates but risk adding "
                         + "a different person.");
 
+        addRow(grid, ++row, "Max images in \"Face Name\" tab:", faceNameMaxImages,
+                "Maximum number of similar unnamed faces shown as candidates in the "
+                        + "\"Face Name\" tab.\n\n"
+                        + "Default: " + defaults.getFaceNameMaxImages() + ".\n\n"
+                        + "Higher values show more candidate faces to choose from, while "
+                        + "lower values keep the grid smaller.");
+
+        addRow(grid, ++row, "Check for updates on startup:", updateCheckEnabled,
+                "Whether Face Sort checks the project's GitHub repository for a newer "
+                        + "release on application startup and shows a notice when one is "
+                        + "available.\n\n"
+                        + "Default: " + (defaults.isUpdateCheckEnabled() ? "enabled" : "disabled") + ".\n\n"
+                        + "Disabling this also skips the network request at startup.");
+
         Button saveButton = new Button("Save");
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> onSave());
@@ -261,13 +278,28 @@ public class SettingsView extends BorderPane {
         faceaiCacheDir.setText(config.getFaceaiCacheDir() == null ? "" : config.getFaceaiCacheDir());
         thumbnailSize.getValueFactory().setValue(config.getThumbnailSize());
         maxImportThreads.getValueFactory().setValue(config.getMaxImportThreads());
-        minNameSimilarity.getValueFactory().setValue(config.getMinNameSimilarity());
+        minNameSimilarity.setText(String.valueOf(config.getMinNameSimilarity()));
+        faceNameMaxImages.setText(String.valueOf(config.getFaceNameMaxImages()));
+        updateCheckEnabled.setSelected(config.isUpdateCheckEnabled());
     }
 
     /**
      * Copies the current form values into the configuration and persists it.
+     * Numeric text fields are validated before saving; on invalid input the
+     * form is left untouched and an error is shown in the status bar.
      */
     private void onSave() {
+        Double minSimilarity = parseUnitSimilarity(minNameSimilarity.getText());
+        if (minSimilarity == null) {
+            statusLabel.setText("Min similarity must be a number between 0.0 and 1.0.");
+            return;
+        }
+        Integer maxImages = parsePositiveInteger(faceNameMaxImages.getText());
+        if (maxImages == null) {
+            statusLabel.setText("Max images must be a positive integer.");
+            return;
+        }
+
         config.setMinBoundingBoxSize(minBoundingBoxSize.getValue());
         config.setMinConfidence(minConfidence.getValue());
         config.setMaxFacesPerImage(maxFacesPerImage.getValue());
@@ -281,7 +313,9 @@ public class SettingsView extends BorderPane {
         config.setFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir);
         config.setThumbnailSize(thumbnailSize.getValue());
         config.setMaxImportThreads(maxImportThreads.getValue());
-        config.setMinNameSimilarity(minNameSimilarity.getValue());
+        config.setMinNameSimilarity(minSimilarity);
+        config.setFaceNameMaxImages(maxImages);
+        config.setUpdateCheckEnabled(updateCheckEnabled.isSelected());
 
         try {
             AppConfig.save(configPath, config);
@@ -309,6 +343,8 @@ public class SettingsView extends BorderPane {
         config.setThumbnailSize(defaults.getThumbnailSize());
         config.setMaxImportThreads(defaults.getMaxImportThreads());
         config.setMinNameSimilarity(defaults.getMinNameSimilarity());
+        config.setFaceNameMaxImages(defaults.getFaceNameMaxImages());
+        config.setUpdateCheckEnabled(defaults.isUpdateCheckEnabled());
         populateFromConfig();
 
         try {
@@ -345,5 +381,41 @@ public class SettingsView extends BorderPane {
         Spinner<Double> spinner = new Spinner<>(min, max, min, step);
         spinner.setEditable(true);
         return spinner;
+    }
+
+    /**
+     * Parses the given text as a {@code double} in the closed range [0.0, 1.0].
+     *
+     * @param text the text to parse
+     * @return the parsed value, or {@code null} if the text is not a number in range
+     */
+    private static Double parseUnitSimilarity(String text) {
+        try {
+            double value = Double.parseDouble(text.trim());
+            if (value < 0.0 || value > 1.0) {
+                return null;
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Parses the given text as a positive {@code int}.
+     *
+     * @param text the text to parse
+     * @return the parsed value, or {@code null} if not a positive integer
+     */
+    private static Integer parsePositiveInteger(String text) {
+        try {
+            int value = Integer.parseInt(text.trim());
+            if (value <= 0) {
+                return null;
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

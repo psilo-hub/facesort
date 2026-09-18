@@ -56,12 +56,15 @@ public class FaceSortApp extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        // 0. Background update check on a daemon thread; never blocks startup.
-        new UpdateChecker(Path.of("config")).startInBackground();
-
-        // 1. Load configuration (falls back to defaults when the file is absent).
+        // 0. Load configuration (falls back to defaults when the file is absent).
         Path configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
         config = AppConfig.load(configPath);
+
+        // 1. Background update check on a daemon thread; never blocks startup.
+        //    Skipped when the user disabled it in the settings.
+        if (config.isUpdateCheckEnabled()) {
+            new UpdateChecker(Path.of("config")).startInBackground();
+        }
 
         // 2. Open the database under config/, creating the directory if needed.
         Path configDir = Path.of("config");
@@ -102,7 +105,7 @@ public class FaceSortApp extends Application {
         ImportView importView = new ImportView(importService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
-        FaceNameView faceNameView = new FaceNameView(faceToNameService);
+        FaceNameView faceNameView = new FaceNameView(faceToNameService, config);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
         SettingsView settingsView = new SettingsView(config, configPath);

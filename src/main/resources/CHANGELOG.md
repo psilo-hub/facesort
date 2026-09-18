@@ -16,6 +16,9 @@ All notable changes to Face Sort will be documented in this file.
 - Explanation tooltips on settings labels and a persisted reset-to-defaults.
 - Hovering an image in the "Name Face" and "Random Tag" tabs shows the image
   path as a pop-up.
+- Setting to disable the automatic update check on startup.
+- Setting to configure the maximum number of images shown as candidates in
+  the "Face Name" tab.
 
 ### Changed
 - Optimized image import for large folders.
@@ -24,6 +27,8 @@ All notable changes to Face Sort will be documented in this file.
 - In "Face Name", faces with the highest similarity to the selected name's
   average embedding are shown first, and a checkbox can exclude faces that are
   closer to another name's average embedding.
+- The minimum similarity for images shown in "Face Name" is now editable as a
+  plain value in Settings instead of a stepped spinner.
 
 ## [0.1.0]
 

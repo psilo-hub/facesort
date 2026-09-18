@@ -1,6 +1,6 @@
-1. Settings ... disable update check
+1. Settings ... disable update check (done)
 
-2. In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images.
+2. In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images. (done)
 
 3. Model download progress
 

@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
@@ -52,10 +53,10 @@ import java.util.Locale;
 public class FaceNameView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 110.0;
-    private static final int CANDIDATE_LIMIT = 30;
     private static final int NAMED_LIMIT = 5;
 
     private final FaceToNameService faceToNameService;
+    private final ConfigModel config;
 
     private final Label statusLabel = new Label("");
     private final ListView<NameRecord> nameList = new ListView<>();
@@ -75,9 +76,11 @@ public class FaceNameView extends BorderPane implements Refreshable {
      * Creates the face-to-name tab.
      *
      * @param faceToNameService the face-to-name service; must not be null
+     * @param config            the application settings; must not be null
      */
-    public FaceNameView(FaceToNameService faceToNameService) {
+    public FaceNameView(FaceToNameService faceToNameService, ConfigModel config) {
         this.faceToNameService = faceToNameService;
+        this.config = config;
         buildUi();
         loadNames(false);
     }
@@ -234,7 +237,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
                         faceToNameService.findMostSimilarNamed(name.id(), NAMED_LIMIT);
                 List<SimilarityResult> candidates =
                         faceToNameService.findUnnamedForName(
-                                name.id(), CANDIDATE_LIMIT, excludeOtherNamesBox.isSelected());
+                                name.id(), config.getFaceNameMaxImages(),
+                                excludeOtherNamesBox.isSelected());
                 return new NameContent(named, candidates);
             }
         });

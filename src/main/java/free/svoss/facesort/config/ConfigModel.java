@@ -19,6 +19,10 @@ public class ConfigModel {
     public static final String DEFAULT_DB_NAME = "facesort.db";
     /** Minimum similarity for adding a face to an existing name. */
     public static final double DEFAULT_MIN_NAME_SIMILARITY = 0.75;
+    /** Maximum unnamed faces shown as candidates in the "Face Name" tab. */
+    public static final int DEFAULT_FACE_NAME_MAX_IMAGES = 30;
+    /** Whether the automatic update check runs on application startup. */
+    public static final boolean DEFAULT_UPDATE_CHECK_ENABLED = true;
 
     private String lastImportFolder = "";
 
@@ -59,6 +63,12 @@ public class ConfigModel {
     private String dbName = DEFAULT_DB_NAME;
     @JsonProperty("minNameSimilarity")
     private double minNameSimilarity = DEFAULT_MIN_NAME_SIMILARITY;
+    @JsonProperty("faceNameMaxImages")
+    private int faceNameMaxImages = DEFAULT_FACE_NAME_MAX_IMAGES;
+
+    // Startup behaviour
+    @JsonProperty("updateCheckEnabled")
+    private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK_ENABLED;
 
     public ConfigModel() {
         // No-arg constructor required by Jackson for deserialization.
@@ -182,5 +192,21 @@ public class ConfigModel {
 
     public void setMinNameSimilarity(double minNameSimilarity) {
         this.minNameSimilarity = minNameSimilarity;
+    }
+
+    public int getFaceNameMaxImages() {
+        return faceNameMaxImages;
+    }
+
+    public void setFaceNameMaxImages(int faceNameMaxImages) {
+        this.faceNameMaxImages = faceNameMaxImages;
+    }
+
+    public boolean isUpdateCheckEnabled() {
+        return updateCheckEnabled;
+    }
+
+    public void setUpdateCheckEnabled(boolean updateCheckEnabled) {
+        this.updateCheckEnabled = updateCheckEnabled;
     }
 }
