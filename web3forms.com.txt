@@ -1,0 +1,22 @@
+web3forms.com
+
+
+Form Access Key
+Your unique form id to send form submissions
+
+84f96b52-64e6-488a-910f-cb597637439f
+
+This is a public key. You can use it in client side code.
+
+Quick Start Examples
+
+HTML
+
+
+<form action="https://api.web3forms.com/submit" method="POST">
+  <input type="hidden" name="access_key" value="84f96b52-64e6-488a-910f-cb597637439f">
+  <input type="text" name="name" required>
+  <input type="email" name="email" required>
+  <textarea name="message" required></textarea>
+  <button type="submit">Submit</button>
+</form>
