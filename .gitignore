@@ -26,3 +26,4 @@ replay_pid*
 /.idea
 /.opencode
 /config
+/rebuildAndStart.bat
