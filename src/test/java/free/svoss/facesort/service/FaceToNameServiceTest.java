@@ -172,6 +172,51 @@ class FaceToNameServiceTest {
     }
 
     @Test
+    void findUnnamedForName_withPathPrefix_onlyOffersCandidatesFromMatchingImages() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        imageDao.addPath("imgA1", "/photos/family/winter.jpg");
+        imageDao.addPath("imgA2", "/photos/family/winter.jpg");
+        imageDao.addPath("imgU1", "/photos/family/summer.jpg");
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10, false, "/photos");
+
+        assertEquals(1, results.size(), "all images share the /photos prefix");
+    }
+
+    @Test
+    void findUnnamedForName_withPathPrefix_filtersOutNonMatchingImages() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        long matching = addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", new float[]{0.9f, 0.2f, 0, 0, 0, 0, 0, 0}, null);
+        imageDao.addPath("imgA1", "/photos/family/a.jpg");
+        imageDao.addPath("imgA2", "/photos/family/b.jpg");
+        imageDao.addPath("imgU1", "/photos/family/c.jpg");
+        imageDao.addPath("imgU2", "/other/location/d.jpg");
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10, false, "/photos/family");
+
+        assertEquals(1, results.size());
+        assertEquals(matching, results.get(0).faceRecord().id());
+    }
+
+    @Test
+    void findUnnamedForName_withNonMatchingPathPrefix_returnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
+        imageDao.addPath("imgA1", "/photos/a.jpg");
+        imageDao.addPath("imgA2", "/photos/b.jpg");
+
+        assertTrue(service.findUnnamedForName(alice, 10, false, "/missing").isEmpty());
+    }
+
+    @Test
     void findMostSimilarNamed_ranksTaggedFacesBySimilarityToAverage() throws SQLException {
         long alice = nameDao.insert("Alice");
         long best = addImageAndFace("imgA1", xLike(), alice);

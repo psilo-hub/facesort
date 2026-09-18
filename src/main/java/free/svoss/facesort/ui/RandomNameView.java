@@ -53,6 +53,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
 
     private final Label statusLabel = new Label("");
     private final TextField nameField = new TextField();
+    private final TextField pathFilterField = new TextField();
     private final Label nameExistsLabel = new Label("");
     private final Button tagSelectedButton = new Button("Tag selected");
     private final Button nextButton = new Button("Next");
@@ -81,13 +82,22 @@ public class RandomNameView extends BorderPane implements Refreshable {
         tagSelectedButton.setOnAction(e -> onTagSelected());
         nextButton.setOnAction(e -> loadSample());
 
+        pathFilterField.setPromptText("Filter by path prefix");
+        pathFilterField.setTooltip(new Tooltip("Restrict the random sample to images whose "
+                + "stored path starts with the entered text. Press Enter to apply."));
+        pathFilterField.setOnAction(e -> loadSample());
         HBox.setHgrow(nameField, Priority.ALWAYS);
+
         nameExistsLabel.setWrapText(true);
         nameField.textProperty().addListener((obs, oldText, newText) -> checkNameExists());
         HBox controls = new HBox(8,
                 new Label("Name:"), nameField, nameExistsLabel, tagSelectedButton, nextButton);
         controls.setAlignment(Pos.CENTER_LEFT);
         controls.setPadding(new Insets(10));
+
+        HBox filterBar = new HBox(8, new Label("Path filter:"), pathFilterField);
+        filterBar.setAlignment(Pos.CENTER_LEFT);
+        filterBar.setPadding(new Insets(10));
 
         facesPane.setPadding(new Insets(10));
 
@@ -97,7 +107,8 @@ public class RandomNameView extends BorderPane implements Refreshable {
         statusLabel.setWrapText(true);
         BorderPane.setMargin(statusLabel, new Insets(0, 10, 10, 10));
 
-        setTop(controls);
+        VBox topBox = new VBox(controls, filterBar);
+        setTop(topBox);
         setCenter(scroll);
         setBottom(statusLabel);
     }
@@ -108,13 +119,14 @@ public class RandomNameView extends BorderPane implements Refreshable {
      */
     private void loadSample() {
         setBusy(true);
+        String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
         statusLabel.setText("Loading random unnamed faces...");
         facesPane.getChildren().clear();
 
         setTask(new Task<>() {
             @Override
             protected List<FaceRecord> call() throws SQLException {
-                return namingService.findRandomUnnamed(BATCH_SIZE);
+                return namingService.findRandomUnnamed(BATCH_SIZE, pathPrefix);
             }
         });
 
@@ -124,7 +136,9 @@ public class RandomNameView extends BorderPane implements Refreshable {
             showFaces(faces);
             setBusy(false);
             statusLabel.setText(faces.isEmpty()
-                    ? "No unnamed faces left — import photos or visit the other tagging tabs."
+                    ? (pathPrefix.isEmpty()
+                            ? "No unnamed faces left — import photos or visit the other tagging tabs."
+                            : "No unnamed faces match the path filter.")
                     : faces.size() + " random unnamed face(s). Select faces, type a name, and press Tag selected.");
         });
 
@@ -402,6 +416,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
      */
     private void setBusy(boolean busy) {
         nextButton.setDisable(busy);
+        pathFilterField.setDisable(busy);
         nameField.setDisable(busy);
         tagSelectedButton.setDisable(busy || selectedFaceIds().isEmpty());
     }

@@ -80,6 +80,62 @@ class FaceDaoTest {
     }
 
     @Test
+    void findUnnamed_withPathPrefix_returnsOnlyFacesWhoseImageMatches() throws Exception {
+        insertImage("img1");
+        insertImage("img2");
+        imageDao.addPath("img1", "/photos/family/winter.jpg");
+        imageDao.addPath("img2", "/photos/travel/beach.jpg");
+        long nameId = nameDao.insert("Alice");
+        insertFace("img1", 0, 0, new float[]{1.0f}, nameId);
+        insertFace("img1", 20, 0, new float[]{2.0f}, null);
+        insertFace("img2", 40, 0, new float[]{3.0f}, null);
+
+        List<FaceRecord> matching = faceDao.findUnnamed("/photos/family");
+
+        assertEquals(1, matching.size(), "only the unnamed face from the matching folder");
+        assertEquals("img1", matching.get(0).imageHash());
+        assertTrue(matching.get(0).nameId() == null);
+    }
+
+    @Test
+    void findUnnamed_withFullFilePath_returnsFacesOfThatImage() throws Exception {
+        insertImage("img1");
+        insertImage("img2");
+        imageDao.addPath("img1", "/photos/family/winter.jpg");
+        imageDao.addPath("img2", "/photos/family/summer.jpg");
+        insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        insertFace("img2", 40, 0, new float[]{2.0f}, null);
+
+        List<FaceRecord> matching = faceDao.findUnnamed("/photos/family/winter.jpg");
+
+        assertEquals(1, matching.size(), "only faces of the exact image file");
+        assertEquals("img1", matching.get(0).imageHash());
+    }
+
+    @Test
+    void findUnnamed_withNonMatchingPrefixReturnsEmpty() throws Exception {
+        insertImage("img1");
+        imageDao.addPath("img1", "/photos/family/winter.jpg");
+        insertFace("img1", 0, 0, new float[]{1.0f}, null);
+
+        assertTrue(faceDao.findUnnamed("/other/location").isEmpty());
+    }
+
+    @Test
+    void findUnnamed_blankOrNullPrefixReturnsAllUnnamed() throws Exception {
+        insertImage("img1");
+        insertImage("img2");
+        imageDao.addPath("img1", "/photos/a.jpg");
+        imageDao.addPath("img2", "/other/b.jpg");
+        insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        insertFace("img2", 20, 0, new float[]{2.0f}, null);
+
+        assertEquals(2, faceDao.findUnnamed(null).size());
+        assertEquals(2, faceDao.findUnnamed("").size());
+        assertEquals(2, faceDao.findUnnamed("   ").size());
+    }
+
+    @Test
     void findRandomUnnamed_returnsOnlyUnnamedFaces() throws Exception {
         insertImage("img1");
         long nameId = nameDao.insert("Alice");
@@ -91,6 +147,24 @@ class FaceDaoTest {
 
         assertEquals(2, random.size(), "only the unnamed faces are returned");
         assertTrue(random.stream().allMatch(f -> f.nameId() == null));
+    }
+
+    @Test
+    void findRandomUnnamed_withPathPrefix_returnsOnlyMatchingFaces() throws Exception {
+        insertImage("img1");
+        insertImage("img2");
+        insertImage("img3");
+        imageDao.addPath("img1", "/photos/family/a.jpg");
+        imageDao.addPath("img2", "/photos/family/b.jpg");
+        imageDao.addPath("img3", "/photos/travel/c.jpg");
+        insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        insertFace("img2", 20, 0, new float[]{2.0f}, null);
+        insertFace("img3", 40, 0, new float[]{3.0f}, null);
+
+        List<FaceRecord> random = faceDao.findRandomUnnamed(10, "/photos/family");
+
+        assertEquals(2, random.size(), "only faces from the matching folder");
+        assertTrue(random.stream().noneMatch(f -> f.imageHash().equals("img3")));
     }
 
     @Test

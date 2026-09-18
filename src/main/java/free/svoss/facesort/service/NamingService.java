@@ -163,13 +163,29 @@ public final class NamingService {
      * @throws SQLException             if the database operation fails
      */
     public List<FaceRecord> findRandomUnnamed(int limit) throws SQLException {
+        return findRandomUnnamed(limit, null);
+    }
+
+    /**
+     * Returns up to {@code limit} random unnamed faces, optionally restricted
+     * to images that have at least one stored path starting with the given
+     * prefix. A {@code null} or blank prefix disables the restriction.
+     *
+     * @param limit      maximum number of faces; must not be negative
+     * @param pathPrefix path prefix the stored image path must start with, or
+     *                   {@code null}/{@code ""} for any faces
+     * @return the random sample, never {@code null}; faces are unnamed
+     * @throws IllegalArgumentException if {@code limit} is negative
+     * @throws SQLException             if the database operation fails
+     */
+    public List<FaceRecord> findRandomUnnamed(int limit, String pathPrefix) throws SQLException {
         if (limit < 0) {
             throw new IllegalArgumentException("limit must not be negative");
         }
         if (limit == 0) {
             return List.of();
         }
-        return faceDao.findRandomUnnamed(limit);
+        return faceDao.findRandomUnnamed(limit, pathPrefix);
     }
 
     /**

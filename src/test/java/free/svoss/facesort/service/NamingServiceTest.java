@@ -113,6 +113,34 @@ class NamingServiceTest {
     }
 
     @Test
+    void findRandomUnnamed_withPathPrefix_returnsOnlyFacesFromMatchingImages() throws SQLException {
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        imageDao.insert("imgFamily", 0, "{}", 1);
+        imageDao.addPath("imgFamily", "/photos/family/a.jpg");
+        faceDao.insert(new FaceRecord(0, "imgFamily", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, null));
+        imageDao.insert("imgTravel", 0, "{}", 1);
+        imageDao.addPath("imgTravel", "/photos/travel/b.jpg");
+        faceDao.insert(new FaceRecord(0, "imgTravel", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, null));
+
+        List<FaceRecord> matching = service.findRandomUnnamed(25, "/photos/family");
+
+        assertEquals(1, matching.size());
+        assertEquals("imgFamily", matching.get(0).imageHash());
+    }
+
+    @Test
+    void findRandomUnnamed_withBlankPathPrefix_returnsAll() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA", alice);
+        addImageAndFace("imgU", null);
+
+        assertEquals(1, service.findRandomUnnamed(25, "").size());
+        assertEquals(1, service.findRandomUnnamed(25, null).size());
+    }
+
+    @Test
     void createOrFindName_reusesExistingNameId() throws SQLException {
         long alice = nameDao.insert("Alice");
 

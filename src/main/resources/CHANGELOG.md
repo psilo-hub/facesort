@@ -19,6 +19,10 @@ All notable changes to Face Sort will be documented in this file.
 - Setting to disable the automatic update check on startup.
 - Setting to configure the maximum number of images shown as candidates in
   the "Face Name" tab.
+- Path-prefix filter in the "Random Tag" and "Face Name" tabs: entering a
+  path (or path prefix) restricts the shown faces to images whose stored path
+  starts with that text; in "Face Name" it filters the "Most similar unnamed
+  faces".
 - On first start, a model-download frame shows the file being downloaded
   (its URL), where it is stored locally and a progress bar until the models
   are ready.

@@ -21,12 +21,14 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -65,6 +67,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final Label unnamedLabel = new Label("Most similar unnamed faces:");
     private final CheckBox excludeOtherNamesBox =
             new CheckBox("Exclude faces closer to another name");
+    private final TextField pathFilterField = new TextField();
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button("Tag selected");
     private final Button renameButton = new Button("Rename...");
@@ -142,11 +145,22 @@ public class FaceNameView extends BorderPane implements Refreshable {
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
+        pathFilterField.setPromptText("Filter by path prefix");
+        pathFilterField.setTooltip(tooltip("Only show unnamed faces whose image path starts "
+                + "with the entered text. Press Enter to reload the candidates."));
+        pathFilterField.setOnAction(e -> {
+            if (activeName != null) {
+                selectName(activeName);
+            }
+        });
+        HBox filterBar = new HBox(6, new Label("Path filter:"), pathFilterField);
+
         VBox center = new VBox(8,
                 namedFacesLabel,
                 namedFacesPane,
                 unnamedLabel,
                 excludeOtherNamesBox,
+                filterBar,
                 candidatesPane);
         center.setPadding(new Insets(10));
 
@@ -224,6 +238,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void selectName(NameRecord name) {
         activeName = name;
+        String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
         statusLabel.setText("Loading similar faces for '" + name.name() + "'...");
         namedFacesLabel.setText("");
         namedFacesPane.getChildren().clear();
@@ -238,7 +253,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 List<SimilarityResult> candidates =
                         faceToNameService.findUnnamedForName(
                                 name.id(), config.getFaceNameMaxImages(),
-                                excludeOtherNamesBox.isSelected());
+                                excludeOtherNamesBox.isSelected(), pathPrefix);
                 return new NameContent(named, candidates);
             }
         });
@@ -249,7 +264,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
             showNamedFaces(name, content.namedFaces());
             showCandidates(content.candidates());
             statusLabel.setText(content.candidates().isEmpty()
-                    ? "No unnamed faces similar to '" + name.name() + "'."
+                    ? (pathPrefix.isEmpty()
+                            ? "No unnamed faces similar to '" + name.name() + "'."
+                            : "No unnamed faces similar to '" + name.name()
+                            + "' match the path filter.")
                     : content.candidates().size()
                     + " similar unnamed face(s) for '" + name.name() + "'.");
         });

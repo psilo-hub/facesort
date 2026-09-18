@@ -83,11 +83,37 @@ public class FaceToNameService {
      * Returns the top {@code limit} unnamed faces most similar to the average
      * embedding of the given name, sorted by similarity descending.
      *
+     * <p>Equivalent to {@link #findUnnamedForName(long, int, boolean, String)}
+     * with both {@code excludeCloserToOtherNames} and {@code pathPrefix} left
+     * at their disabled defaults.</p>
+     *
+     * @param nameId                     id of the reference name
+     * @param limit                      maximum number of results; values &le; 0
+     *                                   yield an empty list
+     * @param excludeCloserToOtherNames  whether to hide faces that are closer to
+     *                                   another name's average embedding than to
+     *                                   the selected name's
+     * @return matching faces as {@link SimilarityResult}, descending by similarity
+     * @throws SQLException on database error
+     */
+    public List<SimilarityResult> findUnnamedForName(long nameId, int limit,
+                                                     boolean excludeCloserToOtherNames) throws SQLException {
+        return findUnnamedForName(nameId, limit, excludeCloserToOtherNames, null);
+    }
+
+    /**
+     * Returns the top {@code limit} unnamed faces most similar to the average
+     * embedding of the given name, sorted by similarity descending.
+     *
      * <p>The average embedding is computed over all faces currently tagged with
      * {@code nameId}. If the name has no faces (or none with embeddings), the
      * result is empty and no average is computed. Candidates whose similarity
      * falls below {@link ConfigModel#getMinNameSimilarity()} never qualify, so
      * faces that are not similar enough cannot be added to an existing name.</p>
+     *
+     * <p>When {@code pathPrefix} is non-blank, only candidates whose images
+     * have at least one stored path starting with that prefix qualify, so the
+     * user can restrict the offered faces to a folder or file.</p>
      *
      * <p>When {@code excludeCloserToOtherNames} is {@code true}, each candidate
      * is additionally compared against the average embedding of every other
@@ -101,11 +127,15 @@ public class FaceToNameService {
      * @param excludeCloserToOtherNames  whether to hide faces that are closer to
      *                                   another name's average embedding than to
      *                                   the selected name's
+     * @param pathPrefix                 path prefix the stored image path must
+     *                                   start with, or {@code null}/{@code ""}
+     *                                   for any faces
      * @return matching faces as {@link SimilarityResult}, descending by similarity
      * @throws SQLException on database error
      */
     public List<SimilarityResult> findUnnamedForName(long nameId, int limit,
-                                                     boolean excludeCloserToOtherNames) throws SQLException {
+                                                     boolean excludeCloserToOtherNames,
+                                                     String pathPrefix) throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
@@ -122,7 +152,7 @@ public class FaceToNameService {
                 ? averageOfOtherNames(nameId) : Map.of();
 
         List<SimilarityResult> results = new ArrayList<>();
-        for (FaceRecord candidate : faceDao.findUnnamed()) {
+        for (FaceRecord candidate : faceDao.findUnnamed(pathPrefix)) {
             double similarity = faceAiService.calcSimilarity(average, candidate.embedding());
             if (similarity < cutoff) {
                 continue;

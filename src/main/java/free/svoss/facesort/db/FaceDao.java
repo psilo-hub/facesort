@@ -78,13 +78,31 @@ public class FaceDao {
 
     /**
      * Returns all unnamed faces (name_id IS NULL).
+     *
+     * @return all unnamed faces
+     * @throws SQLException on database error
      */
     public List<FaceRecord> findUnnamed() throws SQLException {
+        return findUnnamed(null);
+    }
+
+    /**
+     * Returns all unnamed faces (name_id IS NULL), optionally restricted to
+     * images that have at least one stored path starting with the given
+     * prefix. A {@code null} or blank prefix disables the restriction.
+     *
+     * @param pathPrefix path prefix the stored image path must start with, or
+     *                   {@code null}/{@code ""} to return all unnamed faces
+     * @return the matching unnamed faces
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findUnnamed(String pathPrefix) throws SQLException {
         List<FaceRecord> faces = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
+        try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE name_id IS NULL")) {
+                + "FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
+            bindPathFilter(ps, pathPrefix);
+            ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
             }
@@ -103,14 +121,34 @@ public class FaceDao {
      * @throws SQLException on database error
      */
     public List<FaceRecord> findRandomUnnamed(int limit) throws SQLException {
+        return findRandomUnnamed(limit, null);
+    }
+
+    /**
+     * Returns up to {@code limit} unnamed faces chosen at random, optionally
+     * restricted to images that have at least one stored path starting with
+     * the given prefix. A {@code null} or blank prefix disables the
+     * restriction.
+     *
+     * <p>A non-positive limit yields an empty list (SQLite would otherwise
+     * interpret a negative LIMIT as "unbounded").</p>
+     *
+     * @param limit      maximum number of faces to return; must not be negative
+     * @param pathPrefix path prefix the stored image path must start with, or
+     *                   {@code null}/{@code ""} to return any random faces
+     * @return up to {@code limit} random unnamed faces
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findRandomUnnamed(int limit, String pathPrefix) throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE name_id IS NULL ORDER BY RANDOM() LIMIT ?")) {
-            ps.setInt(1, limit);
+                + "FROM faces WHERE name_id IS NULL" + pathFilterClause() + " ORDER BY RANDOM() LIMIT ?")) {
+            bindPathFilter(ps, pathPrefix);
+            ps.setInt(4, limit);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
@@ -230,6 +268,44 @@ public class FaceDao {
                 "DELETE FROM faces WHERE id = ?")) {
             ps.setLong(1, faceId);
             ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Builds the SQL fragment that restricts results to images having at least
+     * one stored path starting with a given prefix. The fragment contains
+     * three {@code ?} placeholders, all bound to the same prefix value by
+     * {@link #bindPathFilter(PreparedStatement, String)}.
+     *
+     * @return the WHERE fragment, always starting with {@code " AND "}
+     */
+    private static String pathFilterClause() {
+        return " AND (? IS NULL OR EXISTS ("
+                + "SELECT 1 FROM image_paths p "
+                + "WHERE p.hash = faces.image_hash "
+                + "AND substr(p.path, 1, length(?)) = ?))";
+    }
+
+    /**
+     * Binds the path-prefix placeholders produced by
+     * {@link #pathFilterClause()} to the given prefix. The prefix is trimmed;
+     * a {@code null} or blank prefix leaves the clause disabled.
+     *
+     * <p>The clause's placeholders live at indexes 1..3, so a query that adds
+     * further placeholders (e.g. LIMIT) must start them at index 4.</p>
+     *
+     * @param ps         the prepared statement to bind
+     * @param pathPrefix the trimmed prefix, or {@code null} for no filter
+     * @throws SQLException on database error
+     */
+    private static void bindPathFilter(PreparedStatement ps, String pathPrefix) throws SQLException {
+        String prefix = pathPrefix == null ? null : pathPrefix.trim();
+        for (int i = 1; i <= 3; i++) {
+            if (prefix == null || prefix.isEmpty()) {
+                ps.setNull(i, Types.VARCHAR);
+            } else {
+                ps.setString(i, prefix);
+            }
         }
     }
 
