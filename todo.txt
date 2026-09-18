@@ -1,11 +1,13 @@
-Export feature
+1. Settings ... disable update check
 
-Proper readme
+2. In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images.
 
-Settings ... disable update check
+3. Model download progress
 
-Model download progress
+4. Filter images by path
 
-In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images.
+5. Select range
 
-Filter images by path
+6. Export feature
+
+7. Proper readme
