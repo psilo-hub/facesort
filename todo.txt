@@ -1,0 +1,11 @@
+Export feature
+
+Proper readme
+
+Settings ... disable update check
+
+Model download progress
+
+In Settings: minimal similarity for images to show in "Face Name" tab, and maximum number of images.
+
+Filter images by path
