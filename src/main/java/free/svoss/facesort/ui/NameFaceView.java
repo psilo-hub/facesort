@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
@@ -58,8 +59,8 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private final ImageView representativeView = new ImageView();
     private final TextField nameField = new TextField();
     private final Label nameExistsLabel = new Label("");
-    private final Button tagButton = new Button("Tag");
-    private final Button nextButton = new Button("Next cluster");
+    private final Button tagButton = new Button(I18n.get("ui.nameFace.tag"));
+    private final Button nextButton = new Button(I18n.get("ui.nameFace.nextCluster"));
     private final FlowPane candidatesPane = new FlowPane(10, 10);
 
     private List<ClusteringService.Cluster> clusters;
@@ -88,12 +89,12 @@ public class NameFaceView extends BorderPane implements Refreshable {
         representativeView.setSmooth(true);
         representativeView.setStyle("-fx-border-color: #4a90d9; -fx-border-width: 2;");
 
-        nameField.setPromptText("Enter a name");
+        nameField.setPromptText(I18n.get("ui.nameFace.namePrompt"));
         tagButton.setDefaultButton(true);
         tagButton.setOnAction(e -> onTagRepresentative());
         nextButton.setOnAction(e -> showNextCluster());
 
-        HBox nameRow = new HBox(8, new Label("Name:"), nameField, nameExistsLabel, tagButton, nextButton);
+        HBox nameRow = new HBox(8, new Label(I18n.get("ui.nameFace.name")), nameField, nameExistsLabel, tagButton, nextButton);
         nameRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(nameField, Priority.ALWAYS);
         nameExistsLabel.setWrapText(true);
@@ -103,7 +104,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
                 clusterLabel,
                 representativeView,
                 nameRow,
-                new Label("More faces from this cluster, most similar first:"),
+                new Label(I18n.get("ui.nameFace.moreFaces")),
                 candidatesPane);
         content.setPadding(new Insets(10));
         content.setAlignment(Pos.TOP_CENTER);
@@ -123,7 +124,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
      */
     private void loadClusters() {
         setBusy(true, true);
-        statusLabel.setText("Clustering unnamed faces...");
+        statusLabel.setText(I18n.get("ui.nameFace.clustering"));
         clusters = null;
         clusterIndex = -1;
 
@@ -141,7 +142,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             clusters = result;
             setBusy(false, clusters.isEmpty());
             if (clusters.isEmpty()) {
-                clusterLabel.setText("No unnamed faces to name.");
+                clusterLabel.setText(I18n.get("ui.nameFace.noUnnamed"));
             } else {
                 showNextCluster();
             }
@@ -149,7 +150,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
         activeTask.setOnFailed(e -> {
             setBusy(false, true);
-            handleFailure("Could not load clusters", activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.clusterFailed"), activeTask.getException());
         });
 
         startTask("nameface-cluster-loader");
@@ -186,8 +187,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
         clusterIndex = (clusterIndex + 1) % clusters.size();
         ClusteringService.Cluster cluster = clusters.get(clusterIndex);
 
-        clusterLabel.setText(String.format(Locale.ROOT,
-                "Cluster %d of %d — %d face(s)",
+        clusterLabel.setText(I18n.format("ui.nameFace.clusterCount",
                 clusterIndex + 1, clusters.size(), cluster.faces().size()));
         setImage(representativeView, cluster.representative());
         installPathTooltip(representativeView, cluster.representative());
@@ -234,7 +234,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
         activeTask.setOnFailed(e -> {
             if (candidateRepId == representative.id()) {
-                handleFailure("Could not rank cluster faces", activeTask.getException());
+                handleFailure(I18n.get("ui.nameFace.rankFailed"), activeTask.getException());
             }
         });
 
@@ -272,11 +272,11 @@ public class NameFaceView extends BorderPane implements Refreshable {
             @SuppressWarnings("unchecked")
             Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
             if (existing.isPresent()) {
-                nameExistsLabel.setText("Name already exists ("
-                        + existing.get().faceCount() + " face(s))");
+                nameExistsLabel.setText(I18n.format("ui.nameFace.nameExists",
+                        existing.get().faceCount()));
                 nameExistsLabel.setStyle("-fx-text-fill: #c9302c;");
             } else {
-                nameExistsLabel.setText("New name");
+                nameExistsLabel.setText(I18n.get("ui.nameFace.newName"));
                 nameExistsLabel.setStyle("-fx-text-fill: #3c763d;");
             }
         });
@@ -295,7 +295,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private void onTagRepresentative() {
         String name = nameField.getText() == null ? "" : nameField.getText().trim();
         if (name.isEmpty()) {
-            statusLabel.setText("Type a name first.");
+            statusLabel.setText(I18n.get("ui.nameFace.typeNameFirst"));
             return;
         }
         if (clusters == null || clusterIndex < 0) {
@@ -304,7 +304,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
         FaceRecord representative = clusters.get(clusterIndex).representative();
         setBusy(true, true);
-        statusLabel.setText("Tagging and searching similar faces...");
+        statusLabel.setText(I18n.get("ui.nameFace.taggingSearching"));
 
         setTask(new Task<List<SimilarityResult>>() {
             @Override
@@ -320,8 +320,8 @@ public class NameFaceView extends BorderPane implements Refreshable {
             List<SimilarityResult> similar =
                     (List<SimilarityResult>) activeTask.getValue();
             setBusy(false, clusters.isEmpty());
-            statusLabel.setText("Tagged as '" + name + "'. " + similar.size()
-                    + " similar face(s) suggested.");
+            statusLabel.setText(I18n.format("ui.nameFace.taggedSuggest",
+                    name, similar.size()));
             removeCluster(representative.id());
             candidateRepId = -1;
             showCandidates(similar);
@@ -329,7 +329,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
         activeTask.setOnFailed(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
-            handleFailure("Could not tag face", activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.tagFailed"), activeTask.getException());
         });
 
         startTask("nameface-tagger");
@@ -364,7 +364,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
                     candidate.similarity() * 100));
             sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
-            Button tag = new Button("Tag");
+            Button tag = new Button(I18n.get("ui.nameFace.tag"));
             tag.setOnAction(e -> onTagCandidate(face.id()));
 
             card.getChildren().addAll(thumb, sim, tag);
@@ -381,11 +381,11 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private void onTagCandidate(long faceId) {
         String name = nameField.getText() == null ? "" : nameField.getText().trim();
         if (name.isEmpty()) {
-            statusLabel.setText("Type the name to use for the suggestions.");
+            statusLabel.setText(I18n.get("ui.nameFace.typeSuggestName"));
             return;
         }
         setBusy(true, true);
-        statusLabel.setText("Tagging face " + faceId + "...");
+        statusLabel.setText(I18n.format("ui.nameFace.taggingFace", faceId));
 
         setTask(new Task<Void>() {
             @Override
@@ -398,14 +398,14 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
         activeTask.setOnSucceeded(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
-            statusLabel.setText("Tagged face " + faceId + " as '" + name + "'.");
+            statusLabel.setText(I18n.format("ui.nameFace.taggedFace", faceId, name));
             candidatesPane.getChildren().removeIf(node ->
                     node.getUserData() instanceof Long id && id == faceId);
         });
 
         activeTask.setOnFailed(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
-            handleFailure("Could not tag face", activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.tagFailed"), activeTask.getException());
         });
 
         startTask("nameface-tag-candidate");
@@ -419,7 +419,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private void removeCluster(long faceId) {
         clusters.removeIf(c -> c.representative().id() == faceId);
         if (clusters.isEmpty()) {
-            clusterLabel.setText("All clusters named.");
+            clusterLabel.setText(I18n.get("ui.nameFace.allNamed"));
         } else {
             clusterIndex--;
             showNextCluster(false);
@@ -451,7 +451,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
      * @param face  the face whose source image paths should be shown
      */
     private void installPathTooltip(ImageView thumb, FaceRecord face) {
-        Tooltip tooltip = new Tooltip("Loading image path…");
+        Tooltip tooltip = new Tooltip(I18n.get("common.loadingPath"));
         Tooltip.install(thumb, tooltip);
         Task<List<String>> lookup = new Task<>() {
             @Override
@@ -462,10 +462,10 @@ public class NameFaceView extends BorderPane implements Refreshable {
         lookup.setOnSucceeded(e -> {
             List<String> paths = lookup.getValue();
             tooltip.setText(paths.isEmpty()
-                    ? "No stored path for this image"
+                    ? I18n.get("common.noStoredPath")
                     : String.join(System.lineSeparator(), paths));
         });
-        lookup.setOnFailed(e -> tooltip.setText("Image path unavailable"));
+        lookup.setOnFailed(e -> tooltip.setText(I18n.get("common.pathUnavailable")));
         Thread thread = new Thread(lookup, "nameface-path-tooltip-" + face.id());
         thread.setDaemon(true);
         thread.start();
@@ -481,7 +481,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
      */
     private void installContextMenu(javafx.scene.Node node, FaceRecord face) {
         node.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem("Open Original");
+            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
             new ContextMenu(openOriginalItem).show(node, e.getScreenX(), e.getScreenY());
@@ -498,7 +498,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
         try {
             return namingService.isOriginalAvailable(face.imageHash());
         } catch (SQLException ex) {
-            statusLabel.setText("Could not check the original image.");
+            statusLabel.setText(I18n.get("common.originalCheckFailed"));
             return false;
         }
     }
@@ -511,10 +511,10 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private void openOriginal(String hash) {
         try {
             boolean opened = namingService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : "Original file not found.");
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
         } catch (IOException | SQLException ex) {
-            statusLabel.setText("Could not open the original image.");
-            handleFailure("Could not open the original image", ex);
+            statusLabel.setText(I18n.get("common.openOriginalFailed"));
+            handleFailure(I18n.get("common.openOriginalFailed"), ex);
         }
     }
 
@@ -565,7 +565,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Put a name to a face");
+        alert.setTitle(I18n.get("ui.nameFace.alertTitle"));
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

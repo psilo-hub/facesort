@@ -1,6 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
@@ -64,13 +65,13 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final ListView<NameRecord> nameList = new ListView<>();
     private final Label namedFacesLabel = new Label("");
     private final FlowPane namedFacesPane = new FlowPane(10, 10);
-    private final Label unnamedLabel = new Label("Most similar unnamed faces:");
+    private final Label unnamedLabel = new Label(I18n.get("ui.faceName.unnamedLabel"));
     private final CheckBox excludeOtherNamesBox =
-            new CheckBox("Exclude faces closer to another name");
+            new CheckBox(I18n.get("ui.faceName.excludeOtherNames"));
     private final TextField pathFilterField = new TextField();
     private final FlowPane candidatesPane = new FlowPane(10, 10);
-    private final Button tagSelectedButton = new Button("Tag selected");
-    private final Button renameButton = new Button("Rename...");
+    private final Button tagSelectedButton = new Button(I18n.get("ui.faceName.tagSelected"));
+    private final Button renameButton = new Button(I18n.get("ui.faceName.rename"));
 
     private NameRecord activeName;
     private Task<?> activeTask;
@@ -120,14 +121,9 @@ public class FaceNameView extends BorderPane implements Refreshable {
         renameButton.setOnAction(e -> onRename());
         renameButton.disableProperty().bind(
                 nameList.getSelectionModel().selectedItemProperty().isNull());
-        renameButton.setTooltip(tooltip("Rename the selected name. Faces already "
-                + "tagged with the name keep their assignments."));
+        renameButton.setTooltip(tooltip(I18n.get("ui.faceName.renameTooltip")));
 
-        Tooltip exclusionTip = new Tooltip("Only show faces that are at least as similar "
-                + "to the selected name as to any other name's average embedding.\n\n"
-                + "When checked, faces that are more similar to another name's average "
-                + "face than to the selected name's are hidden, so only faces whose best "
-                + "match is the selected name are shown.");
+        Tooltip exclusionTip = new Tooltip(I18n.get("ui.faceName.excludeTooltip"));
         exclusionTip.setWrapText(true);
         exclusionTip.setMaxWidth(420);
         excludeOtherNamesBox.setTooltip(exclusionTip);
@@ -138,23 +134,22 @@ public class FaceNameView extends BorderPane implements Refreshable {
         });
 
         VBox left = new VBox(6,
-                new Label("Names:"),
+                new Label(I18n.get("ui.faceName.names")),
                 nameList,
                 tagSelectedButton,
                 renameButton);
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
-        pathFilterField.setPromptText("Filter by path prefix");
-        pathFilterField.setTooltip(tooltip("Only show unnamed faces whose image path starts "
-                + "with the entered text. Press Enter to reload the candidates."));
+        pathFilterField.setPromptText(I18n.get("ui.faceName.pathFilterPrompt"));
+        pathFilterField.setTooltip(tooltip(I18n.get("ui.faceName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> {
             if (activeName != null) {
                 selectName(activeName);
             }
         });
         HBox.setHgrow(pathFilterField, Priority.ALWAYS);
-        HBox filterBar = new HBox(6, new Label("Path filter:"), pathFilterField);
+        HBox filterBar = new HBox(6, new Label(I18n.get("ui.faceName.pathFilter")), pathFilterField);
 
         VBox center = new VBox(8,
                 namedFacesLabel,
@@ -185,7 +180,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
      *                          made the cached face counts stale)
      */
     private void loadNames(boolean refreshActiveName) {
-        statusLabel.setText("Loading names...");
+        statusLabel.setText(I18n.get("ui.faceName.loadingNames"));
 
         setTask(new Task<List<NameRecord>>() {
             @Override
@@ -204,7 +199,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
         });
 
         activeTask.setOnFailed(e ->
-                handleFailure("Could not load names", activeTask.getException()));
+                handleFailure(I18n.get("ui.faceName.loadNamesFailed"), activeTask.getException()));
 
         startTask("facename-name-loader");
     }
@@ -217,8 +212,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void applyNames(List<NameRecord> names) {
         nameList.setItems(FXCollections.observableArrayList(names));
         statusLabel.setText(names.isEmpty()
-                ? "No names yet — import photos and tag some faces first."
-                : "Select a name to see similar unnamed faces.");
+                ? I18n.get("ui.faceName.noNames")
+                : I18n.get("ui.faceName.selectName"));
     }
 
     /**
@@ -240,7 +235,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void selectName(NameRecord name) {
         activeName = name;
         String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
-        statusLabel.setText("Loading similar faces for '" + name.name() + "'...");
+        statusLabel.setText(I18n.format("ui.faceName.loadingSimilar", name.name()));
         namedFacesLabel.setText("");
         namedFacesPane.getChildren().clear();
         candidatesPane.getChildren().clear();
@@ -266,15 +261,14 @@ public class FaceNameView extends BorderPane implements Refreshable {
             showCandidates(content.candidates());
             statusLabel.setText(content.candidates().isEmpty()
                     ? (pathPrefix.isEmpty()
-                            ? "No unnamed faces similar to '" + name.name() + "'."
-                            : "No unnamed faces similar to '" + name.name()
-                            + "' match the path filter.")
-                    : content.candidates().size()
-                    + " similar unnamed face(s) for '" + name.name() + "'.");
+                            ? I18n.format("ui.faceName.noneSimilar", name.name())
+                            : I18n.format("ui.faceName.noneSimilarFilter", name.name()))
+                    : I18n.format("ui.faceName.similarCount",
+                            content.candidates().size(), name.name()));
         });
 
         activeTask.setOnFailed(e ->
-                handleFailure("Could not load similar faces", activeTask.getException()));
+                handleFailure(I18n.get("ui.faceName.similarLoadFailed"), activeTask.getException()));
 
         startTask("facename-similar-loader");
     }
@@ -289,11 +283,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void showNamedFaces(NameRecord name, List<SimilarityResult> named) {
         namedFacesPane.getChildren().clear();
         if (named.isEmpty()) {
-            namedFacesLabel.setText("No faces tagged with '" + name.name() + "' yet.");
+            namedFacesLabel.setText(I18n.format("ui.faceName.noneTagged", name.name()));
             return;
         }
-        namedFacesLabel.setText("Faces tagged with '" + name.name()
-                + "', most similar to the average:");
+        namedFacesLabel.setText(I18n.format("ui.faceName.taggedWith", name.name()));
         renderCards(namedFacesPane, named, false);
     }
 
@@ -360,7 +353,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void installContextMenu(VBox card, FaceRecord face) {
         card.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem("Open Original");
+            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
             new ContextMenu(openOriginalItem).show(card, e.getScreenX(), e.getScreenY());
@@ -377,7 +370,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
         try {
             return faceToNameService.isOriginalAvailable(face.imageHash());
         } catch (SQLException ex) {
-            statusLabel.setText("Could not check the original image.");
+            statusLabel.setText(I18n.get("common.originalCheckFailed"));
             return false;
         }
     }
@@ -390,10 +383,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void openOriginal(String hash) {
         try {
             boolean opened = faceToNameService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : "Original file not found.");
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
         } catch (IOException | SQLException ex) {
-            statusLabel.setText("Could not open the original image.");
-            handleFailure("Could not open the original image", ex);
+            statusLabel.setText(I18n.get("common.openOriginalFailed"));
+            handleFailure(I18n.get("common.openOriginalFailed"), ex);
         }
     }
 
@@ -437,11 +430,11 @@ public class FaceNameView extends BorderPane implements Refreshable {
         }
         List<Long> faceIds = selectedCandidates();
         if (faceIds.isEmpty()) {
-            statusLabel.setText("Click faces to select them, then press Tag selected.");
+            statusLabel.setText(I18n.get("ui.faceName.clickToSelect"));
             return;
         }
 
-        statusLabel.setText("Tagging " + faceIds.size() + " face(s) as '" + activeName.name() + "'...");
+        statusLabel.setText(I18n.format("ui.faceName.tagging", faceIds.size(), activeName.name()));
         setTask(new Task<Void>() {
             @Override
             protected Void call() throws SQLException {
@@ -451,13 +444,12 @@ public class FaceNameView extends BorderPane implements Refreshable {
         });
 
         activeTask.setOnSucceeded(e -> {
-            statusLabel.setText("Tagged " + faceIds.size() + " face(s) as '"
-                    + activeName.name() + "'.");
+            statusLabel.setText(I18n.format("ui.faceName.tagged", faceIds.size(), activeName.name()));
             selectName(activeName); // refresh: tagged faces disappear
         });
 
         activeTask.setOnFailed(e ->
-                handleFailure("Could not tag faces", activeTask.getException()));
+                handleFailure(I18n.get("ui.faceName.tagFailed"), activeTask.getException()));
 
         startTask("facename-tagger");
     }
@@ -472,27 +464,27 @@ public class FaceNameView extends BorderPane implements Refreshable {
             return;
         }
         TextInputDialog dialog = new TextInputDialog(activeName.name());
-        dialog.setTitle("Rename");
-        dialog.setHeaderText("Rename '" + activeName.name() + "'");
-        dialog.setContentText("New name:");
+        dialog.setTitle(I18n.get("ui.faceName.rename.title"));
+        dialog.setHeaderText(I18n.format("ui.faceName.rename.header", activeName.name()));
+        dialog.setContentText(I18n.get("ui.faceName.rename.newName"));
         Button okButton = (Button) dialog.getDialogPane().lookupButton(
                 javafx.scene.control.ButtonType.OK);
-        okButton.setText("Rename");
+        okButton.setText(I18n.get("ui.faceName.rename.confirm"));
 
         if (!dialog.showAndWait().isPresent()) {
             return;
         }
         String newName = dialog.getEditor().getText().trim();
         if (newName.isEmpty()) {
-            statusLabel.setText("The name cannot be empty.");
+            statusLabel.setText(I18n.get("ui.faceName.rename.empty"));
             return;
         }
         if (newName.equals(activeName.name())) {
-            statusLabel.setText("The name is unchanged.");
+            statusLabel.setText(I18n.get("ui.faceName.rename.unchanged"));
             return;
         }
 
-        statusLabel.setText("Renaming to '" + newName + "'...");
+        statusLabel.setText(I18n.format("ui.faceName.renaming", newName));
         setTask(new Task<NameRecord>() {
             @Override
             protected NameRecord call() throws SQLException {
@@ -502,7 +494,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
 
         activeTask.setOnSucceeded(e -> {
             activeName = (NameRecord) activeTask.getValue();
-            statusLabel.setText("Renamed to '" + activeName.name() + "'.");
+            statusLabel.setText(I18n.format("ui.faceName.renamed", activeName.name()));
             loadNames(true); // refresh list and candidates for the renamed name
         });
 
@@ -510,9 +502,9 @@ public class FaceNameView extends BorderPane implements Refreshable {
             Throwable error = activeTask.getException();
             statusLabel.setText(error instanceof IllegalArgumentException
                     ? error.getMessage()
-                    : "Could not rename the name.");
+                    : I18n.get("ui.faceName.renameFailed"));
             if (!(error instanceof IllegalArgumentException)) {
-                handleFailure("Could not rename the name", error);
+                handleFailure(I18n.get("ui.faceName.renameFailed"), error);
             }
         });
 
@@ -583,7 +575,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Add faces to a name");
+        alert.setTitle(I18n.get("ui.faceName.alertTitle"));
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

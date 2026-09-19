@@ -1,5 +1,7 @@
 package free.svoss.facesort.update;
 
+import free.svoss.facesort.i18n.I18n;
+
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Hyperlink;
@@ -25,10 +27,10 @@ public class UpdateNoticeDialog extends Dialog<Void> {
      * Creates the update notice dialog.
      */
     public UpdateNoticeDialog() {
-        setTitle("Update available");
+        setTitle(I18n.get("update.title"));
         setResizable(false);
 
-        Label message = new Label("A new version of Face Sort is available.");
+        Label message = new Label(I18n.get("update.message"));
         message.setWrapText(true);
 
         Hyperlink releasesLink = new Hyperlink(RELEASES_URL);

@@ -2,11 +2,13 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.i18n.I18n;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
@@ -34,7 +36,9 @@ public class SettingsView extends BorderPane {
 
     private final ConfigModel config;
     private final Path configPath;
+    private final Runnable onLanguageChanged;
 
+    private final ComboBox<String> languageBox = new ComboBox<>();
     private final Spinner<Integer> minBoundingBoxSize = intSpinner(20, 500, 10);
     private final Spinner<Double> minConfidence = doubleSpinner(0.1, 1.0, 0.05);
     private final Spinner<Integer> maxFacesPerImage = intSpinner(1, 100, 1);
@@ -56,12 +60,15 @@ public class SettingsView extends BorderPane {
     /**
      * Creates the Settings tab.
      *
-     * @param config     the configuration object to edit and persist; must not be null
-     * @param configPath path of the JSON config file to write on save; must not be null
+     * @param config           the configuration object to edit and persist; must not be null
+     * @param configPath       path of the JSON config file to write on save; must not be null
+     * @param onLanguageChanged callback fired after the user picked a new UI language; the
+     *                          language selection has been applied and saved by then
      */
-    public SettingsView(ConfigModel config, Path configPath) {
+    public SettingsView(ConfigModel config, Path configPath, Runnable onLanguageChanged) {
         this.config = config;
         this.configPath = configPath;
+        this.onLanguageChanged = onLanguageChanged;
         buildUi();
         populateFromConfig();
     }
@@ -77,134 +84,79 @@ public class SettingsView extends BorderPane {
         grid.setVgap(10);
         grid.setPadding(new Insets(10));
 
-        int row = 0;
-        addRow(grid, row++, "Min bounding box size:", minBoundingBoxSize,
-                "Minimum side length (in pixels) of a detected face box; "
-                        + "faces smaller than this are discarded during import.\n\n"
-                        + "Default: " + defaults.getMinBoundingBoxSize() + " px.\n\n"
-                        + "Higher values keep only larger (usually nearer) faces, so fewer "
-                        + "false positives but small or distant faces are missed. "
-                        + "Lower values also keep small or distant faces, which adds noise "
-                        + "and slows processing.");
+        languageBox.getItems().setAll(I18n.supportedLanguages().stream()
+                .map(I18n.Language::displayName).toList());
+        languageBox.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null) {
+                onLanguageSelected();
+            }
+        });
+        addRow(grid, 0, I18n.get("settings.language"), languageBox,
+                I18n.get("settings.tooltip.language"));
 
-        addRow(grid, row++, "Min confidence:", minConfidence,
-                "Minimum confidence score a detected face must have to be stored; "
-                        + "detections scoring below this are discarded during import.\n\n"
-                        + "Default: " + format(defaults.getMinConfidence()) + ".\n\n"
-                        + "Higher values only accept very certain detections, cutting false "
-                        + "positives but possibly skipping genuine faces. Lower values keep "
-                        + "more faces, including uncertain ones.");
+        int row = 1;
+        addRow(grid, row++, I18n.get("settings.minBoundingBoxSize"), minBoundingBoxSize,
+                I18n.format("settings.tooltip.minBoundingBoxSize",
+                        defaults.getMinBoundingBoxSize()));
 
-        addRow(grid, row++, "Max faces per image:", maxFacesPerImage,
-                "Maximum number of faces stored per imported image. When an image "
-                        + "contains more faces, only the most confident ones are kept.\n\n"
-                        + "Default: " + defaults.getMaxFacesPerImage() + ".\n\n"
-                        + "Higher values keep more faces from group photos at the cost of "
-                        + "more data. Lower values store fewer faces and can drop people in "
-                        + "crowded pictures.");
+        addRow(grid, row++, I18n.get("settings.minConfidence"), minConfidence,
+                I18n.format("settings.tooltip.minConfidence",
+                        format(defaults.getMinConfidence())));
 
-        addRow(grid, row++, "Clustering threshold:", clusteringThreshold,
-                "Minimum similarity between two unnamed faces for them to be grouped "
-                        + "into the same cluster in the \"Put a name to a face\" tab.\n\n"
-                        + "Default: " + format(defaults.getClusteringThreshold()) + ".\n\n"
-                        + "Higher values group only very similar faces, giving smaller and "
-                        + "more precise clusters, but a single person may be split into "
-                        + "several clusters. Lower values merge more faces and can mix "
-                        + "different people together.");
+        addRow(grid, row++, I18n.get("settings.maxFacesPerImage"), maxFacesPerImage,
+                I18n.format("settings.tooltip.maxFacesPerImage",
+                        defaults.getMaxFacesPerImage()));
 
-        addRow(grid, row++, "HNSW M:", hnswM,
-                "Number of links kept per node in the HNSW index used to find similar "
-                        + "faces during clustering.\n\n"
-                        + "Default: " + defaults.getHnswM() + ".\n\n"
-                        + "Higher values improve neighbor-search accuracy at the cost of "
-                        + "more memory and a slower index build. Lower values build faster "
-                        + "and use less memory but can miss true neighbors.");
+        addRow(grid, row++, I18n.get("settings.clusteringThreshold"), clusteringThreshold,
+                I18n.format("settings.tooltip.clusteringThreshold",
+                        format(defaults.getClusteringThreshold())));
 
-        addRow(grid, row++, "HNSW efConstruction:", hnswEfConstruction,
-                "How many candidate nodes HNSW considers while building each node's "
-                        + "links. Trades index build time against search quality.\n\n"
-                        + "Default: " + defaults.getHnswEfConstruction() + ".\n\n"
-                        + "Higher values build a more accurate index but take longer and "
-                        + "use more memory. Lower values build more quickly with a less "
-                        + "accurate index.");
+        addRow(grid, row++, I18n.get("settings.hnswM"), hnswM,
+                I18n.format("settings.tooltip.hnswM", defaults.getHnswM()));
 
-        addRow(grid, row++, "HNSW efSearch:", hnswEfSearch,
-                "How many candidate nodes HNSW examines during each neighbor search "
-                        + "performed at clustering time.\n\n"
-                        + "Default: " + defaults.getHnswEfSearch() + ".\n\n"
-                        + "Higher values give more accurate searches but run slower. "
-                        + "Lower values run faster but can miss true neighbors.");
+        addRow(grid, row++, I18n.get("settings.hnswEfConstruction"), hnswEfConstruction,
+                I18n.format("settings.tooltip.hnswEfConstruction",
+                        defaults.getHnswEfConstruction()));
 
-        addRow(grid, row++, "KNN K:", knnK,
-                "Number of nearest neighbors queried for each face when linking faces "
-                        + "into clusters.\n\n"
-                        + "Default: " + defaults.getKnnK() + ".\n\n"
-                        + "Higher values can connect more distant faces into a cluster, "
-                        + "which is slower and may merge different people. Lower values "
-                        + "run faster but only link very close faces.");
+        addRow(grid, row++, I18n.get("settings.hnswEfSearch"), hnswEfSearch,
+                I18n.format("settings.tooltip.hnswEfSearch", defaults.getHnswEfSearch()));
 
-        addRow(grid, row++, "FaceAI cache dir:", faceaiCacheDir,
-                "Directory where FaceAI stores the downloaded face-detection and "
-                        + "recognition models. Models are fetched on first use and reused "
-                        + "from this folder afterwards.\n\n"
-                        + "Default: blank, which uses FaceAI's built-in cache location "
-                        + "(e.g. ~/.djl.ai/cache).\n\n"
-                        + "This setting has no higher/lower range: leave it blank for the "
-                        + "default location or enter a path to control where models live.");
-        faceaiCacheDir.setPromptText("Leave blank for the default cache location");
+        addRow(grid, row++, I18n.get("settings.knnK"), knnK,
+                I18n.format("settings.tooltip.knnK", defaults.getKnnK()));
 
-        addRow(grid, row++, "Max detection size:", maxDetectionDimension,
-                "Largest width/height (in pixels) an image may have before it is "
-                        + "scaled down before face detection runs.\n\n"
-                        + "Default: " + defaults.getMaxDetectionDimension() + " px.\n\n"
-                        + "Higher values detect small or distant faces in huge photos more "
-                        + "reliably but use more memory and take much longer. Lower values "
-                        + "make detection fast and cheap on high-resolution photos at the "
-                        + "risk of missing very small faces.");
+        addRow(grid, row++, I18n.get("settings.faceaiCacheDir"), faceaiCacheDir,
+                I18n.get("settings.tooltip.faceaiCacheDir"));
+        faceaiCacheDir.setPromptText(I18n.get("settings.faceaiCacheDirPrompt"));
 
-        addRow(grid, row, "Thumbnail size:", thumbnailSize,
-                "Maximum width/height (in pixels) of the full-image thumbnail stored "
-                        + "for each imported image.\n\n"
-                        + "Default: " + defaults.getThumbnailSize() + " px.\n\n"
-                        + "Higher values give sharper previews but larger database files. "
-                        + "Lower values keep the database smaller at the cost of preview "
-                        + "quality.");
+        addRow(grid, row++, I18n.get("settings.maxDetectionDimension"), maxDetectionDimension,
+                I18n.format("settings.tooltip.maxDetectionDimension",
+                        defaults.getMaxDetectionDimension()));
 
-        addRow(grid, ++row, "Max import threads:", maxImportThreads,
-                "Number of parallel worker threads used when importing image files. "
-                        + "Applies to the next import.\n\n"
-                        + "Default: " + defaults.getMaxImportThreads() + ".\n\n"
-                        + "Higher values import faster on multi-core machines but "
-                        + "increase CPU and memory use. Lower values are gentler on the "
-                        + "system but slower.");
+        addRow(grid, row++, I18n.get("settings.thumbnailSize"), thumbnailSize,
+                I18n.format("settings.tooltip.thumbnailSize", defaults.getThumbnailSize()));
 
-        addRow(grid, ++row, "Min similarity for adding to a name:", minNameSimilarity,
-                "Minimum similarity to a name's average embedding for a face to be "
-                        + "offered when adding faces to an existing name in the "
-                        + "\"Add faces to a name\" tab.\n\n"
-                        + "Default: " + format(defaults.getMinNameSimilarity()) + ".\n\n"
-                        + "Higher values only allow very similar faces, avoiding wrong "
-                        + "additions. Lower values offer more candidates but risk adding "
-                        + "a different person.");
+        addRow(grid, row++, I18n.get("settings.maxImportThreads"), maxImportThreads,
+                I18n.format("settings.tooltip.maxImportThreads",
+                        defaults.getMaxImportThreads()));
 
-        addRow(grid, ++row, "Max images in \"Add faces to a name\" tab:", faceNameMaxImages,
-                "Maximum number of similar unnamed faces shown as candidates in the "
-                        + "\"Add faces to a name\" tab.\n\n"
-                        + "Default: " + defaults.getFaceNameMaxImages() + ".\n\n"
-                        + "Higher values show more candidate faces to choose from, while "
-                        + "lower values keep the grid smaller.");
+        addRow(grid, row++, I18n.get("settings.minNameSimilarity"), minNameSimilarity,
+                I18n.format("settings.tooltip.minNameSimilarity",
+                        format(defaults.getMinNameSimilarity())));
 
-        addRow(grid, ++row, "Check for updates on startup:", updateCheckEnabled,
-                "Whether Face Sort checks the project's GitHub repository for a newer "
-                        + "release on application startup and shows a notice when one is "
-                        + "available.\n\n"
-                        + "Default: " + (defaults.isUpdateCheckEnabled() ? "enabled" : "disabled") + ".\n\n"
-                        + "Disabling this also skips the network request at startup.");
+        addRow(grid, row++, I18n.get("settings.faceNameMaxImages"), faceNameMaxImages,
+                I18n.format("settings.tooltip.faceNameMaxImages",
+                        defaults.getFaceNameMaxImages()));
 
-        Button saveButton = new Button("Save");
+        addRow(grid, row++, I18n.get("settings.updateCheckEnabled"), updateCheckEnabled,
+                I18n.format("settings.tooltip.updateCheckEnabled",
+                        defaults.isUpdateCheckEnabled()
+                                ? I18n.get("settings.enabled")
+                                : I18n.get("settings.disabled")));
+
+        Button saveButton = new Button(I18n.get("settings.save"));
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> onSave());
-        Button resetButton = new Button("Reset to defaults");
+        Button resetButton = new Button(I18n.get("settings.reset"));
         resetButton.setOnAction(e -> onReset());
 
         HBox actions = new HBox(8, saveButton, resetButton, statusLabel);
@@ -266,6 +218,12 @@ public class SettingsView extends BorderPane {
      * Copies the current configuration values into the form controls.
      */
     private void populateFromConfig() {
+        String current = config.getLanguage() == null
+                ? ConfigModel.DEFAULT_LANGUAGE : config.getLanguage();
+        I18n.supportedLanguages().stream()
+                .filter(lang -> lang.code().equals(current))
+                .findFirst()
+                .ifPresent(lang -> languageBox.setValue(lang.displayName()));
         minBoundingBoxSize.getValueFactory().setValue(config.getMinBoundingBoxSize());
         minConfidence.getValueFactory().setValue(config.getMinConfidence());
         maxFacesPerImage.getValueFactory().setValue(config.getMaxFacesPerImage());
@@ -284,6 +242,35 @@ public class SettingsView extends BorderPane {
     }
 
     /**
+     * Applies a newly selected UI language: stores it in the configuration,
+     * persists it best-effort, switches {@link I18n} and rebuilds the window.
+     */
+    private void onLanguageSelected() {
+        String selected = languageBox.getValue();
+        String code = I18n.supportedLanguages().stream()
+                .filter(lang -> lang.displayName().equals(selected))
+                .map(I18n.Language::code)
+                .findFirst()
+                .orElse(ConfigModel.DEFAULT_LANGUAGE);
+        String current = config.getLanguage() == null
+                ? ConfigModel.DEFAULT_LANGUAGE : config.getLanguage();
+        if (code.equals(current)) {
+            return;
+        }
+        config.setLanguage(code);
+        I18n.setLocale(I18n.localeFor(code));
+        try {
+            AppConfig.save(configPath, config);
+        } catch (IOException e) {
+            statusLabel.setText(I18n.format("settings.saveFailed", e.getMessage()));
+        }
+        if (onLanguageChanged != null) {
+            onLanguageChanged.run();
+        }
+        statusLabel.setText(I18n.get("settings.saved"));
+    }
+
+    /**
      * Copies the current form values into the configuration and persists it.
      * Numeric text fields are validated before saving; on invalid input the
      * form is left untouched and an error is shown in the status bar.
@@ -291,12 +278,12 @@ public class SettingsView extends BorderPane {
     private void onSave() {
         Double minSimilarity = parseUnitSimilarity(minNameSimilarity.getText());
         if (minSimilarity == null) {
-            statusLabel.setText("Min similarity must be a number between 0.0 and 1.0.");
+            statusLabel.setText(I18n.get("settings.error.minSimilarity"));
             return;
         }
         Integer maxImages = parsePositiveInteger(faceNameMaxImages.getText());
         if (maxImages == null) {
-            statusLabel.setText("Max images must be a positive integer.");
+            statusLabel.setText(I18n.get("settings.error.maxImages"));
             return;
         }
 
@@ -319,9 +306,9 @@ public class SettingsView extends BorderPane {
 
         try {
             AppConfig.save(configPath, config);
-            statusLabel.setText("Saved");
+            statusLabel.setText(I18n.get("settings.saved"));
         } catch (IOException e) {
-            statusLabel.setText("Save failed: " + e.getMessage());
+            statusLabel.setText(I18n.format("settings.saveFailed", e.getMessage()));
         }
     }
 
@@ -349,9 +336,9 @@ public class SettingsView extends BorderPane {
 
         try {
             AppConfig.save(configPath, config);
-            statusLabel.setText("Reset to defaults and saved");
+            statusLabel.setText(I18n.get("settings.resetDone"));
         } catch (IOException e) {
-            statusLabel.setText("Reset failed to save: " + e.getMessage());
+            statusLabel.setText(I18n.format("settings.resetFailed", e.getMessage()));
         }
     }
 

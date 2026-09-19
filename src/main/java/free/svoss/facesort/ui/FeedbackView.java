@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.FeedbackService;
 
 import javafx.concurrent.Task;
@@ -31,17 +32,19 @@ public class FeedbackView extends BorderPane {
     /** Minimum number of characters required before a message becomes submittable. */
     public static final int MIN_FEEDBACK_LENGTH = 10;
 
-    private static final String[] FEEDBACK_TYPES = {
-            "Report an error",
-            "Feature request",
-            "Other"
-    };
+    private final String[] feedbackTypes() {
+        return new String[]{
+                I18n.get("ui.feedback.type.report"),
+                I18n.get("ui.feedback.type.request"),
+                I18n.get("ui.feedback.type.other")
+        };
+    }
 
     private final FeedbackService feedbackService;
 
     private final ComboBox<String> typeBox = new ComboBox<>();
     private final TextArea feedbackText = new TextArea();
-    private final Button submitButton = new Button("Submit");
+    private final Button submitButton = new Button(I18n.get("ui.feedback.submit"));
     private final Label statusLabel = new Label();
 
     private boolean sending;
@@ -60,7 +63,7 @@ public class FeedbackView extends BorderPane {
      */
     FeedbackView(FeedbackService feedbackService) {
         this.feedbackService = Objects.requireNonNull(feedbackService, "feedbackService");
-        typeBox.getItems().addAll(FEEDBACK_TYPES);
+        typeBox.getItems().addAll(feedbackTypes());
         typeBox.getSelectionModel().selectFirst();
         feedbackText.textProperty().addListener((obs, oldText, newText) -> updateSubmitAvailability());
         buildUi();
@@ -71,11 +74,11 @@ public class FeedbackView extends BorderPane {
      * Builds the type picker, message area, submit button and status line.
      */
     private void buildUi() {
-        Label typeLabel = new Label("Feedback type:");
+        Label typeLabel = new Label(I18n.get("ui.feedback.typeLabel"));
         typeBox.setMaxWidth(Double.MAX_VALUE);
 
-        Label messageLabel = new Label("Your feedback:");
-        feedbackText.setPromptText("Enter at least " + MIN_FEEDBACK_LENGTH + " characters...");
+        Label messageLabel = new Label(I18n.get("ui.feedback.messageLabel"));
+        feedbackText.setPromptText(I18n.format("ui.feedback.prompt", MIN_FEEDBACK_LENGTH));
         feedbackText.setWrapText(true);
         feedbackText.setPrefRowCount(10);
         VBox.setVgrow(feedbackText, Priority.ALWAYS);
@@ -112,7 +115,7 @@ public class FeedbackView extends BorderPane {
      */
     private void onSubmit() {
         String selected = typeBox.getSelectionModel().getSelectedItem();
-        String subject = selected == null ? FEEDBACK_TYPES[0] : selected;
+        String subject = selected == null ? feedbackTypes()[0] : selected;
         String message = feedbackText.getText().trim();
         if (message.length() < MIN_FEEDBACK_LENGTH) {
             return;
@@ -120,7 +123,7 @@ public class FeedbackView extends BorderPane {
 
         sending = true;
         updateSubmitAvailability();
-        statusLabel.setText("Submitting feedback...");
+        statusLabel.setText(I18n.get("ui.feedback.submitting"));
 
         Task<Void> task = new Task<>() {
             @Override
@@ -132,15 +135,15 @@ public class FeedbackView extends BorderPane {
         task.setOnSucceeded(e -> {
             sending = false;
             feedbackText.clear();
-            statusLabel.setText("Your feedback was submitted");
+            statusLabel.setText(I18n.get("ui.feedback.submitted"));
             updateSubmitAvailability();
         });
         task.setOnFailed(e -> {
             sending = false;
             updateSubmitAvailability();
             Throwable error = task.getException();
-            statusLabel.setText("Submission failed: "
-                    + (error == null ? "unknown error" : error.getMessage()));
+            statusLabel.setText(I18n.format("ui.feedback.submitFailed",
+                    error == null ? I18n.get("app.unknownError") : error.getMessage()));
         });
 
         Thread thread = new Thread(task, "feedback-submit");

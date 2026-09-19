@@ -23,6 +23,8 @@ public class ConfigModel {
     public static final int DEFAULT_FACE_NAME_MAX_IMAGES = 30;
     /** Whether the automatic update check runs on application startup. */
     public static final boolean DEFAULT_UPDATE_CHECK_ENABLED = true;
+    /** Language code for the UI, one of the codes shipped in {@code i18n/messages*.properties}. */
+    public static final String DEFAULT_LANGUAGE = "en";
 
     private String lastImportFolder = "";
 
@@ -69,6 +71,10 @@ public class ConfigModel {
     // Startup behaviour
     @JsonProperty("updateCheckEnabled")
     private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK_ENABLED;
+
+    // Internationalization
+    @JsonProperty("language")
+    private String language = DEFAULT_LANGUAGE;
 
     public ConfigModel() {
         // No-arg constructor required by Jackson for deserialization.
@@ -208,5 +214,13 @@ public class ConfigModel {
 
     public void setUpdateCheckEnabled(boolean updateCheckEnabled) {
         this.updateCheckEnabled = updateCheckEnabled;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
     }
 }

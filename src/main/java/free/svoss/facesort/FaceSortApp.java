@@ -7,6 +7,7 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.ClusteringService;
 import free.svoss.facesort.service.DeduplicationService;
 import free.svoss.facesort.service.FaceAiService;
@@ -51,6 +52,10 @@ import java.util.List;
  * a model-download frame is shown first so the user sees which file is being
  * downloaded and where it is stored; the main window is built once the models
  * are ready.</p>
+ *
+ * <p>When the user changes the UI language in the settings, the main window is
+ * rebuilt from the same services so every tab reflects the new language while
+ * keeping the currently selected tab selected.</p>
  */
 public class FaceSortApp extends Application {
 
@@ -60,16 +65,26 @@ public class FaceSortApp extends Application {
 
     private ConfigModel config;
     private Path configPath;
+    private Stage primaryStage;
+    private int lastSelectedTabIndex;
+
     private Database database;
     private FaceAiService faceAiService;
     private ImportService importService;
+    private ClusteringService clusteringService;
+    private NamingService namingService;
+    private FaceToNameService faceToNameService;
+    private DeduplicationService dedupService;
+    private ViewService viewService;
 
     @Override
     public void start(Stage primaryStage) {
+        this.primaryStage = primaryStage;
         try {
             // 0. Load configuration (falls back to defaults when the file is absent).
             configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
             config = AppConfig.load(configPath);
+            I18n.setLocale(I18n.localeFor(config.getLanguage()));
 
             // 1. Background update check on a daemon thread; never blocks startup.
             //    Skipped when the user disabled it in the settings.
@@ -85,7 +100,7 @@ public class FaceSortApp extends Application {
                 startModelDownload(primaryStage);
             }
         } catch (Exception e) {
-            showStartupError("Failed to start: " + e.getMessage(), e);
+            showStartupError(I18n.format("app.startupFailed", e.getMessage()), e);
             Platform.exit();
         }
     }
@@ -123,14 +138,14 @@ public class FaceSortApp extends Application {
             try {
                 showMainWindow(primaryStage);
             } catch (Exception ex) {
-                showStartupError("Failed to initialize the application: " + ex.getMessage(), ex);
+                showStartupError(I18n.format("app.initFailed", ex.getMessage()), ex);
                 Platform.exit();
             }
         });
         task.setOnFailed(e -> {
             Throwable error = task.getException();
-            showStartupError("Failed to download the FaceAI models: "
-                    + (error != null ? error.getMessage() : "unknown error"), error);
+            showStartupError(I18n.format("app.modelDownloadFailed",
+                    error != null ? error.getMessage() : I18n.get("app.unknownError")), error);
             Platform.exit();
         });
 
@@ -140,8 +155,8 @@ public class FaceSortApp extends Application {
     }
 
     /**
-     * Opens the database, wires up services and views, and shows the main tab
-     * window. Must be called on the JavaFX application thread.
+     * Opens the database and builds the service layer once. Must be called on
+     * the JavaFX application thread.
      *
      * @param primaryStage the primary stage to display the main window in
      */
@@ -164,7 +179,7 @@ public class FaceSortApp extends Application {
         try {
             faceAiService = new FaceAiService(config);
         } catch (Exception e) {
-            showStartupError("FaceAI initialization failed: " + e.getMessage(), e);
+            showStartupError(I18n.format("app.faceaiInitFailed", e.getMessage()), e);
             Platform.exit();
             return;
         }
@@ -176,12 +191,21 @@ public class FaceSortApp extends Application {
             importAiServices.add(new FaceAiService(config));
         }
         importService = new ImportService(imageDao, faceDao, importAiServices, config);
-        ClusteringService clusteringService = new ClusteringService(faceAiService, faceDao, config);
-        NamingService namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, config);
-        FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, config);
-        DeduplicationService dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao, imageDao);
-        ViewService viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao);
+        clusteringService = new ClusteringService(faceAiService, faceDao, config);
+        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, config);
+        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, config);
+        dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao, imageDao);
+        viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao);
 
+        buildMainWindowUi();
+    }
+
+    /**
+     * Rebuilds the main tab window from the existing services. Used on startup
+     * and whenever the UI language changes, so every tab picks up the new
+     * language. Must be called on the JavaFX application thread.
+     */
+    private void buildMainWindowUi() {
         // 6. Views.
         ImportView importView = new ImportView(importService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
@@ -189,19 +213,23 @@ public class FaceSortApp extends Application {
         FaceNameView faceNameView = new FaceNameView(faceToNameService, config);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
-        SettingsView settingsView = new SettingsView(config, configPath);
+        SettingsView settingsView = new SettingsView(config, configPath, this::changeLanguage);
         FeedbackView feedbackView = new FeedbackView();
 
         // 7. Main window with the eight tabs.
         MainWindow mainWindow = new MainWindow(
-                new Tab("Import images", importView),
-                new Tab("Put a name to a face", nameFaceView),
-                new Tab("Tag random face", randomNameView),
-                new Tab("Add faces to a name", faceNameView),
-                new Tab("Deduplicate", dedupeView),
-                new Tab("View", viewView),
-                new Tab("Settings", settingsView),
-                new Tab("Feedback", feedbackView));
+                new Tab(I18n.get("tab.import"), importView),
+                new Tab(I18n.get("tab.nameFace"), nameFaceView),
+                new Tab(I18n.get("tab.randomName"), randomNameView),
+                new Tab(I18n.get("tab.faceName"), faceNameView),
+                new Tab(I18n.get("tab.deduplicate"), dedupeView),
+                new Tab(I18n.get("tab.view"), viewView),
+                new Tab(I18n.get("tab.settings"), settingsView),
+                new Tab(I18n.get("tab.feedback"), feedbackView));
+
+        int selected = lastSelectedTabIndex;
+        mainWindow.getSelectionModel().selectedIndexProperty().addListener(
+                (obs, oldIndex, newIndex) -> lastSelectedTabIndex = newIndex.intValue());
 
         Scene scene = new Scene(mainWindow, 1200, 800);
         var cssResource = getClass().getResource("/css/styles.css");
@@ -211,7 +239,19 @@ public class FaceSortApp extends Application {
 
         primaryStage.setTitle(APP_TITLE);
         primaryStage.setScene(scene);
+        if (selected > 0 && selected < mainWindow.getTabs().size()) {
+            mainWindow.getSelectionModel().select(selected);
+        }
         primaryStage.show();
+    }
+
+    /**
+     * Rebuilds the main window after the user changed the UI language. The
+     * language is already saved and applied to {@link I18n} by the settings
+     * view before this callback fires.
+     */
+    private void changeLanguage() {
+        buildMainWindowUi();
     }
 
     @Override
@@ -233,7 +273,7 @@ public class FaceSortApp extends Application {
     private void showStartupError(String message, Throwable cause) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(APP_TITLE);
-        alert.setHeaderText("Startup failed");
+        alert.setHeaderText(I18n.get("app.startupFailedHeader"));
         alert.setContentText(message + System.lineSeparator() + cause);
         alert.showAndWait();
     }

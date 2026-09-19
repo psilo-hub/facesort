@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.service.ViewService;
 import javafx.concurrent.Task;
@@ -45,8 +46,8 @@ public class ViewView extends BorderPane implements Refreshable {
 
     private final ViewService viewService;
 
-    private final Button backButton = new Button("Back to names");
-    private final Label titleLabel = new Label("Names");
+    private final Button backButton = new Button(I18n.get("ui.view.backToNames"));
+    private final Label titleLabel = new Label(I18n.get("ui.view.names"));
     private final Label statusLabel = new Label("");
     private final ScrollPane scrollPane = new ScrollPane();
     private final FlowPane namesPane = new FlowPane(12, 12);
@@ -102,7 +103,7 @@ public class ViewView extends BorderPane implements Refreshable {
         activeNameId = 0;
         activeNameText = "";
         setBusy(true);
-        statusLabel.setText("Loading names...");
+        statusLabel.setText(I18n.get("ui.view.loadingNames"));
 
         setTask(new Task<>() {
             @Override
@@ -119,16 +120,16 @@ public class ViewView extends BorderPane implements Refreshable {
                 namesPane.getChildren().add(buildNameCard(summary));
             }
             scrollPane.setContent(namesPane);
-            titleLabel.setText("Names (" + summaries.size() + ")");
+            titleLabel.setText(I18n.format("ui.view.namesCount", summaries.size()));
             backButton.setVisible(false);
             setBusy(false);
             statusLabel.setText(
-                    summaries.isEmpty() ? "No names yet — import photos and tag some faces first." : "");
+                    summaries.isEmpty() ? I18n.get("ui.view.noNames") : "");
         });
 
         activeTask.setOnFailed(e -> {
             setBusy(false);
-            handleFailure("Could not load names", activeTask.getException());
+            handleFailure(I18n.get("ui.view.loadNamesFailed"), activeTask.getException());
         });
 
         startTask("view-names-loader");
@@ -159,7 +160,7 @@ public class ViewView extends BorderPane implements Refreshable {
         activeNameId = nameId;
         activeNameText = displayName;
         setBusy(true);
-        statusLabel.setText("Loading images for '" + displayName + "'...");
+        statusLabel.setText(I18n.format("ui.view.loadingImages", displayName));
 
         setTask(new Task<>() {
             @Override
@@ -176,15 +177,15 @@ public class ViewView extends BorderPane implements Refreshable {
                 imagesPane.getChildren().add(buildImageThumbnail(image));
             }
             scrollPane.setContent(imagesPane);
-            titleLabel.setText("Images for '" + displayName + "' (" + images.size() + ")");
+            titleLabel.setText(I18n.format("ui.view.imagesCount", displayName, images.size()));
             backButton.setVisible(true);
             setBusy(false);
-            statusLabel.setText(images.isEmpty() ? "No images found for this name." : "");
+            statusLabel.setText(images.isEmpty() ? I18n.get("ui.view.noImages") : "");
         });
 
         activeTask.setOnFailed(e -> {
             setBusy(false);
-            handleFailure("Could not load images", activeTask.getException());
+            handleFailure(I18n.get("ui.view.loadImagesFailed"), activeTask.getException());
         });
 
         startTask("view-images-loader");
@@ -211,7 +212,7 @@ public class ViewView extends BorderPane implements Refreshable {
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13;");
 
         int count = summary.faceCount();
-        Label countLabel = new Label(count + (count == 1 ? " face" : " faces"));
+        Label countLabel = new Label(I18n.format(count == 1 ? "ui.view.face" : "ui.view.faces", count));
         countLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
         card.getChildren().addAll(
@@ -246,7 +247,7 @@ public class ViewView extends BorderPane implements Refreshable {
         view.setSmooth(true);
 
         String hash = image.hash();
-        Label caption = new Label(jpg != null ? hash.substring(0, Math.min(8, hash.length())) : "No preview");
+        Label caption = new Label(jpg != null ? hash.substring(0, Math.min(8, hash.length())) : I18n.get("ui.view.noPreview"));
         caption.setStyle("-fx-font-size: 10; -fx-text-fill: #666666;");
 
         box.getChildren().addAll(view, caption);
@@ -269,10 +270,10 @@ public class ViewView extends BorderPane implements Refreshable {
     private void installContextMenu(VBox box, ViewService.NamedImage image) {
         String hash = image.hash();
         box.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem("Open Original");
+            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(hash));
             openOriginalItem.setOnAction(ev -> openOriginal(hash));
-            MenuItem untagItem = new MenuItem("Untag from '" + activeNameText + "'");
+            MenuItem untagItem = new MenuItem(I18n.format("ui.view.untagFrom", activeNameText));
             untagItem.setOnAction(ev -> untagFaces(hash));
             new ContextMenu(openOriginalItem, untagItem)
                     .show(box, e.getScreenX(), e.getScreenY());
@@ -302,10 +303,10 @@ public class ViewView extends BorderPane implements Refreshable {
     private void openOriginal(String hash) {
         try {
             boolean opened = viewService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : "Original file not found.");
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
         } catch (IOException | SQLException ex) {
             LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
-            handleFailure("Could not open the original image", ex);
+            handleFailure(I18n.get("common.openOriginalFailed"), ex);
         }
     }
 
@@ -317,7 +318,7 @@ public class ViewView extends BorderPane implements Refreshable {
      * @param hash content hash of the image
      */
     private void untagFaces(String hash) {
-        statusLabel.setText("Untagging faces in this image from '" + activeNameText + "'...");
+        statusLabel.setText(I18n.format("ui.view.untagging", activeNameText));
         setTask(new Task<Integer>() {
             @Override
             protected Integer call() throws SQLException {
@@ -327,14 +328,13 @@ public class ViewView extends BorderPane implements Refreshable {
 
         activeTask.setOnSucceeded(e -> {
             int count = (Integer) activeTask.getValue();
-            statusLabel.setText("Untagged " + count + (count == 1 ? " face" : " faces")
-                    + " from '" + activeNameText + "'.");
+            statusLabel.setText(I18n.format("ui.view.untagged", count, activeNameText));
             openNameImages(activeNameId, activeNameText);
         });
 
         activeTask.setOnFailed(e -> {
-            statusLabel.setText("Could not untag faces.");
-            handleFailure("Could not untag faces", activeTask.getException());
+            statusLabel.setText(I18n.get("ui.view.untagFailed"));
+            handleFailure(I18n.get("ui.view.untagFailedHeader"), activeTask.getException());
         });
 
         startTask("view-untagger");
@@ -406,7 +406,7 @@ public class ViewView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("View");
+        alert.setTitle(I18n.get("ui.view.alertTitle"));
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

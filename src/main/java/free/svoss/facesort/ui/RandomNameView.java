@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.NamingService;
@@ -55,8 +56,8 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private final TextField nameField = new TextField();
     private final TextField pathFilterField = new TextField();
     private final Label nameExistsLabel = new Label("");
-    private final Button tagSelectedButton = new Button("Tag selected");
-    private final Button nextButton = new Button("Next");
+    private final Button tagSelectedButton = new Button(I18n.get("ui.randomName.tagSelected"));
+    private final Button nextButton = new Button(I18n.get("ui.randomName.next"));
     private final FlowPane facesPane = new FlowPane(10, 10);
 
     private Task<?> activeTask;
@@ -76,15 +77,14 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * Builds the name input row, the scrolling face grid and the status bar.
      */
     private void buildUi() {
-        nameField.setPromptText("Enter a name");
+        nameField.setPromptText(I18n.get("ui.randomName.namePrompt"));
         tagSelectedButton.getStyleClass().add("primary");
         tagSelectedButton.setDisable(true);
         tagSelectedButton.setOnAction(e -> onTagSelected());
         nextButton.setOnAction(e -> loadSample());
 
-        pathFilterField.setPromptText("Filter by path prefix");
-        pathFilterField.setTooltip(new Tooltip("Restrict the random sample to images whose "
-                + "stored path starts with the entered text. Press Enter to apply."));
+        pathFilterField.setPromptText(I18n.get("ui.randomName.pathFilterPrompt"));
+        pathFilterField.setTooltip(new Tooltip(I18n.get("ui.randomName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> loadSample());
         HBox.setHgrow(pathFilterField, Priority.ALWAYS);
         HBox.setHgrow(nameField, Priority.ALWAYS);
@@ -92,11 +92,11 @@ public class RandomNameView extends BorderPane implements Refreshable {
         nameExistsLabel.setWrapText(true);
         nameField.textProperty().addListener((obs, oldText, newText) -> checkNameExists());
         HBox controls = new HBox(8,
-                new Label("Name:"), nameField, nameExistsLabel, tagSelectedButton, nextButton);
+                new Label(I18n.get("ui.randomName.name")), nameField, nameExistsLabel, tagSelectedButton, nextButton);
         controls.setAlignment(Pos.CENTER_LEFT);
         controls.setPadding(new Insets(10));
 
-        HBox filterBar = new HBox(8, new Label("Path filter:"), pathFilterField);
+        HBox filterBar = new HBox(8, new Label(I18n.get("ui.randomName.pathFilter")), pathFilterField);
         filterBar.setAlignment(Pos.CENTER_LEFT);
         filterBar.setPadding(new Insets(10));
 
@@ -121,7 +121,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private void loadSample() {
         setBusy(true);
         String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
-        statusLabel.setText("Loading random unnamed faces...");
+        statusLabel.setText(I18n.get("ui.randomName.loading"));
         facesPane.getChildren().clear();
 
         setTask(new Task<>() {
@@ -138,14 +138,14 @@ public class RandomNameView extends BorderPane implements Refreshable {
             setBusy(false);
             statusLabel.setText(faces.isEmpty()
                     ? (pathPrefix.isEmpty()
-                            ? "No unnamed faces left — import photos or visit the other tagging tabs."
-                            : "No unnamed faces match the path filter.")
-                    : faces.size() + " random unnamed face(s). Select faces, type a name, and press Tag selected.");
+                            ? I18n.get("ui.randomName.noneLeft")
+                            : I18n.get("ui.randomName.noneMatch"))
+                    : I18n.format("ui.randomName.sampleInfo", faces.size()));
         });
 
         activeTask.setOnFailed(e -> {
             setBusy(false);
-            handleFailure("Could not load faces", activeTask.getException());
+            handleFailure(I18n.get("ui.randomName.loadFailed"), activeTask.getException());
         });
 
         startTask("random-sample-loader");
@@ -182,11 +182,11 @@ public class RandomNameView extends BorderPane implements Refreshable {
             @SuppressWarnings("unchecked")
             Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
             if (existing.isPresent()) {
-                nameExistsLabel.setText("Name already exists ("
-                        + existing.get().faceCount() + " face(s))");
+                nameExistsLabel.setText(I18n.format("ui.randomName.nameExists",
+                        existing.get().faceCount()));
                 nameExistsLabel.setStyle("-fx-text-fill: #c9302c;");
             } else {
-                nameExistsLabel.setText("New name");
+                nameExistsLabel.setText(I18n.get("ui.randomName.newName"));
                 nameExistsLabel.setStyle("-fx-text-fill: #3c763d;");
             }
         });
@@ -229,7 +229,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
             thumb.setSmooth(true);
             installPathTooltip(thumb, face);
 
-            Label idLabel = new Label("id " + face.id());
+            Label idLabel = new Label(I18n.format("ui.randomName.idPrefix", face.id()));
             idLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
             card.getChildren().addAll(thumb, idLabel);
@@ -253,7 +253,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
      */
     private void installContextMenu(VBox card, FaceRecord face) {
         card.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem("Open Original");
+            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
             new ContextMenu(openOriginalItem).show(card, e.getScreenX(), e.getScreenY());
@@ -270,7 +270,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
         try {
             return namingService.isOriginalAvailable(face.imageHash());
         } catch (SQLException ex) {
-            statusLabel.setText("Could not check the original image.");
+            statusLabel.setText(I18n.get("common.originalCheckFailed"));
             return false;
         }
     }
@@ -283,10 +283,10 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private void openOriginal(String hash) {
         try {
             boolean opened = namingService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : "Original file not found.");
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
         } catch (IOException | SQLException ex) {
-            statusLabel.setText("Could not open the original image.");
-            handleFailure("Could not open the original image", ex);
+            statusLabel.setText(I18n.get("common.openOriginalFailed"));
+            handleFailure(I18n.get("common.openOriginalFailed"), ex);
         }
     }
 
@@ -327,17 +327,17 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private void onTagSelected() {
         String name = nameField.getText() == null ? "" : nameField.getText().trim();
         if (name.isEmpty()) {
-            statusLabel.setText("Type a name first.");
+            statusLabel.setText(I18n.get("ui.randomName.typeNameFirst"));
             return;
         }
         List<Long> faceIds = selectedFaceIds();
         if (faceIds.isEmpty()) {
-            statusLabel.setText("Click faces to select them, then press Tag selected.");
+            statusLabel.setText(I18n.get("ui.randomName.clickToSelect"));
             return;
         }
 
         setBusy(true);
-        statusLabel.setText("Tagging " + faceIds.size() + " face(s) as '" + name + "'...");
+        statusLabel.setText(I18n.format("ui.randomName.tagging", faceIds.size(), name));
 
         setTask(new Task<Void>() {
             @Override
@@ -354,12 +354,12 @@ public class RandomNameView extends BorderPane implements Refreshable {
             facesPane.getChildren().removeIf(node ->
                     node.getUserData() instanceof Long id && faceIds.contains(id));
             setBusy(false);
-            statusLabel.setText("Tagged " + faceIds.size() + " face(s) as '" + name + "'.");
+            statusLabel.setText(I18n.format("ui.randomName.tagged", faceIds.size(), name));
         });
 
         activeTask.setOnFailed(e -> {
             setBusy(false);
-            handleFailure("Could not tag faces", activeTask.getException());
+            handleFailure(I18n.get("ui.randomName.tagFailed"), activeTask.getException());
         });
 
         startTask("random-tagger");
@@ -390,7 +390,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * @param face  the face whose source image paths should be shown
      */
     private void installPathTooltip(ImageView thumb, FaceRecord face) {
-        Tooltip tooltip = new Tooltip("Loading image path…");
+        Tooltip tooltip = new Tooltip(I18n.get("common.loadingPath"));
         Tooltip.install(thumb, tooltip);
         Task<List<String>> lookup = new Task<>() {
             @Override
@@ -401,10 +401,10 @@ public class RandomNameView extends BorderPane implements Refreshable {
         lookup.setOnSucceeded(e -> {
             List<String> paths = lookup.getValue();
             tooltip.setText(paths.isEmpty()
-                    ? "No stored path for this image"
+                    ? I18n.get("common.noStoredPath")
                     : String.join(System.lineSeparator(), paths));
         });
-        lookup.setOnFailed(e -> tooltip.setText("Image path unavailable"));
+        lookup.setOnFailed(e -> tooltip.setText(I18n.get("common.pathUnavailable")));
         Thread thread = new Thread(lookup, "randomname-path-tooltip-" + face.id());
         thread.setDaemon(true);
         thread.start();
@@ -457,7 +457,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Tag random face");
+        alert.setTitle(I18n.get("ui.randomName.alertTitle"));
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

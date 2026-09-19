@@ -9,6 +9,8 @@
 [![Platform: Windows · Linux · macOS](https://img.shields.io/badge/Platform-Windows%20%E2%80%A2%20Linux%20%E2%80%A2%20macOS-informational.svg)]()
 [![Download](https://img.shields.io/badge/Download-latest%20release-blue.svg)](https://github.com/psilo-hub/facesort/releases)
 
+> [English](README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Русский](README.ru.md) · [中文](README.zh.md)
+
 
 A cross-platform **desktop app** that sorts your photo collection by people. It
 detects faces in your photos, groups similar ones automatically, and lets you tag
@@ -102,7 +104,9 @@ The main window is a set of tabs. Work through them roughly in this order:
 
 7. **Settings** — tune face detection, clustering, import and model parameters;
    see each control's tooltip for details. Changes are applied via **Save** or
-   reset with **Reset to defaults**.
+   reset with **Reset to defaults**. The **Language** dropdown switches the UI
+   language immediately (available languages: English, Deutsch, Français,
+   Español, Русский, 中文).
 
 8. **Feedback** — send a bug report or feature request to the developers.
 
@@ -131,7 +135,8 @@ copy it to back up your library:
 | FaceAI model cache | Downloaded models — default `~/.djl.ai/cache` (Linux/macOS) or `%USERPROFILE%\.djl.ai\cache` (Windows); configurable via the *FaceAI cache dir* setting |
 
 All settings can be changed in the **Settings** tab (each control has an
-explanation tooltip); they are stored in `config/facesort-config.json`.
+explanation tooltip); they are stored in `config/facesort-config.json`. The UI
+**language** is stored there too.
 
 ## License
 

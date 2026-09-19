@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.service.DeduplicationService;
 import javafx.concurrent.Task;
@@ -21,7 +22,6 @@ import javafx.stage.Window;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,13 +43,13 @@ public class DedupeView extends BorderPane {
 
     private final DeduplicationService dedupService;
 
-    private final Button startButton = new Button("Start");
-    private final Button dupesButton = new Button("These are dupes");
-    private final Button notDupesButton = new Button("These are not dupes");
-    private final Button skipButton = new Button("Skip");
-    private final Button stopButton = new Button("Stop");
+    private final Button startButton = new Button(I18n.get("ui.dedupe.start"));
+    private final Button dupesButton = new Button(I18n.get("ui.dedupe.dupes"));
+    private final Button notDupesButton = new Button(I18n.get("ui.dedupe.notDupes"));
+    private final Button skipButton = new Button(I18n.get("ui.dedupe.skip"));
+    private final Button stopButton = new Button(I18n.get("ui.dedupe.stop"));
 
-    private final Label statusLabel = new Label("Click Start to find duplicate names.");
+    private final Label statusLabel = new Label(I18n.get("ui.dedupe.idleHint"));
     private final Label pairLabel = new Label();
     private final ImageView faceAView = new ImageView();
     private final ImageView faceBView = new ImageView();
@@ -88,7 +88,7 @@ public class DedupeView extends BorderPane {
 
         pairLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
         pairLabel.setPadding(new Insets(0, 0, 10, 0));
-        pairLabel.setText("Click Start to begin a deduplication session.");
+        pairLabel.setText(I18n.get("ui.dedupe.idleHint2"));
 
         VBox sideA = new VBox(6, faceAView, nameALabel);
         VBox sideB = new VBox(6, faceBView, nameBLabel);
@@ -128,7 +128,7 @@ public class DedupeView extends BorderPane {
         sessionActive = true;
         startButton.setDisable(true);
         stopButton.setDisable(false);
-        statusLabel.setText("Preparing candidates...");
+        statusLabel.setText(I18n.get("ui.dedupe.preparing"));
         loadNextPair();
     }
 
@@ -154,7 +154,7 @@ public class DedupeView extends BorderPane {
             }
             Optional<DeduplicationService.DupeCandidate> next = activeTask.getValue();
             if (next.isEmpty()) {
-                endSession("No more pairs to compare.");
+                endSession(I18n.get("ui.dedupe.noneLeft"));
             } else {
                 showPair(next.get());
             }
@@ -164,9 +164,9 @@ public class DedupeView extends BorderPane {
             Throwable error = activeTask.getException();
             LOG.log(Level.WARNING, "Failed to load the next pair", error);
             if (sessionActive) {
-                endSession("Could not load the next pair.");
+                endSession(I18n.get("ui.dedupe.loadFailed"));
             }
-            showError("Could not load the next pair", error);
+            showError(I18n.get("ui.dedupe.loadFailed"), error);
         });
 
         Thread thread = new Thread(activeTask, "dedupe-pair-loader");
@@ -182,10 +182,9 @@ public class DedupeView extends BorderPane {
     private void showPair(DeduplicationService.DupeCandidate candidate) {
         current = candidate;
         round++;
-        pairLabel.setText(String.format("Comparing '%s' vs '%s'",
+        pairLabel.setText(I18n.format("ui.dedupe.comparing",
                 candidate.nameA(), candidate.nameB()));
-        statusLabel.setText(String.format(Locale.ROOT,
-                "Round %d — Comparing '%s' vs '%s' (similarity %.2f)",
+        statusLabel.setText(I18n.format("ui.dedupe.round",
                 round, candidate.nameA(), candidate.nameB(), candidate.similarity()));
         nameALabel.setText(candidate.nameA());
         nameBLabel.setText(candidate.nameB());
@@ -205,11 +204,9 @@ public class DedupeView extends BorderPane {
         }
         ChoiceDialog<String> dialog = new ChoiceDialog<>(current.nameA(),
                 current.nameA(), current.nameB());
-        dialog.setTitle("Which name survives?");
-        dialog.setHeaderText("Merge duplicates");
-        dialog.setContentText(String.format(
-                "All faces of the eliminated name are reassigned to the surviving name.%n"
-                        + "Which of '%s' and '%s' should survive?",
+        dialog.setTitle(I18n.get("ui.dedupe.survivorTitle"));
+        dialog.setHeaderText(I18n.get("ui.dedupe.mergeHeader"));
+        dialog.setContentText(I18n.format("ui.dedupe.mergeContent",
                 current.nameA(), current.nameB()));
 
         Optional<String> choice = dialog.showAndWait();
@@ -256,7 +253,7 @@ public class DedupeView extends BorderPane {
             loadNextPair();
         } catch (SQLException ex) {
             LOG.log(Level.WARNING, "Deduplication decision failed", ex);
-            showError("The operation failed", ex);
+            showError(I18n.get("ui.dedupe.operationFailed"), ex);
             setDecisionEnabled(true);
         }
     }
@@ -271,7 +268,7 @@ public class DedupeView extends BorderPane {
             activeTask.cancel(true);
             activeTask = null;
         }
-        endSession("Session stopped.");
+        endSession(I18n.get("ui.dedupe.sessionStopped"));
     }
 
     /**
@@ -283,7 +280,7 @@ public class DedupeView extends BorderPane {
         sessionActive = false;
         current = null;
         statusLabel.setText(message);
-        pairLabel.setText("Click Start to begin a new deduplication session.");
+        pairLabel.setText(I18n.get("ui.dedupe.newSessionHint"));
         nameALabel.setText("");
         nameBLabel.setText("");
         faceAView.setImage(null);
@@ -347,7 +344,7 @@ public class DedupeView extends BorderPane {
             return;
         }
         node.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem("Open Original");
+            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
             new ContextMenu(openOriginalItem).show(node, e.getScreenX(), e.getScreenY());
@@ -378,10 +375,10 @@ public class DedupeView extends BorderPane {
     private void openOriginal(String hash) {
         try {
             boolean opened = dedupService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : "Original file not found.");
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
         } catch (IOException | SQLException ex) {
             LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
-            showError("Could not open the original image", ex);
+            showError(I18n.get("common.openOriginalFailed"), ex);
         }
     }
 
@@ -393,7 +390,7 @@ public class DedupeView extends BorderPane {
      */
     private void showError(String message, Throwable error) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Deduplicate");
+        alert.setTitle(I18n.get("ui.dedupe.alertTitle"));
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

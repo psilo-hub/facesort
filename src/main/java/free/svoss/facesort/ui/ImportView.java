@@ -2,6 +2,7 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.ImportService;
 
 import javafx.application.Platform;
@@ -23,7 +24,6 @@ import javafx.stage.Window;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 
 /**
  * The Import tab: pick a folder, run the import pipeline, watch progress.
@@ -44,12 +44,12 @@ public class ImportView extends BorderPane {
     private final ConfigModel config;
 
     private final TextField folderField = new TextField();
-    private final Button browseButton = new Button("Browse...");
-    private final Button importButton = new Button("Import");
-    private final Button stopButton = new Button("Stop");
+    private final Button browseButton = new Button(I18n.get("ui.import.browse"));
+    private final Button importButton = new Button(I18n.get("ui.import.import"));
+    private final Button stopButton = new Button(I18n.get("ui.import.stop"));
     private final ProgressBar progressBar = new ProgressBar(0);
     private final TextArea logArea = new TextArea();
-    private final Label statusLabel = new Label("Ready.");
+    private final Label statusLabel = new Label(I18n.get("ui.import.ready"));
 
     private volatile boolean cancelRequested;
 
@@ -72,8 +72,8 @@ public class ImportView extends BorderPane {
      */
     private void buildUi() {
         // Top: folder selection + import/stop buttons
-        Label folderLabel = new Label("Folder:");
-        folderField.setPromptText("Select a folder of photos");
+        Label folderLabel = new Label(I18n.get("ui.import.folder"));
+        folderField.setPromptText(I18n.get("ui.import.folderPrompt"));
         HBox.setHgrow(folderField, Priority.ALWAYS);
         browseButton.setOnAction(e -> onBrowse());
         importButton.setDefaultButton(true);
@@ -88,7 +88,7 @@ public class ImportView extends BorderPane {
         // Center: log area with progress bar above it
         logArea.setEditable(false);
         logArea.setWrapText(true);
-        logArea.setPromptText("Import log will appear here.");
+        logArea.setPromptText(I18n.get("ui.import.logPrompt"));
         VBox.setVgrow(logArea, Priority.ALWAYS);
 
         progressBar.setMaxWidth(Double.MAX_VALUE);
@@ -119,7 +119,7 @@ public class ImportView extends BorderPane {
      */
     private void onBrowse() {
         DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Select Photo Folder");
+        chooser.setTitle(I18n.get("ui.import.folderChooserTitle"));
         String current = folderField.getText();
         if (current != null && !current.isBlank()) {
             Path path = Path.of(current);
@@ -140,7 +140,7 @@ public class ImportView extends BorderPane {
     private void onImport() {
         Path folder = Path.of(folderField.getText().trim());
         if (!Files.isDirectory(folder)) {
-            statusLabel.setText("Please pick a valid folder first.");
+            statusLabel.setText(I18n.get("ui.import.invalidFolder"));
             return;
         }
         startImport(folder);
@@ -152,7 +152,7 @@ public class ImportView extends BorderPane {
     private void onStop() {
         cancelRequested = true;
         stopButton.setDisable(true);
-        appendLog("Stop requested - finishing the current image...");
+        appendLog(I18n.get("ui.import.stopRequested"));
     }
 
     /**
@@ -166,9 +166,9 @@ public class ImportView extends BorderPane {
         cancelRequested = false;
 
         setBusy(true);
-        statusLabel.setText("Scanning...");
+        statusLabel.setText(I18n.get("ui.import.scanning"));
         progressBar.setProgress(-1);
-        appendLog("Importing from: " + folder.toAbsolutePath());
+        appendLog(I18n.format("ui.import.importingFrom", folder.toAbsolutePath()));
 
         Task<ImportService.ImportResult> task = new Task<>() {
             @Override
@@ -185,14 +185,13 @@ public class ImportView extends BorderPane {
             if (result.wasCancelled()) {
                 progressBar.setProgress(result.totalFiles() > 0
                         ? (double) result.processed() / result.totalFiles() : 0);
-                statusLabel.setText(String.format(Locale.ROOT,
-                        "Import stopped after %d of %d images.",
+                statusLabel.setText(I18n.format("ui.import.stoppedAfter",
                         result.processed(), result.totalFiles()));
-                appendLog("Import stopped.");
+                appendLog(I18n.get("ui.import.stopped"));
             } else {
                 progressBar.setProgress(1);
                 statusLabel.setText(formatSummary(result));
-                appendLog("Import finished.");
+                appendLog(I18n.get("ui.import.finished"));
             }
         });
 
@@ -201,12 +200,9 @@ public class ImportView extends BorderPane {
             cancelRequested = false;
             progressBar.setProgress(0);
             Throwable error = task.getException();
-            if (error instanceof IOException) {
-                statusLabel.setText("Import failed: " + error.getMessage());
-            } else {
-                statusLabel.setText("Import failed: " + error);
-            }
-            appendLog("Import failed: " + error);
+            String detail = error instanceof IOException ? error.getMessage() : String.valueOf(error);
+            statusLabel.setText(I18n.format("ui.import.failed", detail));
+            appendLog(I18n.format("ui.import.failed", error));
         });
 
         Thread thread = new Thread(task, "import-worker");
@@ -238,7 +234,7 @@ public class ImportView extends BorderPane {
             AppConfig.save(Path.of(AppConfig.DEFAULT_CONFIG_FILE), config);
         } catch (IOException e) {
             // Remembering the folder is best-effort; do not fail the import.
-            appendLog("Could not save config: " + e.getMessage());
+            appendLog(I18n.format("ui.import.configSaveFailed", e.getMessage()));
         }
     }
 
@@ -258,8 +254,7 @@ public class ImportView extends BorderPane {
      * @return a human-readable summary string
      */
     private static String formatSummary(ImportService.ImportResult result) {
-        return String.format(Locale.ROOT,
-                "Total: %d, New images: %d, New paths: %d, New faces: %d, Skipped: %d, Errors: %d",
+        return I18n.format("ui.import.summary",
                 result.totalFiles(), result.newImages(), result.newPaths(),
                 result.newFaces(), result.skipped(), result.errors());
     }

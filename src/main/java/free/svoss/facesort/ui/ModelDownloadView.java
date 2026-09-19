@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.tools.faceai.ModelDownloadListener;
 
 import javafx.application.Platform;
@@ -28,16 +29,13 @@ import java.util.Objects;
  */
 public class ModelDownloadView extends VBox {
 
-    private final Label titleLabel = new Label("First-time model download");
-    private final Label hintLabel = new Label(
-            "Face recognition models are not installed yet. They are downloaded "
-            + "once and then reused from the local cache. Depending on your "
-            + "connection this can take a few minutes.");
-    private final Label currentLabel = new Label("Waiting to start...");
-    private final Label urlCaption = new Label("Downloading from:");
+    private final Label titleLabel = new Label(I18n.get("ui.modelDownload.title"));
+    private final Label hintLabel = new Label(I18n.get("ui.modelDownload.hint"));
+    private final Label currentLabel = new Label(I18n.get("ui.modelDownload.waiting"));
+    private final Label urlCaption = new Label(I18n.get("ui.modelDownload.downloadingFrom"));
     private final Label urlLabel = new Label();
     private final VBox urlRow = new VBox(2);
-    private final Label destinationCaption = new Label("Stored in:");
+    private final Label destinationCaption = new Label(I18n.get("ui.modelDownload.storedIn"));
     private final Label destinationLabel = new Label();
     private final VBox destinationRow = new VBox(2);
     private final Label percentLabel = new Label();
@@ -88,7 +86,7 @@ public class ModelDownloadView extends VBox {
         logArea.setEditable(false);
         logArea.setWrapText(true);
         logArea.setPrefHeight(140);
-        logArea.setPromptText("Download log will appear here.");
+        logArea.setPromptText(I18n.get("ui.modelDownload.logPrompt"));
 
         currentLabel.setWrapText(true);
         currentLabel.setMaxWidth(620);
@@ -123,7 +121,7 @@ public class ModelDownloadView extends VBox {
             @Override
             public void onModelDownloaded(String modelName) {
                 Platform.runLater(() -> {
-                    appendLogOnFxThread("Downloaded " + modelName + ".");
+                    appendLogOnFxThread(I18n.format("ui.modelDownload.downloaded", modelName));
                     if (lastDownloadedBytes != -1) {
                         progressBar.setProgress(1);
                     }
@@ -136,7 +134,7 @@ public class ModelDownloadView extends VBox {
             String destinationDirectory, long totalBytes) {
         lastDownloadedBytes = 0;
         lastTotalBytes = totalBytes;
-        currentLabel.setText("Downloading " + modelName + "...");
+        currentLabel.setText(I18n.format("ui.modelDownload.downloading", modelName));
         urlLabel.setText(url);
         urlRow.setVisible(true);
         urlRow.setManaged(true);
@@ -144,13 +142,13 @@ public class ModelDownloadView extends VBox {
         destinationRow.setVisible(true);
         destinationRow.setManaged(true);
         updateProgress();
-        appendLogOnFxThread("Downloading " + modelName + " from " + url);
+        appendLogOnFxThread(I18n.format("ui.modelDownload.downloadingFromUrl", modelName, url));
     }
 
     private void showProgress(String modelName, long downloadedBytes, long totalBytes) {
         lastDownloadedBytes = downloadedBytes;
         lastTotalBytes = totalBytes;
-        currentLabel.setText("Downloading " + modelName + "...");
+        currentLabel.setText(I18n.format("ui.modelDownload.downloading", modelName));
         updateProgress();
     }
 
@@ -158,13 +156,13 @@ public class ModelDownloadView extends VBox {
         if (lastTotalBytes > 0) {
             double fraction = Math.min(1.0, (double) lastDownloadedBytes / lastTotalBytes);
             progressBar.setProgress(fraction);
-            percentLabel.setText(String.format(Locale.ROOT, "%.1f%% of %s",
+            percentLabel.setText(I18n.format("ui.modelDownload.percentOf",
                     fraction * 100, formatBytes(lastTotalBytes)));
         } else {
             progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
             percentLabel.setText(lastDownloadedBytes > 0
                     ? formatBytes(lastDownloadedBytes)
-                    : "Size unknown - downloading...");
+                    : I18n.get("ui.modelDownload.sizeUnknown"));
         }
     }
 
