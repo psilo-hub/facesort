@@ -2,10 +2,6 @@
 
 2. Export feature
 
-3. Rewrite README for end users (done 2026-09-19)
+3. Fix tab name bug with characters being cut off
 
-4. Widen path filter text fields (done 2026-09-19)
-
-5. Rename tabs (done 2026-09-19)
-
-6. Rename Face Name tab (done 2026-09-19)
+4. Implement video import
