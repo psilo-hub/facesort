@@ -26,6 +26,10 @@
 /* ---- Tab panes ---- */
 
 .tab-pane {
+    /* modena clamps tab headers to 1.8333em; at 14px that (~25.7px) clips
+       the .tab-label padding (6px top/bottom), cutting off descenders. */
+    -fx-tab-min-height: 2.5em;
+    -fx-tab-max-height: 2.5em;
     -fx-padding: 8px;
 }
 
