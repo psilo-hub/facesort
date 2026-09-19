@@ -197,7 +197,7 @@ public class FaceSortApp extends Application {
                 new Tab("Import images", importView),
                 new Tab("Put a name to a face", nameFaceView),
                 new Tab("Tag random face", randomNameView),
-                new Tab("Face Name", faceNameView),
+                new Tab("Add faces to a name", faceNameView),
                 new Tab("Deduplicate", dedupeView),
                 new Tab("View", viewView),
                 new Tab("Settings", settingsView),

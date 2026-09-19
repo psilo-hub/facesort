@@ -106,7 +106,7 @@
     -fx-background-color: transparent;
 }
 
-/* ---- Face candidates (Face Name tab) ---- */
+/* ---- Face candidates (Add faces to a name tab) ---- */
 
 .candidate-card {
     -fx-background-color: #f8f8fc;

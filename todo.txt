@@ -7,3 +7,5 @@
 4. Widen path filter text fields (done 2026-09-19)
 
 5. Rename tabs (done 2026-09-19)
+
+6. Rename Face Name tab (done 2026-09-19)

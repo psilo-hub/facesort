@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link AppConfig}: defaults and backward compatibility of the
- * config file with the settings introduced for the "Face Name" tab and the
+ * config file with the settings introduced for the "Add faces to a name" tab and the
  * update check.
  */
 class AppConfigTest {

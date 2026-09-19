@@ -19,7 +19,7 @@ runs locally on your own computer: **your photos never leave your machine.**
 - **Three easy ways to tag faces:**
   - **Put a name to a face** — work through groups of unnamed faces, largest first.
   - **Tag random face** — browse random unnamed faces and tag the ones you select.
-  - **Face Name** — pick a person and tag the unnamed faces most similar to them.
+  - **Add faces to a name** — pick a person and tag the unnamed faces most similar to them.
 - **Duplicate detection** — compares your named people and lets you merge names
   that turn out to be the same person.
 - **Browse & review** — see every person at a glance, drill into the photos that
@@ -78,7 +78,7 @@ The main window is a set of tabs. Work through them roughly in this order:
    them, type a name and press **Tag selected**. Use the *path prefix* field to
    restrict the sample to a particular folder or file.
 
-4. **Face Name** — *put a face to a name.* Select a person on the left; the app
+4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
    shows the best candidates. Select several and press **Tag selected**. Use the
    *"Exclude faces closer to another name"* checkbox to only offer faces whose
@@ -108,7 +108,7 @@ source image.
 ### Suggested workflow
 
 ```
-Import a folder  →  Put a name to a face / Tag random face / Face Name (tag people)
+Import a folder  →  Put a name to a face / Tag random face / Add faces to a name (tag people)
                  →  Deduplicate (merge duplicate person names)
                  →  View (review, open originals, untag mistakes)
 ```

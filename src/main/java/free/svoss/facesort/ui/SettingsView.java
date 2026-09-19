@@ -181,15 +181,15 @@ public class SettingsView extends BorderPane {
         addRow(grid, ++row, "Min similarity for adding to a name:", minNameSimilarity,
                 "Minimum similarity to a name's average embedding for a face to be "
                         + "offered when adding faces to an existing name in the "
-                        + "\"Face Name\" tab.\n\n"
+                        + "\"Add faces to a name\" tab.\n\n"
                         + "Default: " + format(defaults.getMinNameSimilarity()) + ".\n\n"
                         + "Higher values only allow very similar faces, avoiding wrong "
                         + "additions. Lower values offer more candidates but risk adding "
                         + "a different person.");
 
-        addRow(grid, ++row, "Max images in \"Face Name\" tab:", faceNameMaxImages,
+        addRow(grid, ++row, "Max images in \"Add faces to a name\" tab:", faceNameMaxImages,
                 "Maximum number of similar unnamed faces shown as candidates in the "
-                        + "\"Face Name\" tab.\n\n"
+                        + "\"Add faces to a name\" tab.\n\n"
                         + "Default: " + defaults.getFaceNameMaxImages() + ".\n\n"
                         + "Higher values show more candidate faces to choose from, while "
                         + "lower values keep the grid smaller.");

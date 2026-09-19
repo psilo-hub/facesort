@@ -583,7 +583,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Face Name");
+        alert.setTitle("Add faces to a name");
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

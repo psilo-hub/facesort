@@ -19,7 +19,7 @@ public class ConfigModel {
     public static final String DEFAULT_DB_NAME = "facesort.db";
     /** Minimum similarity for adding a face to an existing name. */
     public static final double DEFAULT_MIN_NAME_SIMILARITY = 0.75;
-    /** Maximum unnamed faces shown as candidates in the "Face Name" tab. */
+    /** Maximum unnamed faces shown as candidates in the "Add faces to a name" tab. */
     public static final int DEFAULT_FACE_NAME_MAX_IMAGES = 30;
     /** Whether the automatic update check runs on application startup. */
     public static final boolean DEFAULT_UPDATE_CHECK_ENABLED = true;

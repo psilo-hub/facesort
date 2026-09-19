@@ -38,6 +38,7 @@ All notable changes to Face Sort will be documented in this file.
   plain value in Settings instead of a stepped spinner.
 - Wider path-filter fields in the "Random Tag" and "Face Name" tabs.
 - Renamed the "Import", "Name Face" and "Random Tag" tabs to "Import images", "Put a name to a face" and "Tag random face".
+- Renamed the "Face Name" tab to "Add faces to a name".
 
 ### Fixed
 - Right-clicking an image in the "View" tab now shows the context menu
