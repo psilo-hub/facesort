@@ -86,6 +86,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
         pathFilterField.setTooltip(new Tooltip("Restrict the random sample to images whose "
                 + "stored path starts with the entered text. Press Enter to apply."));
         pathFilterField.setOnAction(e -> loadSample());
+        HBox.setHgrow(pathFilterField, Priority.ALWAYS);
         HBox.setHgrow(nameField, Priority.ALWAYS);
 
         nameExistsLabel.setWrapText(true);

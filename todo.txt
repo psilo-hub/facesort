@@ -3,3 +3,5 @@
 2. Export feature
 
 3. Rewrite README for end users (done 2026-09-19)
+
+4. Widen path filter text fields (done 2026-09-19)

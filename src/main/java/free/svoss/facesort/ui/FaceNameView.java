@@ -153,6 +153,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 selectName(activeName);
             }
         });
+        HBox.setHgrow(pathFilterField, Priority.ALWAYS);
         HBox filterBar = new HBox(6, new Label("Path filter:"), pathFilterField);
 
         VBox center = new VBox(8,
