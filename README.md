@@ -1,9 +1,11 @@
 # Face Sort
 
+<!-- BADGIE TIME -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net/)
 [![Platform: Windows · Linux · macOS](https://img.shields.io/badge/Platform-Windows%20%E2%80%A2%20Linux%20%E2%80%A2%20macOS-informational.svg)]()
 [![Download](https://img.shields.io/badge/Download-latest%20release-blue.svg)](https://github.com/psilo-hub/facesort/releases)
+<!-- END BADGIE TIME -->
 
 A cross-platform **desktop app** that sorts your photo collection by people. It
 detects faces in your photos, groups similar ones automatically, and lets you tag
