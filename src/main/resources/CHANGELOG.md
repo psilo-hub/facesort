@@ -37,6 +37,11 @@ All notable changes to Face Sort will be documented in this file.
 - The minimum similarity for images shown in "Face Name" is now editable as a
   plain value in Settings instead of a stepped spinner.
 
+### Fixed
+- Right-clicking an image in the "View" tab now shows the context menu
+  ("Open Original", "Untag from ...") instead of opening the original file
+  in the default viewer.
+
 ## [0.1.0]
 
 ### Added

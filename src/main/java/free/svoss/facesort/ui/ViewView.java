@@ -13,6 +13,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -249,7 +250,24 @@ public class ViewView extends BorderPane implements Refreshable {
         caption.setStyle("-fx-font-size: 10; -fx-text-fill: #666666;");
 
         box.getChildren().addAll(view, caption);
-        box.setOnMouseClicked(e -> openOriginal(hash));
+        box.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                openOriginal(hash);
+            }
+        });
+        installContextMenu(box, image);
+        return box;
+    }
+
+    /**
+     * Installs a right-click context menu on an image thumbnail with "Open
+     * Original" and "Untag from ..." entries.
+     *
+     * @param box   the thumbnail box to attach the menu to
+     * @param image the named image the box displays
+     */
+    private void installContextMenu(VBox box, ViewService.NamedImage image) {
+        String hash = image.hash();
         box.setOnContextMenuRequested(e -> {
             MenuItem openOriginalItem = new MenuItem("Open Original");
             openOriginalItem.setDisable(!isOriginalAvailable(hash));
@@ -259,7 +277,6 @@ public class ViewView extends BorderPane implements Refreshable {
             new ContextMenu(openOriginalItem, untagItem)
                     .show(box, e.getScreenX(), e.getScreenY());
         });
-        return box;
     }
 
     /**

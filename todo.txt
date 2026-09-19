@@ -1,5 +1,3 @@
-1. Bug fix: untag a face
+1. Select range
 
-2. Select range
-
-3. Export feature
+2. Export feature
