@@ -42,6 +42,9 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
   específico.
 - **Renombrar y desetiquetar**: corrige un error tipográfico en todas partes a la
   vez, o quita una cara de un nombre.
+- **Exportar las fotos de una persona**: en *Añadir caras a un nombre*, elige a
+  una persona y copia cada foto que la contenga a una carpeta de tu elección (las
+  fotos cuyo archivo original ya no existe se exportan como miniaturas).
 - **Descarga de modelos en el primer arranque**: los modelos integrados de
   reconocimiento facial se descargan una vez (con ventana de progreso) y se
   guardan en caché localmente.
@@ -106,7 +109,10 @@ este orden:
    el rango entre ellas. Usa la casilla *«Excluir caras más cercanas a otro
    nombre»* para ofrecer solo caras cuya mejor coincidencia es la persona
    seleccionada, y el campo *prefijo de ruta* para filtrar por carpeta. También
-   puedes **Renombrar…** a cualquier persona aquí.
+   puedes **Renombrar…** a cualquier persona aquí, o pulsar **Exportar
+   imágenes…** para copiar todas las fotos de la persona seleccionada a una
+   carpeta de tu elección (los originales que falten se exportan como
+   miniaturas).
 
 5. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
    similitud. En cada par decide: *Son duplicados* (a continuación, elige qué

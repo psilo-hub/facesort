@@ -5,6 +5,10 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Export a person's photos from the "Add faces to a name" tab: pick any name,
+  choose an output folder, and every image containing that person is copied
+  there; images whose original file is gone are exported as thumbnails instead
+  (2026-09-19)
 - Shift-click selects a range of candidate faces in the "Add faces to a name"
   tab (2026-09-19)
 - Internationalization: the UI language can be changed in the Settings tab

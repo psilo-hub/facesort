@@ -43,6 +43,10 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
   Dateinamen.
 - **Umbenennen & Benennung entfernen** – behebe einen Tippfehler überall auf
   einmal oder entferne ein Gesicht von einem Namen.
+- **Fotos einer Person exportieren** – wähle unter *„Gesichter einem Namen
+  hinzufügen"* eine Person aus und kopiere jedes Foto, das sie enthält, in einen
+  Ordner deiner Wahl (Fotos, deren Originaldatei fehlt, werden stattdessen als
+  Vorschaubilder exportiert).
 - **Modelldownload beim ersten Start** – die eingebauten Gesichtserkennungsmodelle
   werden einmalig heruntergeladen (mit Fortschrittsfenster) und lokal gecacht.
 - **Automatische Update-Prüfung** – informiert dich, wenn eine neue Version
@@ -108,7 +112,9 @@ Reihenfolge ab:
    *„Gesichter ausschließen, die eher einem anderen Namen entsprechen"*, um nur
    Gesichter anzubieten, deren beste Übereinstimmung die ausgewählte Person ist,
    und nutze das Feld *Pfadpräfix* zum Filtern nach Ordnern. Du kannst hier auch
-   jede Person **Umbenennen…**.
+   jede Person **Umbenennen…** oder mit **Bilder exportieren…** alle Fotos der
+   ausgewählten Person in einen Ordner deiner Wahl kopieren (fehlende Originale
+   werden als Vorschaubilder exportiert).
 
 5. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
    vergleichen. Entscheide bei jedem Paar: *Das sind Duplikate* (wähle dann,

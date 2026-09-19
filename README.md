@@ -36,6 +36,9 @@ runs locally on your own computer: **your photos never leave your machine.**
   the same photo is never stored twice.
 - **Path filter** — restrict tagging to a specific folder or file name.
 - **Rename & untag** — fix a typo everywhere at once, or remove a face from a name.
+- **Export a person's photos** — in *Add faces to a name*, pick anyone and copy
+  every photo containing them to a folder of your choice (photos whose original
+  file is gone are exported as thumbnails instead).
 - **First-run model download** — the built-in face-recognition models are
   downloaded once (with a progress window) and cached locally.
 - **Automatic update check** — lets you know when a new release is available.
@@ -92,7 +95,9 @@ The main window is a set of tabs. Work through them roughly in this order:
    select the whole range in between. Use the
    *"Exclude faces closer to another name"* checkbox to only offer faces whose
    best match is the selected person, and the *path prefix* field to filter by
-   folder. You can also **Rename...** any person here.
+   folder. You can also **Rename...** any person here, or press
+   **Export images...** to copy every photo of the selected person to a folder
+   of your choice (missing originals are exported as thumbnails).
 
 5. **Deduplicate** — press **Start** to compare name pairs by similarity. For
    each pair decide: *These are dupes* (then choose which name survives — all
@@ -122,6 +127,7 @@ source image.
 Import a folder  →  Put a name to a face / Tag random face / Add faces to a name (tag people)
                  →  Deduplicate (merge duplicate person names)
                  →  View (review, open originals, untag mistakes)
+                 →  Add faces to a name (export copies of a person's photos)
 ```
 
 ## Where your data is stored

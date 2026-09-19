@@ -44,6 +44,10 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
   précis.
 - **Renommer et retirer un nom** — corrigez une faute de frappe partout d'un
   coup, ou retirez un visage d'un nom.
+- **Exporter les photos d'une personne** — dans *Ajouter des visages à un nom*,
+  choisissez une personne et copiez chaque photo la contenant dans un dossier de
+  votre choix (les photos dont le fichier d'origine a disparu sont exportées sous
+  forme de vignettes à la place).
 - **Téléchargement des modèles au premier lancement** — les modèles intégrés de
   reconnaissance faciale sont téléchargés une seule fois (avec une fenêtre de
   progression) et mis en cache localement.
@@ -111,7 +115,10 @@ ordre :
    la case *« Exclure les visages plus proches d'un autre nom »* pour ne proposer
    que les visages dont la meilleure correspondance est la personne sélectionnée,
    et le champ *préfixe de chemin* pour filtrer par dossier. Vous pouvez aussi
-   **Renommer…** n'importe quelle personne ici.
+   **Renommer…** n'importe quelle personne ici, ou appuyer sur
+   **Exporter les images…** pour copier chaque photo de la personne sélectionnée
+   dans un dossier de votre choix (les originaux manquants sont exportés comme
+   vignettes).
 
 5. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
    de noms par similitude. Pour chaque paire, décidez : *Ce sont des doublons*

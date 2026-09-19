@@ -32,10 +32,12 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,6 +75,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button(I18n.get("ui.faceName.tagSelected"));
     private final Button renameButton = new Button(I18n.get("ui.faceName.rename"));
+    private final Button exportButton = new Button(I18n.get("ui.faceName.export"));
 
     private NameRecord activeName;
     private Task<?> activeTask;
@@ -125,6 +128,11 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 nameList.getSelectionModel().selectedItemProperty().isNull());
         renameButton.setTooltip(tooltip(I18n.get("ui.faceName.renameTooltip")));
 
+        exportButton.setOnAction(e -> onExport());
+        exportButton.disableProperty().bind(
+                nameList.getSelectionModel().selectedItemProperty().isNull());
+        exportButton.setTooltip(tooltip(I18n.get("ui.faceName.exportTooltip")));
+
         Tooltip exclusionTip = new Tooltip(I18n.get("ui.faceName.excludeTooltip"));
         exclusionTip.setWrapText(true);
         exclusionTip.setMaxWidth(420);
@@ -139,7 +147,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
                 new Label(I18n.get("ui.faceName.names")),
                 nameList,
                 tagSelectedButton,
-                renameButton);
+                renameButton,
+                exportButton);
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
@@ -576,6 +585,56 @@ public class FaceNameView extends BorderPane implements Refreshable {
         });
 
         startTask("facename-renamer");
+    }
+
+    /**
+     * Lets the user pick an output folder and exports every image that
+     * contains the selected person into it, copying thumbnails in place of
+     * originals that are no longer available. The export runs on a background
+     * task so the UI stays responsive.
+     */
+    private void onExport() {
+        if (activeName == null) {
+            return;
+        }
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle(I18n.get("ui.faceName.exportFolderChooser"));
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        java.io.File selected = chooser.showDialog(owner);
+        if (selected == null) {
+            return;
+        }
+        Path outputDir = selected.toPath();
+        NameRecord name = activeName;
+
+        statusLabel.setText(I18n.format("ui.faceName.exporting", name.name()));
+        setTask(new Task<FaceToNameService.ExportResult>() {
+            @Override
+            protected FaceToNameService.ExportResult call() throws Exception {
+                return faceToNameService.exportImagesForName(name.id(), outputDir);
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            FaceToNameService.ExportResult result =
+                    (FaceToNameService.ExportResult) activeTask.getValue();
+            if (result.images() == 0) {
+                statusLabel.setText(I18n.format("ui.faceName.exportNone", name.name()));
+            } else {
+                statusLabel.setText(
+                        I18n.format("ui.faceName.exported",
+                                result.images(), name.name(), outputDir)
+                        + " " + I18n.format("ui.faceName.exportBreakdown",
+                                result.originalsCopied(),
+                                result.thumbnailsCopied(),
+                                result.missing()));
+            }
+        });
+
+        activeTask.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.exportFailed"), activeTask.getException()));
+
+        startTask("facename-exporter");
     }
 
     /**

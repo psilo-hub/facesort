@@ -10,15 +10,19 @@ import free.svoss.facesort.model.SimilarityResult;
 
 import java.awt.Desktop;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Implements the "Put a face to a name" flow (IMPLEMENTATION_PLAN.md section 6.5).
@@ -357,5 +361,139 @@ public class FaceToNameService {
         }
         Desktop.getDesktop().open(existing.get().toFile());
         return true;
+    }
+
+    /**
+     * Exports every distinct image that contains the given person to the output
+     * folder.
+     *
+     * <p>Images whose original file still exists on disk are copied with their
+     * original file name. When the original is unavailable, the stored JPEG
+     * thumbnail is written instead, named after the first stored path's base
+     * name (with a {@code .jpg} extension) or after the content hash when no
+     * path is recorded at all. Images with neither a reachable original nor a
+     * thumbnail are counted as missing.</p>
+     *
+     * <p>Each image is exported at most once, even when it contains several
+     * faces of the person. File-name collisions in the output folder are
+     * resolved by appending {@code  (1)}, {@code  (2)}, and so on. When an
+     * original already lives in the output folder (the export target equals a
+     * source folder), it counts as copied without being copied onto itself.</p>
+     *
+     * @param nameId    id of the person whose images should be exported
+     * @param outputDir the folder to copy the images into; created recursively
+     *                  when it does not exist
+     * @return the export summary
+     * @throws NullPointerException if {@code outputDir} is null
+     * @throws SQLException         when the database access fails
+     * @throws IOException          when a file cannot be copied or written
+     */
+    public ExportResult exportImagesForName(long nameId, Path outputDir)
+            throws SQLException, IOException {
+        Files.createDirectories(Objects.requireNonNull(outputDir, "outputDir"));
+
+        List<FaceRecord> faces = faceDao.findByNameId(nameId);
+        Set<String> hashes = new LinkedHashSet<>();
+        for (FaceRecord face : faces) {
+            hashes.add(face.imageHash());
+        }
+
+        int originalsCopied = 0;
+        int thumbnailsCopied = 0;
+        int missing = 0;
+        Set<String> usedNames = new HashSet<>();
+        for (String hash : hashes) {
+            Optional<Path> existing = ViewService.firstExistingPath(imageDao.getPaths(hash));
+            if (existing.isPresent()) {
+                Path destination = uniqueDestination(
+                        outputDir, existing.get().getFileName().toString(), usedNames);
+                if (!destination.toAbsolutePath().normalize()
+                        .equals(existing.get().toAbsolutePath().normalize())) {
+                    Files.copy(existing.get(), destination);
+                }
+                originalsCopied++;
+                continue;
+            }
+
+            byte[] thumbnail = imageDao.getThumbnail(hash);
+            if (thumbnail == null || thumbnail.length == 0) {
+                missing++;
+                continue;
+            }
+            Path destination = uniqueDestination(
+                    outputDir, fallbackThumbnailName(imageDao.getPaths(hash), hash), usedNames);
+            Files.write(destination, thumbnail);
+            thumbnailsCopied++;
+        }
+
+        return new ExportResult(hashes.size(), originalsCopied, thumbnailsCopied, missing);
+    }
+
+    /**
+     * Returns a destination path in {@code outputDir} whose file name is not
+     * yet in {@code usedNames}. Collisions get a numeric suffix inserted before
+     * the extension.
+     *
+     * @param outputDir the export folder
+     * @param fileName  the desired file name
+     * @param usedNames the names already used in this export run
+     * @return a collision-free destination path
+     */
+    private static Path uniqueDestination(Path outputDir, String fileName, Set<String> usedNames) {
+        String candidate = fileName;
+        int suffix = 1;
+        while (usedNames.contains(candidate)) {
+            candidate = withNumericSuffix(fileName, suffix);
+            suffix++;
+        }
+        usedNames.add(candidate);
+        return outputDir.resolve(candidate);
+    }
+
+    /**
+     * Inserts {@code  (n)} before the last extension of a file name.
+     *
+     * @param name the original file name
+     * @param n    the collision counter
+     * @return the suffixed name
+     */
+    private static String withNumericSuffix(String name, int n) {
+        int dot = name.lastIndexOf('.');
+        if (dot <= 0) {
+            return name + " (" + n + ")";
+        }
+        return name.substring(0, dot) + " (" + n + ")" + name.substring(dot);
+    }
+
+    /**
+     * Derives the name for a thumbnail-exported image: the base name of the
+     * first stored path with a {@code .jpg} extension, or {@code hash + ".jpg"}
+     * when no path is stored.
+     *
+     * @param storedPaths stored paths for the image, in priority order
+     * @param hash        content hash of the image
+     * @return a stable base name for the exported JPEG thumbnail
+     */
+    private static String fallbackThumbnailName(List<String> storedPaths, String hash) {
+        for (String path : storedPaths) {
+            String base = Path.of(path).getFileName().toString();
+            if (!base.isBlank()) {
+                int dot = base.lastIndexOf('.');
+                return dot > 0 ? base.substring(0, dot) + ".jpg" : base + ".jpg";
+            }
+        }
+        return hash + ".jpg";
+    }
+
+    /**
+     * Summary of an export run.
+     *
+     * @param images           distinct images that contain the person
+     * @param originalsCopied  images whose original file was copied
+     * @param thumbnailsCopied images exported as a stored thumbnail instead
+     * @param missing          images that could not be exported at all
+     */
+    public record ExportResult(int images, int originalsCopied,
+                               int thumbnailsCopied, int missing) {
     }
 }
