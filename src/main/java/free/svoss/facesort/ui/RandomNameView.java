@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The "Random Tag" tab.
+ * The "Tag random face" tab.
  *
  * <p>Shows a random sample of unnamed faces as a grid. The user can browse
  * through fresh random samples with "Next", and tag any of the shown faces by
@@ -457,7 +457,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Random Tag");
+        alert.setTitle("Tag random face");
         alert.setHeaderText(message);
         alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;

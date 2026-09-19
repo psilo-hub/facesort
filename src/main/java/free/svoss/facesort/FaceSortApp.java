@@ -194,9 +194,9 @@ public class FaceSortApp extends Application {
 
         // 7. Main window with the eight tabs.
         MainWindow mainWindow = new MainWindow(
-                new Tab("Import", importView),
-                new Tab("Name Face", nameFaceView),
-                new Tab("Random Tag", randomNameView),
+                new Tab("Import images", importView),
+                new Tab("Put a name to a face", nameFaceView),
+                new Tab("Tag random face", randomNameView),
                 new Tab("Face Name", faceNameView),
                 new Tab("Deduplicate", dedupeView),
                 new Tab("View", viewView),

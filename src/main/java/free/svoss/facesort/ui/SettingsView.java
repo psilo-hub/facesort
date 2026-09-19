@@ -105,7 +105,7 @@ public class SettingsView extends BorderPane {
 
         addRow(grid, row++, "Clustering threshold:", clusteringThreshold,
                 "Minimum similarity between two unnamed faces for them to be grouped "
-                        + "into the same cluster in the \"Name Face\" tab.\n\n"
+                        + "into the same cluster in the \"Put a name to a face\" tab.\n\n"
                         + "Default: " + format(defaults.getClusteringThreshold()) + ".\n\n"
                         + "Higher values group only very similar faces, giving smaller and "
                         + "more precise clusters, but a single person may be split into "

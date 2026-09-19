@@ -37,6 +37,7 @@ All notable changes to Face Sort will be documented in this file.
 - The minimum similarity for images shown in "Face Name" is now editable as a
   plain value in Settings instead of a stepped spinner.
 - Wider path-filter fields in the "Random Tag" and "Face Name" tabs.
+- Renamed the "Import", "Name Face" and "Random Tag" tabs to "Import images", "Put a name to a face" and "Tag random face".
 
 ### Fixed
 - Right-clicking an image in the "View" tab now shows the context menu
