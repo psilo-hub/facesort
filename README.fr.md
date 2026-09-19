@@ -105,10 +105,12 @@ ordre :
 4. **Ajouter des visages à un nom** — Sélectionnez une personne à gauche ;
    l'application classe chaque visage non nommé selon sa similitude avec
    l'embedding moyen de la personne et affiche les meilleurs candidats.
-   Sélectionnez-en plusieurs et appuyez sur **Nommer la sélection**. Utilisez la
-   case *« Exclure les visages plus proches d'un autre nom »* pour ne proposer que
-   les visages dont la meilleure correspondance est la personne sélectionnée, et
-   le champ *préfixe de chemin* pour filtrer par dossier. Vous pouvez aussi
+   Sélectionnez-en plusieurs et appuyez sur **Nommer la sélection** — cliquez sur
+   les visages un à un, ou maintenez **Maj** enfoncée et cliquez sur le premier
+   et le dernier visage pour sélectionner toute la plage entre les deux. Utilisez
+   la case *« Exclure les visages plus proches d'un autre nom »* pour ne proposer
+   que les visages dont la meilleure correspondance est la personne sélectionnée,
+   et le champ *préfixe de chemin* pour filtrer par dossier. Vous pouvez aussi
    **Renommer…** n'importe quelle personne ici.
 
 5. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires

@@ -102,11 +102,13 @@ Reihenfolge ab:
 4. **Gesichter einem Namen hinzufügen** – Wähle links eine Person; die App reiht
    jedes unbenannte Gesicht nach Ähnlichkeit zum durchschnittlichen Embedding der
    Person und zeigt die besten Kandidaten. Wähle mehrere aus und drücke
-   **Ausgewählte benennen**. Aktiviere das Kontrollkästchen *„Gesichter ausschließen,
-   die eher einem anderen Namen entsprechen"*, um nur Gesichter anzubieten, deren
-   beste Übereinstimmung die ausgewählte Person ist, und nutze das Feld
-   *Pfadpräfix* zum Filtern nach Ordnern. Du kannst hier auch jede Person
-   **Umbenennen…**.
+   **Ausgewählte benennen** – klicke Gesichter einzeln an oder halte die
+   **Umschalttaste** gedrückt und klicke auf das erste und das letzte Gesicht, um
+   den gesamten Bereich dazwischen auszuwählen. Aktiviere das Kontrollkästchen
+   *„Gesichter ausschließen, die eher einem anderen Namen entsprechen"*, um nur
+   Gesichter anzubieten, deren beste Übereinstimmung die ausgewählte Person ist,
+   und nutze das Feld *Pfadpräfix* zum Filtern nach Ordnern. Du kannst hier auch
+   jede Person **Umbenennen…**.
 
 5. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
    vergleichen. Entscheide bei jedem Paar: *Das sind Duplikate* (wähle dann,

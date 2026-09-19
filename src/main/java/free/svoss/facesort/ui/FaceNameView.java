@@ -47,7 +47,8 @@ import java.util.Locale;
  * <p>Given a name selected on the left, all unnamed faces are ranked by
  * similarity to the average embedding of the faces already tagged with that
  * name and shown as a grid on the right. The user can select several
- * candidates and tag them all with the selected name.</p>
+ * candidates (Shift-clicking selects a whole range at once) and tag them all
+ * with the selected name.</p>
  *
  * <p>The view owns no business logic; all ranking and tagging is delegated to
  * {@link FaceToNameService}. Queries run on background {@link Task}s so the
@@ -75,6 +76,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
 
     private NameRecord activeName;
     private Task<?> activeTask;
+    private VBox rangeAnchor;
 
     /**
      * Creates the face-to-name tab.
@@ -141,7 +143,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
-        pathFilterField.setPromptText(I18n.get("ui.faceName.pathFilterPrompt"));
+        unnamedLabel.setTooltip(tooltip(I18n.get("ui.faceName.selectionHint")));
         pathFilterField.setTooltip(tooltip(I18n.get("ui.faceName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> {
             if (activeName != null) {
@@ -298,6 +300,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void showCandidates(List<SimilarityResult> similar) {
         candidatesPane.getChildren().clear();
+        rangeAnchor = null;
         renderCards(candidatesPane, similar, true);
     }
 
@@ -334,7 +337,13 @@ public class FaceNameView extends BorderPane implements Refreshable {
             if (selectable) {
                 card.setOnMouseClicked(e -> {
                     if (e.getButton() == MouseButton.PRIMARY) {
-                        toggleSelected(card);
+                        if (e.isShiftDown() && rangeAnchor != null
+                                && candidatesPane.getChildren().contains(rangeAnchor)) {
+                            selectRange(rangeAnchor, card);
+                        } else {
+                            toggleSelected(card);
+                            rangeAnchor = card;
+                        }
                     }
                 });
             }
@@ -397,13 +406,71 @@ public class FaceNameView extends BorderPane implements Refreshable {
      * @param card the clicked candidate card
      */
     private void toggleSelected(VBox card) {
-        boolean selected = card.getStyleClass().contains("selected");
-        if (selected) {
-            card.getStyleClass().remove("selected");
-        } else {
-            card.getStyleClass().add("selected");
+        setSelected(card, !card.getStyleClass().contains("selected"));
+        tagSelectedButton.setDisable(selectedCandidates().isEmpty());
+    }
+
+    /**
+     * Selects the whole range of candidate cards between the anchor and the
+     * shift-clicked card, replacing the previous selection.
+     *
+     * @param anchorCard the card that fixes the start of the range
+     * @param clickedCard the shift-clicked card that fixes the end
+     */
+    private void selectRange(VBox anchorCard, VBox clickedCard) {
+        List<javafx.scene.Node> children = candidatesPane.getChildren();
+        int size = children.size();
+        List<Integer> indices = rangeSelection(
+                children.indexOf(anchorCard), children.indexOf(clickedCard), size);
+        if (indices.isEmpty()) {
+            return;
+        }
+        java.util.Set<Integer> range = new java.util.HashSet<>(indices);
+        for (int i = 0; i < size; i++) {
+            setSelected((VBox) children.get(i), range.contains(i));
         }
         tagSelectedButton.setDisable(selectedCandidates().isEmpty());
+    }
+
+    /**
+     * Puts or removes the {@code selected} style class on a candidate card.
+     *
+     * @param card     the card to update
+     * @param selected whether the card should look selected
+     */
+    private static void setSelected(VBox card, boolean selected) {
+        if (selected) {
+            if (!card.getStyleClass().contains("selected")) {
+                card.getStyleClass().add("selected");
+            }
+        } else {
+            card.getStyleClass().remove("selected");
+        }
+    }
+
+    /**
+     * Computes the inclusive range of candidate indices between the range
+     * anchor and the shift-clicked card, in ascending display order.
+     *
+     * @param anchorIndex  index of the anchor card
+     * @param clickedIndex index of the shift-clicked card
+     * @param size         number of candidate cards currently shown
+     * @return the ascending, inclusive indices between the two cards,
+     *         clamped to {@code [0, size)}; empty when {@code size <= 0}
+     */
+    static List<Integer> rangeSelection(int anchorIndex, int clickedIndex, int size) {
+        if (size <= 0) {
+            return List.of();
+        }
+        int anchor = Math.max(0, Math.min(anchorIndex, size - 1));
+        int clicked = Math.max(0, Math.min(clickedIndex, size - 1));
+        int low = Math.min(anchor, clicked);
+        int high = Math.max(anchor, clicked);
+        List<Integer> indices = new ArrayList<>(high - low + 1);
+        for (int i = low; i <= high; i++) {
+            indices.add(i);
+        }
+        return indices;
     }
 
     /**

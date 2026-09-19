@@ -1,4 +1,4 @@
-1. Select range: In the "Add faces to a name" tab, after selecting a name, it should be possible to select a range of the "Most similar unnamed faces". Maybe by holding SHIFT and selecting the first and the last image.
+1. ✅ Select range: In the "Add faces to a name" tab, after selecting a name, it should be possible to select a range of the "Most similar unnamed faces". Maybe by holding SHIFT and selecting the first and the last image.
 
 2. Export feature: In the "Add faces to a name" tab, after selecting a name, it should be possible to export all images of the selected person. The user should be able to select an output folder. Then all images (later also videos) that contain that person should be copied to the output folder. If an image isn't available, then the thumbnail should be copied to the output folder instead.
 

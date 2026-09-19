@@ -87,7 +87,9 @@ The main window is a set of tabs. Work through them roughly in this order:
 
 4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
-   shows the best candidates. Select several and press **Tag selected**. Use the
+   shows the best candidates. Select several and press **Tag selected** — click
+   faces one by one, or hold **Shift** and click the first and last face to
+   select the whole range in between. Use the
    *"Exclude faces closer to another name"* checkbox to only offer faces whose
    best match is the selected person, and the *path prefix* field to filter by
    folder. You can also **Rename...** any person here.

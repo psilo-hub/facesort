@@ -101,7 +101,9 @@ este orden:
 4. **Añadir caras a un nombre**: selecciona a una persona a la izquierda; la
    aplicación ordena cada cara sin nombre por su similitud con el embedding medio
    de esa persona y muestra los mejores candidatos. Selecciona varias y pulsa
-   **Etiquetar selección**. Usa la casilla *«Excluir caras más cercanas a otro
+   **Etiquetar selección**: haz clic en las caras una a una o mantén pulsada la
+   tecla **Mayús** y haz clic en la primera y la última cara para seleccionar todo
+   el rango entre ellas. Usa la casilla *«Excluir caras más cercanas a otro
    nombre»* para ofrecer solo caras cuya mejor coincidencia es la persona
    seleccionada, y el campo *prefijo de ruta* para filtrar por carpeta. También
    puedes **Renombrar…** a cualquier persona aquí.

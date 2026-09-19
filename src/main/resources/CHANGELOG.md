@@ -5,6 +5,8 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Shift-click selects a range of candidate faces in the "Add faces to a name"
+  tab (2026-09-19)
 - Internationalization: the UI language can be changed in the Settings tab
   (English, Deutsch, Français, Español, Русский, 中文) and is saved in the
   config file; all UI strings are externalized (2026-09-19)
