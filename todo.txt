@@ -1,3 +1,5 @@
 1. Select range
 
 2. Export feature
+
+3. Rewrite README for end users (done 2026-09-19)
