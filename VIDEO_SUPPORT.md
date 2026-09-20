@@ -208,7 +208,7 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 3 — Video import service
 
-- [ ] TDD: `VideoImportServiceTest` first (over `Database.inMemory()`,
+- [x] TDD: `VideoImportServiceTest` first (over `Database.inMemory()`,
   `FakeFaceAiEngine`, and a fake `VideoFrameSource` that yields a few identical
   frames):
   - imports a fake "video", stores video row + paths + one `images` row +
@@ -228,7 +228,7 @@ accepted limitation for this iteration (see §10).
   shared, package-internal helper used by both `ImportService` and
   `VideoImportService`, keeping the detection criteria identical for photos and
   frames. Re-run the existing `ImportServiceTest` — must stay green.
-- [ ] Implement `free.svoss.facesort.service.VideoImportService` (mirrors
+- [x] Implement `free.svoss.facesort.service.VideoImportService` (mirrors
   `ImportService`: `ImageDao` + `FaceDao` + new `VideoDao`, a list of
   `FaceAiService` workers, a `dbLock` serializing SQLite access, daemon worker
   pool, progress listener, cancellation supplier):
@@ -241,11 +241,11 @@ accepted limitation for this iteration (see §10).
   - aggregate result record `VideoImportResult(totalVideos, newVideos, newFrames,
     newFaces, skipped, errors, processed, wasCancelled)`; `close()` releases the
     FaceAI services.
-- [ ] Handle the frame-hash collision case: when a frame's content hash already
+- [x] Handle the frame-hash collision case: when a frame's content hash already
   exists in `images` (identical frame, or a photo with identical content), keep
   the existing image row and only add the `video_frames` link.
-- [ ] Run full suite green (`mvn test`).
-- [ ] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md`.
+- [x] Run full suite green (`mvn test`).
+- [x] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md`.
 
 ### Phase 4 — Import tab integration and i18n
 

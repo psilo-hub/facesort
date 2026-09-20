@@ -46,6 +46,16 @@ All notable changes to Face Sort will be documented in this file.
   frame per second (at most 120 per video) in a single forward pass, reporting
   each frame's real position. Videos with an unreadable header fail cleanly
   instead of crashing. Internal plumbing, no UI yet (2026-09-20)
+- Video import service: `VideoImportService` imports video folders end-to-end —
+  content-hash deduplication (known videos are skipped, same content under a
+  new path only records the path), ffmpeg frame extraction and face detection
+  for every sampled frame, full-frame thumbnails, per-file error resilience,
+  parallel multi-engine workers, progress listener and cancellation. Frames
+  that collide with already-stored content (an identical frame or a photo)
+  reuse the existing image row and are only linked to the video. Photos and
+  video frames are now analysed through one shared detection pipeline so their
+  results are identical. No user-visible UI yet — the Import tab still imports
+  images only (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

@@ -52,14 +52,17 @@ public class VideoDao {
 
     /**
      * Returns a {@link VideoRecord} by hash, or empty when not found.
-     * Linked-frame counts are computed live from {@code video_frames}.
+     * Linked-frame counts are computed live: {@code frameCount} counts the
+     * {@code video_frames} rows, {@code faceCount} sums the faces stored on the
+     * linked frame images.
      */
     public Optional<VideoRecord> findByHash(String hash) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
                 SELECT v.hash, v.detection_ts, v.criteria_json, v.duration_secs,
                        (SELECT COUNT(*) FROM video_frames vf
                          WHERE vf.video_hash = v.hash) AS frame_count,
-                       (SELECT COALESCE(SUM(vf.face_count), 0) FROM video_frames vf
+                       (SELECT COALESCE(SUM(i.face_count), 0) FROM video_frames vf
+                         JOIN images i ON i.hash = vf.frame_hash
                          WHERE vf.video_hash = v.hash) AS face_count
                 FROM videos v WHERE v.hash = ?
                 """)) {
@@ -121,10 +124,14 @@ public class VideoDao {
     }
 
     /**
-     * Links a frame image to a video at the given millisecond offset.
-     * A frame may be linked to at most one video; repeat links are ignored.
+     * Links a frame image to a video at the given millisecond offset. A frame
+     * may be linked to at most one video — when it already belongs to another
+     * video the link is ignored.
+     *
+     * @return the number of links inserted (1 when linked, 0 when the frame
+     *         already belongs to another video)
      */
-    public void linkFrame(String frameHash, String videoHash, long timestampMs) throws SQLException {
+    public int linkFrame(String frameHash, String videoHash, long timestampMs) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR IGNORE INTO video_frames (frame_hash, video_hash, timestamp_ms)
                 VALUES (?, ?, ?)
@@ -132,7 +139,7 @@ public class VideoDao {
             ps.setString(1, frameHash);
             ps.setString(2, videoHash);
             ps.setLong(3, timestampMs);
-            ps.executeUpdate();
+            return ps.executeUpdate();
         }
     }
 
@@ -167,6 +174,21 @@ public class VideoDao {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong("timestamp_ms") : null;
             }
+        }
+    }
+
+    /**
+     * Persists the frame and face counts on the video row after import
+     * completes. The row is expected to exist (use
+     * {@link #insert(String, long, String, double)} first).
+     */
+    public void updateVideoCounts(String hash, int frameCount, int faceCount) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE videos SET frame_count = ?, face_count = ? WHERE hash = ?")) {
+            ps.setInt(1, frameCount);
+            ps.setInt(2, faceCount);
+            ps.setString(3, hash);
+            ps.executeUpdate();
         }
     }
 
