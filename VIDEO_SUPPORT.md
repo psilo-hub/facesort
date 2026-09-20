@@ -117,7 +117,7 @@ accepted limitation for this iteration (see §10).
   `build-platform`) a step that clones ffmpeg4j at the pinned commit and runs
   `mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml`, mirroring the existing
   FaceAI / rawGitHubFetcher steps.
-- [ ] Add the dependency to `pom.xml`:
+- [x] Add the dependency to `pom.xml`:
   `com.github.manevolent:ffmpeg4j:5.1.2-1.5.8-1` (resolved from the local repo).
 - [ ] Add per-platform shade-plugin filters (same pattern as the existing
   `pytorch-jni`/`sqlite-jdbc`/`jna` filters) to keep only the current platform's

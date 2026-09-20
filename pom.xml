@@ -33,6 +33,13 @@
             <version>1.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- ffmpeg4j (locally installed; commit pinned, see ffmpeg4j-pin.txt) -->
+        <dependency>
+            <groupId>com.github.manevolent</groupId>
+            <artifactId>ffmpeg4j</artifactId>
+            <version>5.1.2-1.5.8-1</version>
+        </dependency>
+
         <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
