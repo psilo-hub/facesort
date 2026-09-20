@@ -3,7 +3,9 @@ package free.svoss.facesort.ui;
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.i18n.I18n;
+import free.svoss.facesort.service.ImportCoordinator;
 import free.svoss.facesort.service.ImportService;
+import free.svoss.facesort.service.VideoImportService;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -29,18 +31,20 @@ import java.nio.file.Path;
  * The Import tab: pick a folder, run the import pipeline, watch progress.
  *
  * <p>The view owns no business logic; it delegates all work to
- * {@link ImportService}. Importing runs on a background thread via a
- * {@link Task}, progress messages are forwarded to the log area on the
- * JavaFX application thread, and the summary {@link ImportService.ImportResult}
- * is displayed in the status label when the run finishes.</p>
+ * {@link ImportService} (photos) and {@link VideoImportService} (videos),
+ * sequenced by {@link ImportCoordinator}. Importing runs on a background
+ * thread via a {@link Task}, progress messages are forwarded to the log area
+ * on the JavaFX application thread, and the combined summary is displayed in
+ * the status label when the run finishes.</p>
  *
- * <p>While an import runs, a Stop button can request cancellation: the service
- * honors it between files and during folder scanning, and already-imported rows
- * are kept.</p>
+ * <p>While an import runs, a Stop button can request cancellation: the shared
+ * flag is honored by both phases between files and during folder scanning,
+ * and already-imported rows are kept.</p>
  */
 public class ImportView extends BorderPane {
 
     private final ImportService importService;
+    private final VideoImportService videoImportService;
     private final ConfigModel config;
 
     private final TextField folderField = new TextField();
@@ -56,12 +60,15 @@ public class ImportView extends BorderPane {
     /**
      * Creates the Import tab.
      *
-     * @param importService the import pipeline; must not be null
-     * @param config        application configuration used to remember the last
-     *                      import folder; must not be null
+     * @param importService      the photo import pipeline; must not be null
+     * @param videoImportService the video import pipeline; must not be null
+     * @param config             application configuration used to remember the last
+     *                           import folder; must not be null
      */
-    public ImportView(ImportService importService, ConfigModel config) {
+    public ImportView(ImportService importService, VideoImportService videoImportService,
+                      ConfigModel config) {
         this.importService = importService;
+        this.videoImportService = videoImportService;
         this.config = config;
         buildUi();
         restoreLastFolder();
@@ -156,8 +163,9 @@ public class ImportView extends BorderPane {
     }
 
     /**
-     * Runs the import pipeline on a background thread, streaming progress
-     * messages to the log area and showing the summary when complete.
+     * Runs the combined photo + video import pipeline on a background thread,
+     * streaming progress messages from both phases to the log area and showing
+     * the combined summary when complete.
      *
      * @param folder the root directory to scan
      */
@@ -170,27 +178,32 @@ public class ImportView extends BorderPane {
         progressBar.setProgress(-1);
         appendLog(I18n.format("ui.import.importingFrom", folder.toAbsolutePath()));
 
-        Task<ImportService.ImportResult> task = new Task<>() {
+        Task<ImportCoordinator.CombinedImportResult> task = new Task<>() {
             @Override
-            protected ImportService.ImportResult call() throws Exception {
-                return importService.importFolder(folder, message ->
-                        Platform.runLater(() -> appendLog(message)), () -> cancelRequested);
+            protected ImportCoordinator.CombinedImportResult call() throws Exception {
+                return ImportCoordinator.run(importService, videoImportService, folder,
+                        message -> Platform.runLater(() -> appendLog(message)),
+                        () -> cancelRequested,
+                        () -> Platform.runLater(
+                                () -> appendLog(I18n.get("ui.import.videoPhase"))));
             }
         };
 
         task.setOnSucceeded(e -> {
-            ImportService.ImportResult result = task.getValue();
+            ImportCoordinator.CombinedImportResult result = task.getValue();
             setBusy(false);
             cancelRequested = false;
             if (result.wasCancelled()) {
-                progressBar.setProgress(result.totalFiles() > 0
-                        ? (double) result.processed() / result.totalFiles() : 0);
-                statusLabel.setText(I18n.format("ui.import.stoppedAfter",
-                        result.processed(), result.totalFiles()));
+                progressBar.setProgress(result.total() > 0
+                        ? (double) result.processed() / result.total() : 0);
+                String stopped = I18n.format("ui.import.stoppedAfter",
+                        result.processed(), result.total());
+                statusLabel.setText(stopped + System.lineSeparator()
+                        + formatSummaries(result));
                 appendLog(I18n.get("ui.import.stopped"));
             } else {
                 progressBar.setProgress(1);
-                statusLabel.setText(formatSummary(result));
+                statusLabel.setText(formatSummaries(result));
                 appendLog(I18n.get("ui.import.finished"));
             }
         });
@@ -248,6 +261,17 @@ public class ImportView extends BorderPane {
     }
 
     /**
+     * Formats the photo and video summaries as two status lines.
+     *
+     * @param result the combined import result
+     * @return a two-line human-readable summary string
+     */
+    private static String formatSummaries(ImportCoordinator.CombinedImportResult result) {
+        return formatSummary(result.images()) + System.lineSeparator()
+                + formatVideoSummary(result.videos());
+    }
+
+    /**
      * Formats the import summary as a single status line.
      *
      * @param result the import result
@@ -256,6 +280,18 @@ public class ImportView extends BorderPane {
     private static String formatSummary(ImportService.ImportResult result) {
         return I18n.format("ui.import.summary",
                 result.totalFiles(), result.newImages(), result.newPaths(),
+                result.newFaces(), result.skipped(), result.errors());
+    }
+
+    /**
+     * Formats the video import summary as a single status line.
+     *
+     * @param result the video import result
+     * @return a human-readable summary string
+     */
+    private static String formatVideoSummary(VideoImportService.VideoImportResult result) {
+        return I18n.format("ui.import.videoSummary",
+                result.totalVideos(), result.newVideos(), result.newFrames(),
                 result.newFaces(), result.skipped(), result.errors());
     }
 }

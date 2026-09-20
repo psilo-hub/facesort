@@ -56,6 +56,16 @@ All notable changes to Face Sort will be documented in this file.
   video frames are now analysed through one shared detection pipeline so their
   results are identical. No user-visible UI yet — the Import tab still imports
   images only (2026-09-20)
+- Video import reaches the Import tab: pressing **Import** now processes photos
+  **and** videos in one run — photos first, then videos — streaming both phases
+  into the same log with one Stop button. Each video is sampled at most once
+  per second (120 frames max), every detected face is stored like a photo face,
+  and the final status shows a photo summary and a video summary (total / new
+  videos / frames / faces / skipped / errors). Known videos are skipped on
+  re-import, and cancelling mid-run leaves already-imported files in place
+  (2026-09-20)
+- The Import tab's folder picker, progress messages and summaries mention
+  photos **and videos** in all six languages (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

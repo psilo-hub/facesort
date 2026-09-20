@@ -7,6 +7,7 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.ClusteringService;
 import free.svoss.facesort.service.DeduplicationService;
@@ -14,6 +15,7 @@ import free.svoss.facesort.service.FaceAiService;
 import free.svoss.facesort.service.FaceToNameService;
 import free.svoss.facesort.service.ImportService;
 import free.svoss.facesort.service.NamingService;
+import free.svoss.facesort.service.VideoImportService;
 import free.svoss.facesort.service.ViewService;
 import free.svoss.facesort.ui.DedupeView;
 import free.svoss.facesort.ui.FaceNameView;
@@ -71,6 +73,7 @@ public class FaceSortApp extends Application {
     private Database database;
     private FaceAiService faceAiService;
     private ImportService importService;
+    private VideoImportService videoImportService;
     private ClusteringService clusteringService;
     private NamingService namingService;
     private FaceToNameService faceToNameService;
@@ -173,6 +176,7 @@ public class FaceSortApp extends Application {
         FaceDao faceDao = new FaceDao(connection);
         NameDao nameDao = new NameDao(connection);
         NotDupeDao notDupeDao = new NotDupeDao(connection);
+        VideoDao videoDao = new VideoDao(connection);
 
         // 4. FaceAI engine. Models are already cached at this point (downloaded
         //    on first start); they are loaded lazily on first use.
@@ -185,12 +189,17 @@ public class FaceSortApp extends Application {
         }
 
         // 5. Services. One FaceAI service per import worker; the shared
-        //    faceAiService stays dedicated to the other services.
+        //    faceAiService stays dedicated to the other services. The video
+        //    import reuses the same worker services because its phase always
+        //    runs after the photo phase inside one Task, so the two never
+        //    detect concurrently.
         List<FaceAiService> importAiServices = new ArrayList<>();
         for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
             importAiServices.add(new FaceAiService(config));
         }
         importService = new ImportService(imageDao, faceDao, importAiServices, config);
+        videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
+                importAiServices, config);
         clusteringService = new ClusteringService(faceAiService, faceDao, config);
         namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, config);
         faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, config);
@@ -207,7 +216,7 @@ public class FaceSortApp extends Application {
      */
     private void buildMainWindowUi() {
         // 6. Views.
-        ImportView importView = new ImportView(importService, config);
+        ImportView importView = new ImportView(importService, videoImportService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
         FaceNameView faceNameView = new FaceNameView(faceToNameService, config);
@@ -256,6 +265,8 @@ public class FaceSortApp extends Application {
 
     @Override
     public void stop() throws Exception {
+        // videoImportService shares the import worker FaceAI services with
+        // importService, so closing importService releases them exactly once.
         if (importService != null) {
             importService.close();
         }

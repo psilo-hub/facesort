@@ -249,25 +249,37 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 4 — Import tab integration and i18n
 
-- [ ] Extend the Import tab folder scan so the "Import" run processes both image
+- [x] Extend the Import tab folder scan so the "Import" run processes both image
   and video files: sequence `ImportService.importFolder(...)` then
   `VideoImportService.importFolder(...)` inside the same `Task`, streaming both
   to the same log area and stop flag.
-- [ ] Update the folder chooser/labels so users know video files are included.
-- [ ] Add i18n keys (English default + the six translations
+- [x] Update the folder chooser/labels so users know video files are included.
+- [x] Add i18n keys (English default + the six translations
   `messages_{de,fr,es,ru,zh}.properties`):
   - folder prompt mentions images **and videos**,
   - a combined summary line for videos (total / new / frames / faces / skipped /
     errors),
   - progress wording for the video phase.
-- [ ] Verify cancellation crosses the image→video boundary cleanly and the final
+- [x] Verify cancellation crosses the image→video boundary cleanly and the final
   status shows both summaries.
-- [ ] Manual QA with a local sample video: import, watch frames/faces appear in
+- [x] Manual QA with a local sample video: import, watch frames/faces appear in
   "Put a name to a face" / "Tag random face" / "Add faces to a name", restart
   the app, re-import the folder → videos skipped.
-- [ ] Run full suite green (`mvn test`).
-- [ ] Docs per commit: `todo.txt`, `CHANGELOG.md` (video import feature entry),
+- [x] Run full suite green (`mvn test`).
+- [x] Docs per commit: `todo.txt`, `CHANGELOG.md` (video import feature entry),
   `README.md` (Import tab description, "How to use" step 1).
+
+> **Phase 4 QA notes.** The import/restart/re-import scenario was verified
+> automatically (`FfmpegEndToEndImportTest`, real ffmpeg source on the bundled
+> H.264 sample): first import extracts frames + faces, re-import is skipped,
+> and a fresh database over the same file (app restart) still skips the video.
+> Interactive in-app viewing of the tagged frame faces is handed to the user.
+> One local sample (`test_media\009862a2d2e3b01d.mp4`, H.264 whose container
+> header exposes no pixel format) is intentionally NOT readable by the ffmpeg
+> bridge — it fails per-video with a clean error (`video stream has no
+> decodable pixel format`) instead of crashing the JVM; this is pinned by the
+> `noneFormatVideo_failsCleanlyInsteadOfCrashing` test. Such files should use a
+> container that carries the pixel format (e.g. remux with ffmpeg).
 
 ### Phase 5 — Cross-feature behaviour (verify + adjust)
 

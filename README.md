@@ -31,9 +31,13 @@ runs locally on your own computer: **your photos never leave your machine.**
   that turn out to be the same person.
 - **Browse & review** — see every person at a glance, drill into the photos that
   contain them, open the originals in your system viewer, and untag faces.
-- **Smart import** — scans subfolders recursively and skips photos it has already
-  imported (by content, not by file name), so re-importing a folder is a no-op and
-  the same photo is never stored twice.
+- **Smart import** — scans subfolders recursively and skips photos and videos it
+  has already imported (by content, not by file name), so re-importing a folder is
+  a no-op and files are never stored twice.
+- **Video import** — import video files (MP4, MKV, MOV, AVI, WebM, M4V, FLV, MPG,
+  MPEG, 3GP, TS, WMV) together with your photos: each video is sampled at most
+  once per second (120 frames max), and every detected face is stored like a
+  photo face. Known videos are skipped on re-import.
 - **Path filter** — restrict tagging to a specific folder or file name.
 - **Rename & untag** — fix a typo everywhere at once, or remove a face from a name.
 - **Export a person's photos** — in *Add faces to a name*, pick anyone and copy
@@ -73,11 +77,13 @@ After that, everything works offline.
 
 The main window is a set of tabs. Work through them roughly in this order:
 
-1. **Import images** — press *Browse…* to pick a folder of photos (JPG, JPEG, PNG, BMP,
-   GIF, WebP; subfolders are scanned recursively), then press **Import**. Every
-   detected face is stored together with its embedding and a thumbnail. You can
-   stop an import at any time; already-imported files are kept. Re-importing
-   the same folder later only records new files.
+1. **Import photos & videos** — press *Browse…* to pick a folder of photos (JPG, JPEG, PNG, BMP,
+   GIF, WebP) and videos (MP4, MKV, MOV, AVI, WebM, M4V, FLV, MPG, MPEG, 3GP, TS, WMV;
+   subfolders are scanned recursively), then press **Import**. Photos are imported
+   first, then videos, in the same run. Every detected face is stored together
+   with its embedding and a thumbnail. You can stop an import at any time;
+   already-imported files are kept. Re-importing the same folder later only
+   records new files.
 
 2. **Put a name to a face** — The app clusters all unnamed faces
    and shows the largest cluster's representative. Type a name (existing names
@@ -138,7 +144,7 @@ copy it to back up your library:
 
 | Path | Purpose |
 |------|---------|
-| `config/facesort.db` | Your library: photos, faces, names, tags; also holds the `videos`, `video_paths` and `video_frames` tables backing the upcoming video import feature |
+| `config/facesort.db` | Your library: photos, faces, names, tags; also holds the `videos`, `video_paths` and `video_frames` tables backing the video import feature |
 | `config/facesort-config.json` | Your settings |
 | `config/CHANGELOG.md` | Cache used by the automatic update check |
 | FaceAI model cache | Downloaded models — default `~/.djl.ai/cache` (Linux/macOS) or `%USERPROFILE%\.djl.ai\cache` (Windows); configurable via the *FaceAI cache dir* setting |
