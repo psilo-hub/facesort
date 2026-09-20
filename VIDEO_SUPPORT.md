@@ -133,11 +133,11 @@ accepted limitation for this iteration (see §10).
   > 5.1.2-1.5.8 / javacpp 1.5.8 also ship `linux-x86`, `linux-armhf`,
   > `linux-ppc64le`, `android-*` (javacpp additionally `ios-*`) dirs, so the
   > implemented filters exclude those too.
-- [ ] Verify `mvn package -DskipTests` produces a working, reasonably sized
+- [x] Verify `mvn package -DskipTests` produces a working, reasonably sized
   shaded jar for the current platform (Windows) with ffmpeg4j on board.
 - [ ] Verify in CI: each platform job still builds and the shaded jars contain
   only their own platform's natives.
-- [ ] Docs: update `README.md` (Requirements: mention ffmpeg via ffmpeg4j is
+- [x] Docs: update `README.md` (Requirements: mention ffmpeg via ffmpeg4j is
   bundled, nothing to install), the translated READMEs if affected, `CHANGELOG.md`
   (new scaffolded dependency), and `todo.txt`.
 

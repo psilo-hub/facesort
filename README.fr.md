@@ -64,6 +64,7 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
 - Un système de bureau **64 bits** — Windows, Linux (x86_64 / aarch64) ou macOS
   (Intel / Apple Silicon)
 - Quelques Go de mémoire vive libre sont recommandés pour les grandes collections
+- **FFmpeg** — intégré à l'application (via ffmpeg4j) ; rien à installer
 
 ## Téléchargement
 

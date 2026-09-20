@@ -61,6 +61,7 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
 - Ein **64-Bit**-Desktop-Betriebssystem – Windows, Linux (x86_64 / aarch64)
   oder macOS (Intel / Apple Silicon)
 - Für große Fotosammlungen werden einige GB freier Arbeitsspeicher empfohlen
+- **FFmpeg** — in der App gebündelt (über ffmpeg4j); nichts muss installiert werden
 
 ## Download
 

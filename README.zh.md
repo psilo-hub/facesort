@@ -47,6 +47,7 @@
 - **64 位**桌面操作系统——Windows、Linux（x86_64 / aarch64）或 macOS
   （Intel / Apple Silicon）
 - 大型照片集建议配备数 GB 可用内存
+- **FFmpeg**——已随应用内置（通过 ffmpeg4j）；无需另行安装
 
 ## 下载
 

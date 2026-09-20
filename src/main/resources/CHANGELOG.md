@@ -17,6 +17,8 @@ All notable changes to Face Sort will be documented in this file.
 - Tabs now show a unicode emoji before their name (2026-09-19)
 - Translated READMEs: README.de.md, README.fr.md, README.es.md, README.ru.md,
   README.zh.md (2026-09-19)
+- Bundled the ffmpeg4j FFmpeg library (new scaffolded dependency for the
+  upcoming video import feature) — nothing to install (2026-09-19)
 
 ### Changed
 - Tabs renamed (2026-09-19)

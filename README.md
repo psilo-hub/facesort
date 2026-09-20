@@ -51,6 +51,7 @@ runs locally on your own computer: **your photos never leave your machine.**
 - A **64-bit** desktop OS — Windows, Linux (x86_64 / aarch64) or macOS
   (Intel / Apple Silicon)
 - A few GB of free RAM is recommended for large photo collections
+- **FFmpeg** — bundled with the app (via ffmpeg4j); nothing to install
 
 ## Download
 

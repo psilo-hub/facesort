@@ -61,6 +61,7 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
 - Un sistema de escritorio de **64 bits**: Windows, Linux (x86_64 / aarch64)
   o macOS (Intel / Apple Silicon)
 - Se recomiendan unos cuantos GB de RAM libre para colecciones grandes
+- **FFmpeg** — incluido en la aplicación (mediante ffmpeg4j); no hay nada que instalar
 
 ## Descarga
 
