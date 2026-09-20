@@ -203,8 +203,8 @@ accepted limitation for this iteration (see §10).
   > header does not expose a pixel format (`AV_PIX_FMT_NONE`, e.g. a truncated
   > container) fail with a clean `IOException` instead of crashing the JVM in
   > ffmpeg4j's swscale setup.
-- [ ] Run the new tests green (`mvn test`).
-- [ ] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md` as needed.
+- [x] Run the new tests green (`mvn test`).
+- [x] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md` as needed.
 
 ### Phase 3 — Video import service
 
