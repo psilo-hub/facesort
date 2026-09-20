@@ -31,6 +31,10 @@ All notable changes to Face Sort will be documented in this file.
   `HashUtils.hashBytes` computes the SHA-256 of raw byte content (used to
   fingerprint extracted frames later). Internal plumbing for the upcoming video
   import feature, no UI yet (2026-09-20)
+- Video import foundation: `VideoFrameSource` interface — the test seam for
+  reading sampled frames out of a video (duration probe, forward-only seek to a
+  target, frame + real position delivery, graceful EOF). Keeps the video import
+  logic testable without the ffmpeg native library (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

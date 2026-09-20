@@ -179,7 +179,7 @@ accepted limitation for this iteration (see §10).
   `HashUtils` for the frame hash).
   > Note: added `HashUtils.hashBytes(byte[])` for the frame hash (SHA-256 over
   > the full-frame JPEG bytes); `VideoFrameUtils` only converts RGB24 → image.
-- [ ] Define the **test seam**: an interface `VideoFrameSource` in
+- [x] Define the **test seam**: an interface `VideoFrameSource` in
   `service` (opening a video, returning duration, and iterating the sampled
   frames) with a real `FfmpegVideoFrameSource` implementation wrapping the
   ffmpeg4j API, so `VideoImportService` is testable without native libs —
