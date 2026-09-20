@@ -171,12 +171,14 @@ accepted limitation for this iteration (see §10).
   `count = min(MAX_FRAMES_PER_VIDEO, max(1, floor(duration)))`,
   `spacing = duration / count`, targets at `(i + 0.5) * spacing`. No ffmpeg
   dependency — fully unit-testable.
-- [ ] TDD: `VideoFrameUtilsTest` first — RGB24 byte[] → `BufferedImage` for
+- [x] TDD: `VideoFrameUtilsTest` first — RGB24 byte[] → `BufferedImage` for
   small known images (corner/middle pixels), wrong-size input rejected; watch it
   fail.
-- [ ] Implement `VideoFrameUtils.rgb24ToImage(byte[], width, height)` and add a
+- [x] Implement `VideoFrameUtils.rgb24ToImage(byte[], width, height)` and add a
   `hashPixels`-style helper if needed (or reuse `ImageUtils.toJpegBytes` +
   `HashUtils` for the frame hash).
+  > Note: added `HashUtils.hashBytes(byte[])` for the frame hash (SHA-256 over
+  > the full-frame JPEG bytes); `VideoFrameUtils` only converts RGB24 → image.
 - [ ] Define the **test seam**: an interface `VideoFrameSource` in
   `service` (opening a video, returning duration, and iterating the sampled
   frames) with a real `FfmpegVideoFrameSource` implementation wrapping the

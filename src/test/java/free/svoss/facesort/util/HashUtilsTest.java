@@ -65,6 +65,30 @@ class HashUtilsTest {
     }
 
     @Test
+    void hashBytes_hashesKnownBytesDeterministically() {
+        byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
+        String first = HashUtils.hashBytes(bytes);
+        String second = HashUtils.hashBytes(bytes);
+        assertEquals(first, second, "hashing the same bytes twice must be deterministic");
+        assertTrue(first.matches("[0-9a-f]{64}"), "expected 64 lowercase hex characters, got: " + first);
+    }
+
+    @Test
+    void hashBytes_differentContent_differentHash() {
+        assertNotEquals(
+                HashUtils.hashBytes("content A".getBytes(StandardCharsets.UTF_8)),
+                HashUtils.hashBytes("content B".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void hashBytes_andHashFile_agreeOnSameContent() throws Exception {
+        Path file = writeFile("same.txt", "shared content");
+        byte[] bytes = Files.readAllBytes(file);
+        assertEquals(HashUtils.hashFile(file), HashUtils.hashBytes(bytes),
+                "bytes hash must match the file hash of the same content");
+    }
+
+    @Test
     void bytesToHex_encodesKnownBytes() {
         // 0x00 0xFF 0x10 -> "00ff10"
         assertEquals("00ff10", HashUtils.bytesToHex(new byte[]{0x00, (byte) 0xFF, 0x10}));

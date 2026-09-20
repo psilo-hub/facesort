@@ -45,6 +45,23 @@ public final class HashUtils {
     }
 
     /**
+     * Computes the SHA-256 hash of the given bytes and returns it as a
+     * lowercase hex string.
+     *
+     * @param data the bytes to hash
+     * @return the hex-encoded SHA-256 hash (64 characters)
+     */
+    public static String hashBytes(byte[] data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return bytesToHex(digest.digest(data));
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed to be available in all Java implementations
+            throw new AssertionError("SHA-256 algorithm not available", e);
+        }
+    }
+
+    /**
      * Converts a byte array to a lowercase hexadecimal string.
      *
      * @param bytes the byte array to convert
