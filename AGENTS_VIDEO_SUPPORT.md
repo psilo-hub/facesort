@@ -1,17 +1,25 @@
-# Task: Implement the next unchecked item from VIDEO_SUPPORT.md
+# Task: Implement unchecked items from VIDEO_SUPPORT.md
 
 You are working in the `psilo-hub/facesort` repository. Your job on this
-invocation is to implement **exactly one** unchecked item from the
-implementation plan in `VIDEO_SUPPORT.md`, verify it, update all affected
-documentation, and commit. This instruction is designed to be run
-repeatedly — each run advances the plan by one item — until every phase
-in `VIDEO_SUPPORT.md` is fully checked off.
+invocation is to implement unchecked items from the implementation plan in
+`VIDEO_SUPPORT.md`, verify them, update all affected documentation, and
+commit. This instruction is designed to be run repeatedly — each run
+advances the plan — until every phase in `VIDEO_SUPPORT.md` is fully
+checked off.
+
+**Important:** After committing each item, check whether the current phase
+still has unchecked items. If it does, continue with the next item (still
+committing after each one) rather than stopping. Only stop when the
+entire phase is complete or when no unchecked items remain in the file.
 
 ## Hard rules
 
-1. **One item per invocation.** Do not implement multiple items, do not
-   skip ahead, and do not batch phases together. Pick the *first*
-   unchecked item in document order.
+1. **One phase per run, items committed after each.** Implement items in the
+   first phase that still has unchecked work, in document order. After
+   committing each item, check whether the phase still has unchecked items.
+   If it does, continue with the next item (committing after each one) rather
+   than stopping. Only stop when the entire phase is complete or when no
+   unchecked items remain in the file.
 2. **Read before writing.** Read `VIDEO_SUPPORT.md` in full, then read
    every source file the item touches before editing anything.
 3. **Follow the plan.** `VIDEO_SUPPORT.md` is the source of truth for
@@ -40,7 +48,9 @@ in `VIDEO_SUPPORT.md` is fully checked off.
    - exact checkbox text,
    - any sub-bullets or notes immediately beneath it that scope the work.
 5. If any sub-checkboxes exist under that item, treat the first
-   unchecked *sub-item* as the unit of work for this run.
+   unchecked *sub-item* as the unit of work for this item.
+6. The phase chosen here is the **current phase** for this run; you will
+   keep working through its unchecked items until the phase is complete.
 
 If **no unchecked items remain** anywhere in the file: stop, print
 "VIDEO_SUPPORT.md is fully implemented — nothing to do." and exit
@@ -153,20 +163,28 @@ manufacture edits.
    Keep the subject line under ~72 characters. Use the imperative mood.
 4. Do not amend, rebase, force-push, or push to a remote unless the
    user explicitly asked you to.
+5. After the commit, check whether the current phase still has unchecked
+   items:
+   - **If yes:** return to **Step 1** and implement the next item in the
+     same phase (commit after each item). Do not stop between items.
+   - **If no:** the phase is complete. Proceed to Step 9 to report the
+     whole run.
 
 ### Step 9 — Report
 
-Print a concise report:
+Print a concise report for the full run (whole phase):
 
-- Item completed (phase + exact text).
-- Files changed.
+- Phase completed and list of items completed (phase + exact text for each).
+- Files changed (per item).
 - Verification results (build, tests, manual checks).
 - Remaining unchecked items in `VIDEO_SUPPORT.md` (count + next item).
 - Anything skipped, blocked, or left unstaged.
 
 ## Stop conditions
 
-Stop immediately and ask the user if:
+The normal stopping point is **the end of the run's phase** (all items in
+the current phase committed and checked off, each in its own commit). Stop
+earlier — immediately — and ask the user if:
 
 - `VIDEO_SUPPORT.md` is missing or unreadable.
 - The next unchecked item is ambiguous about scope, schema, or library.
@@ -176,10 +194,14 @@ Stop immediately and ask the user if:
 - The working tree has unrelated changes that would be entangled with
   this commit.
 
+When an early stop happens mid-phase, report what was completed so far,
+what is blocked, and where the next run should resume.
+
 ## What "done" looks like for the whole plan
 
 Running this instruction repeatedly is complete when
 `VIDEO_SUPPORT.md` contains no unchecked boxes in any phase. At that
 point every phase's work is implemented, tested, documented in
-`CHANGELOG.md`, reflected in the READMEs where relevant, and committed
-as its own focused commit.
+`CHANGELOG.md`, reflected in the READMEs where relevant, and committed.
+Each item is committed as its own focused commit; a single run does not
+stop until it has finished every item in its current phase.
