@@ -5,6 +5,7 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,6 +90,34 @@ class DeduplicationServiceTest {
         assertTrue(pair.isPresent());
         assertEquals("Alice", pair.get().nameA());
         assertEquals("Bob", pair.get().nameB());
+    }
+
+    @Test
+    void nextPair_ranksNamesWhoseFacesAreVideoFrames() throws SQLException {
+        long alice = addName("Alice");
+        long bob = addName("Bob");
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        for (int i = 0; i < 2; i++) {
+            String frame = "vframe" + i;
+            imageDao.insert(frame, 0, "{}", 1);
+            imageDao.saveThumbnail(frame, new byte[]{1});
+            videoDao.linkFrame(frame, "videoA", 1000L * i);
+            faceDao.insert(new FaceRecord(0, frame, 10, 10, 80, 80, 0.9,
+                    identical(), new byte[]{1}, alice));
+        }
+        imageDao.insert("vframeB", 0, "{}", 1);
+        imageDao.saveThumbnail("vframeB", new byte[]{1});
+        videoDao.linkFrame("vframeB", "videoA", 3000L);
+        faceDao.insert(new FaceRecord(0, "vframeB", 10, 10, 80, 80, 0.9,
+                identical(), new byte[]{1}, bob));
+
+        Optional<DeduplicationService.DupeCandidate> pair = service.nextPair();
+
+        assertTrue(pair.isPresent(), "name pairs built from video faces must be proposed");
+        assertEquals(Set.of(alice, bob), Set.of(pair.get().nameIdA(), pair.get().nameIdB()));
+        assertEquals(1.0, pair.get().similarity(), 1e-6);
     }
 
     @Test

@@ -29,8 +29,9 @@ runs locally on your own computer: **your photos never leave your machine.**
   - **Add faces to a name** — pick a person and tag the unnamed faces most similar to them.
 - **Duplicate detection** — compares your named people and lets you merge names
   that turn out to be the same person.
-- **Browse & review** — see every person at a glance, drill into the photos that
-  contain them, open the originals in your system viewer, and untag faces.
+- **Browse & review** — see every person at a glance, drill into the photos and
+  video frames that contain them, open the originals in your system viewer, and
+  untag faces.
 - **Smart import** — scans subfolders recursively and skips photos and videos it
   has already imported (by content, not by file name), so re-importing a folder is
   a no-op and files are never stored twice.
@@ -38,11 +39,12 @@ runs locally on your own computer: **your photos never leave your machine.**
   MPEG, 3GP, TS, WMV) together with your photos: each video is sampled at most
   once per second (120 frames max), and every detected face is stored like a
   photo face. Known videos are skipped on re-import.
-- **Path filter** — restrict tagging to a specific folder or file name.
+- **Path filter** — restrict tagging to a specific folder or file name. Video
+  faces are matched through their video file's path.
 - **Rename & untag** — fix a typo everywhere at once, or remove a face from a name.
 - **Export a person's photos** — in *Add faces to a name*, pick anyone and copy
   every photo containing them to a folder of your choice (photos whose original
-  file is gone are exported as thumbnails instead).
+  file is gone — including video frames — are exported as thumbnails instead).
 - **First-run model download** — the built-in face-recognition models are
   downloaded once (with a progress window) and cached locally.
 - **Automatic update check** — lets you know when a new release is available.
@@ -93,7 +95,8 @@ The main window is a set of tabs. Work through them roughly in this order:
 
 3. **Tag random face** — a random sample of unnamed faces. Click faces to select
    them, type a name and press **Tag selected**. Use the *path prefix* field to
-   restrict the sample to a particular folder or file.
+   restrict the sample to a particular folder or file (video frames are matched
+   through their video file's path).
 
 4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
@@ -114,7 +117,9 @@ The main window is a set of tabs. Work through them roughly in this order:
 6. **View** — browse your tagged collection. Each person is a card showing a
    representative face and the number of tagged faces. Click a card to see the
    images containing that person; click an image to open the original, or use
-   the right-click menu to *Untag* it from that person.
+   the right-click menu to *Untag* it from that person. Video frames appear
+   with their frame thumbnail; they have no photo original to open, so *Open
+   Original* stays disabled for them.
 
 7. **Settings** — tune face detection, clustering, import and model parameters;
    see each control's tooltip for details. Changes are applied via **Save** or
@@ -126,7 +131,8 @@ The main window is a set of tabs. Work through them roughly in this order:
 
 Throughout the app you can right-click any face or thumbnail to **Open Original**
 in your system's default image viewer, and hovering a face shows the path of its
-source image.
+source image. Faces found in videos have no photo original to open; opening the
+video at the frame timestamp is planned future work.
 
 ### Suggested workflow
 

@@ -283,20 +283,31 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 5 — Cross-feature behaviour (verify + adjust)
 
-- [ ] TDD where behaviour changed: assert that a tagged video face appears in
+- [x] TDD where behaviour changed: assert that a tagged video face appears in
   `ViewService.getImagesForName` with its frame thumbnail, and that
   `FaceToNameService.exportImagesForName` exports the frame **thumbnail** for
   video sources (no path → thumbnail fallback path).
-- [ ] Verify (no code change expected): clustering, name-similarity ranking,
+- [x] Verify (no code change expected): clustering, name-similarity ranking,
   deduplication and random/similar tagging all work unchanged because they are
   embedding-based.
-- [ ] "Open Original" for a video face: confirm it reports "original not found"
+- [x] "Open Original" for a video face: confirm it reports "original not found"
   gracefully (no stored path). Document the limitation in `README.md`/tooltips;
   opening the video at the frame timestamp is future work.
-- [ ] Path-prefix filters do not match video frames (Document in the tooltip /
+- [x] Path-prefix filters do not match video frames (Document in the tooltip /
   README). Optionally: extend the path filter to also consider `video_paths`
   (only if it stays small — otherwise leave as noted future work).
-- [ ] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md`.
+- [x] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md`.
+
+> **Phase 5 QA notes.** Verified with automated tests on an in-memory database
+> shaped like a real video import (frame images with a thumbnail, no photo
+> path, linked through `video_frames` to a `videos` + `video_paths` row): a
+> tagged video face appears in the View grid with its frame thumbnail and
+> contributes to the name card/summary; export falls back to the frame
+> thumbnail (`hash.jpg`); "Open Original" and the availability check report
+> no-original gracefully. Clustering, deduplication and similar tagging are
+> embedding-based and were verified unchanged for video faces. The path-prefix
+> filter now also matches `video_paths`, so folder filtering works for video
+> faces too (query + binder extended, tooltips updated in all six languages).
 
 ### Phase 6 — CI and release validation
 
@@ -326,8 +337,8 @@ accepted limitation for this iteration (see §10).
 
 ## 6. Known limitations / future work (out of scope now)
 
-- "Open Original" on a video face opens nothing yet (could seek the video).
-- Path-prefix filters (`ui.faceName.pathFilter` etc.) don't match video faces.
+- "Open Original" on a video face opens nothing yet; opening the video and
+  seeking to the frame timestamp is future work.
 - Frame budget constants are not exposed in Settings.
 - `ImageDao.getAllHashes()`/View/thumbnails now include frame-derived images;
-  no UI distinguishes "photo" from "video frame" beyond the tooltip paths.
+  no UI distinguishes "photo" from "video frame" beyond the tooltip texts.

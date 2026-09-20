@@ -5,6 +5,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,6 +125,29 @@ class FaceToNameServiceExportTest {
         assertEquals(0, result.originalsCopied());
         assertEquals(1, result.thumbnailsCopied());
         assertArrayEquals(thumb, Files.readAllBytes(out.resolve("img1.jpg")));
+    }
+
+    @Test
+    void exportImagesForName_exportsVideoFrameThumbnailWhenNoOriginal() throws Exception {
+        long alice = nameDao.insert("Alice");
+        imageDao.insert("frame1", 0, "{}", 1);
+        byte[] thumb = new byte[]{7, 6, 5};
+        imageDao.saveThumbnail("frame1", thumb);
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.addPath("videoA", "/videos/family/party.mp4");
+        videoDao.linkFrame("frame1", "videoA", 5000L);
+        faceDao.insert(new FaceRecord(0, "frame1", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+
+        Path out = tempDir.resolve("out");
+        FaceToNameService.ExportResult result = service.exportImagesForName(alice, out);
+
+        assertEquals(1, result.images());
+        assertEquals(0, result.originalsCopied(), "the video frame has no photo original");
+        assertEquals(1, result.thumbnailsCopied(), "the frame thumbnail must be exported");
+        assertEquals(0, result.missing());
+        assertArrayEquals(thumb, Files.readAllBytes(out.resolve("frame1.jpg")));
     }
 
     @Test

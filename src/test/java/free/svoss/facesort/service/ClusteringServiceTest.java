@@ -4,6 +4,7 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,6 +91,25 @@ class ClusteringServiceTest {
         insertFace("img1", vectorX());
 
         assertTrue(service.clusterUnnamed().isEmpty());
+    }
+
+    @Test
+    void clusterUnnamed_videoFrameFaceClustersWithSimilarPhotoFace() throws SQLException {
+        insertFace("imgPhoto", vectorX());
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        imageDao.insert("frame1", 0, "{}", 1);
+        imageDao.saveThumbnail("frame1", new byte[]{1, 2, 3});
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.linkFrame("frame1", "videoA", 1000L);
+        faceDao.insert(new FaceRecord(0, "frame1", 10, 10, 80, 80, 0.9,
+                vectorX(), new byte[]{1}, null));
+
+        List<ClusteringService.Cluster> clusters = service.clusterUnnamed();
+
+        assertEquals(1, clusters.size(),
+                "clustering is embedding-based and must not care about the source");
+        assertEquals(2, clusters.get(0).faces().size());
     }
 
     @Test

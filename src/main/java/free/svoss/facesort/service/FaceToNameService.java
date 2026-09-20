@@ -116,7 +116,8 @@ public class FaceToNameService {
      * faces that are not similar enough cannot be added to an existing name.</p>
      *
      * <p>When {@code pathPrefix} is non-blank, only candidates whose images
-     * have at least one stored path starting with that prefix qualify, so the
+     * have at least one stored photo path starting with that prefix qualify,
+     * or whose linked video file path starts with it (video frames), so the
      * user can restrict the offered faces to a folder or file.</p>
      *
      * <p>When {@code excludeCloserToOtherNames} is {@code true}, each candidate
@@ -131,8 +132,8 @@ public class FaceToNameService {
      * @param excludeCloserToOtherNames  whether to hide faces that are closer to
      *                                   another name's average embedding than to
      *                                   the selected name's
-     * @param pathPrefix                 path prefix the stored image path must
-     *                                   start with, or {@code null}/{@code ""}
+     * @param pathPrefix                 path prefix the stored photo/video path
+     *                                   must start with, or {@code null}/{@code ""}
      *                                   for any faces
      * @return matching faces as {@link SimilarityResult}, descending by similarity
      * @throws SQLException on database error

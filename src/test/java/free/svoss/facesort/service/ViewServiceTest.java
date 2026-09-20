@@ -4,6 +4,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +16,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,6 +54,24 @@ class ViewServiceTest {
     private long addFace(String imageHash, float[] embedding, Long nameId) throws SQLException {
         if (insertedImages.add(imageHash)) {
             imageDao.insert(imageHash, 0, "{}", 1);
+        }
+        int offset = bbox.getAndAdd(20);
+        return faceDao.insert(new FaceRecord(
+                0, imageHash, offset, 0, 80, 80, 0.9, embedding, new byte[]{1}, nameId));
+    }
+
+    /**
+     * Inserts a video-frame-shaped image (thumbnail stored, no photo path)
+     * linked to a video, plus a face on it.
+     */
+    private long addVideoFrameFace(String imageHash, float[] embedding, Long nameId) throws SQLException {
+        if (insertedImages.add(imageHash)) {
+            imageDao.insert(imageHash, 0, "{}", 1);
+            imageDao.saveThumbnail(imageHash, new byte[]{9, 8, 7});
+            VideoDao videoDao = new VideoDao(db.getConnection());
+            videoDao.insert("video-of-" + imageHash, 0L, "{}", 10.0);
+            videoDao.addPath("video-of-" + imageHash, "/videos/sample.mp4");
+            videoDao.linkFrame(imageHash, "video-of-" + imageHash, 1000L);
         }
         int offset = bbox.getAndAdd(20);
         return faceDao.insert(new FaceRecord(
@@ -112,5 +133,49 @@ class ViewServiceTest {
         assertEquals(2, images.size(), "two faces in one image must yield one entry");
         assertTrue(images.stream().anyMatch(i -> "imgA".equals(i.hash())));
         assertTrue(images.stream().anyMatch(i -> "imgB".equals(i.hash())));
+    }
+
+    @Test
+    void getImagesForName_returnsVideoFrameWithItsThumbnail() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        List<ViewService.NamedImage> images = service.getImagesForName(alice);
+
+        assertEquals(1, images.size(), "a tagged video frame must appear in the view grid");
+        assertEquals("frame1", images.get(0).hash());
+        assertArrayEquals(new byte[]{9, 8, 7}, images.get(0).thumbnailJpg(),
+                "the frame thumbnail must be presented");
+    }
+
+    @Test
+    void getNameSummaries_includesNameWhoseOnlyFacesAreVideoFrames() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        List<ViewService.NameSummary> summaries = service.getNameSummaries();
+
+        assertEquals(1, summaries.size(), "a name tagged only on video faces must get a card");
+        assertEquals("Alice", summaries.get(0).name().name());
+        assertEquals(1, summaries.get(0).faceCount());
+        assertEquals("frame1", summaries.get(0).representative().imageHash());
+    }
+
+    @Test
+    void isOriginalAvailable_videoFrameWithoutStoredPhotoPathIsFalse() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        assertFalse(service.isOriginalAvailable("frame1"),
+                "a video frame has no original photo to open");
+    }
+
+    @Test
+    void openOriginal_videoFrameWithoutStoredPhotoPathReturnsFalseGracefully() throws Exception {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        assertFalse(service.openOriginal("frame1"),
+                "must report the original as unavailable without side effects");
     }
 }

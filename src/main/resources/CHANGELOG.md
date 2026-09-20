@@ -66,6 +66,18 @@ All notable changes to Face Sort will be documented in this file.
   (2026-09-20)
 - The Import tab's folder picker, progress messages and summaries mention
   photos **and videos** in all six languages (2026-09-20)
+- Video faces work across the tagging and review features: a face tagged on a
+  video frame shows its frame thumbnail in the View tab and in "Add faces to a
+  name", is exported with a person's photos (as the frame thumbnail, since a
+  video frame has no photo original), and is clustered, deduped and ranked
+  exactly like a photo face (2026-09-20)
+- The path-prefix filter (in "Tag random face" and "Add faces to a name") now
+  also matches video faces through their video file's path, so filtering by
+  folder or file works for videos too (2026-09-20)
+- "Open Original" handles video frames gracefully: the entry is disabled (or
+  reports "Original file not found") because a video frame has no photo file to
+  open; opening the video at the frame timestamp is planned future work
+  (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

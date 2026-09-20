@@ -122,6 +122,29 @@ class FaceDaoTest {
     }
 
     @Test
+    void findUnnamed_withPathPrefix_includesVideoFacesWhoseVideoMatches() throws Exception {
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        imageDao.insert("frame1", 0, "{}", 1);
+        imageDao.insert("frame2", 0, "{}", 1);
+        imageDao.insert("imgPhoto", 0, "{}", 1);
+        imageDao.addPath("imgPhoto", "/photos/elsewhere/a.jpg");
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.addPath("videoA", "/videos/family/party.mp4");
+        videoDao.linkFrame("frame1", "videoA", 5000L);
+        videoDao.insert("videoB", 0L, "{}", 12.0);
+        videoDao.addPath("videoB", "/other/location/clip.mp4");
+        videoDao.linkFrame("frame2", "videoB", 1000L);
+        insertFace("frame1", 0, 0, new float[]{1.0f}, null);
+        insertFace("frame2", 0, 0, new float[]{2.0f}, null);
+        insertFace("imgPhoto", 0, 0, new float[]{3.0f}, null);
+
+        List<FaceRecord> matching = faceDao.findUnnamed("/videos/family");
+
+        assertEquals(1, matching.size(), "only the face whose video file lives under the prefix");
+        assertEquals("frame1", matching.get(0).imageHash());
+    }
+
+    @Test
     void findUnnamed_blankOrNullPrefixReturnsAllUnnamed() throws Exception {
         insertImage("img1");
         insertImage("img2");
@@ -165,6 +188,29 @@ class FaceDaoTest {
 
         assertEquals(2, random.size(), "only faces from the matching folder");
         assertTrue(random.stream().noneMatch(f -> f.imageHash().equals("img3")));
+    }
+
+    @Test
+    void findRandomUnnamed_withPathPrefix_includesVideoFacesWhoseVideoMatches() throws Exception {
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        imageDao.insert("frame1", 0, "{}", 1);
+        imageDao.insert("frame2", 0, "{}", 1);
+        imageDao.insert("frame3", 0, "{}", 1);
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.addPath("videoA", "/videos/family/party.mp4");
+        videoDao.linkFrame("frame1", "videoA", 1000L);
+        videoDao.linkFrame("frame2", "videoA", 3000L);
+        videoDao.insert("videoB", 0L, "{}", 12.0);
+        videoDao.addPath("videoB", "/other/location/clip.mp4");
+        videoDao.linkFrame("frame3", "videoB", 500L);
+        insertFace("frame1", 0, 0, new float[]{1.0f}, null);
+        insertFace("frame2", 20, 0, new float[]{2.0f}, null);
+        insertFace("frame3", 40, 0, new float[]{3.0f}, null);
+
+        List<FaceRecord> random = faceDao.findRandomUnnamed(10, "/videos/family");
+
+        assertEquals(2, random.size(), "both faces whose video file lives under the prefix");
+        assertTrue(random.stream().noneMatch(f -> f.imageHash().equals("frame3")));
     }
 
     @Test

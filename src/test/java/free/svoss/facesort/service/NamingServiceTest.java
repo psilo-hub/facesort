@@ -5,6 +5,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.SimilarityResult;
 import org.junit.jupiter.api.AfterEach;
@@ -131,6 +132,29 @@ class NamingServiceTest {
     }
 
     @Test
+    void findRandomUnnamed_withPathPrefix_includesVideoFacesWhoseVideoMatches() throws SQLException {
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.addPath("videoA", "/videos/family/party.mp4");
+        imageDao.insert("frame1", 0, "{}", 1);
+        videoDao.linkFrame("frame1", "videoA", 5000L);
+        faceDao.insert(new FaceRecord(0, "frame1", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, null));
+        videoDao.insert("videoB", 0L, "{}", 5.0);
+        videoDao.addPath("videoB", "/elsewhere/clip.mp4");
+        imageDao.insert("frame2", 0, "{}", 1);
+        videoDao.linkFrame("frame2", "videoB", 1000L);
+        faceDao.insert(new FaceRecord(0, "frame2", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, null));
+
+        List<FaceRecord> matching = service.findRandomUnnamed(25, "/videos/family");
+
+        assertEquals(1, matching.size());
+        assertEquals("frame1", matching.get(0).imageHash());
+    }
+
+    @Test
     void findRandomUnnamed_withBlankPathPrefix_returnsAll() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA", alice);
@@ -191,6 +215,28 @@ class NamingServiceTest {
         List<SimilarityResult> results = service.findSimilarUnnamed(refId, 10);
 
         assertEquals(2, results.size());
+    }
+
+    @Test
+    void findSimilarUnnamed_videoFrameReferenceRanksPhotoFace() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        VideoDao videoDao = new VideoDao(db.getConnection());
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        imageDao.insert("frameRef", 0, "{}", 1);
+        imageDao.saveThumbnail("frameRef", new byte[]{1});
+        videoDao.insert("videoA", 0L, "{}", 10.0);
+        videoDao.linkFrame("frameRef", "videoA", 1000L);
+        long refId = faceDao.insert(new FaceRecord(0, "frameRef", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+        imageDao.insert("imgU1", 0, "{}", 1);
+        long photoFaceId = faceDao.insert(new FaceRecord(0, "imgU1", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, null));
+
+        List<SimilarityResult> results = service.findSimilarUnnamed(refId, 10);
+
+        assertEquals(1, results.size());
+        assertEquals(photoFaceId, results.get(0).faceRecord().id(),
+                "similar tagging works across video frames and photos alike");
     }
 
     @Test

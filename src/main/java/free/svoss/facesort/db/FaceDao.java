@@ -88,11 +88,12 @@ public class FaceDao {
 
     /**
      * Returns all unnamed faces (name_id IS NULL), optionally restricted to
-     * images that have at least one stored path starting with the given
-     * prefix. A {@code null} or blank prefix disables the restriction.
+     * images that have at least one stored photo path starting with the given
+     * prefix, or (for video frames) whose video file path starts with it.
+     * A {@code null} or blank prefix disables the restriction.
      *
-     * @param pathPrefix path prefix the stored image path must start with, or
-     *                   {@code null}/{@code ""} to return all unnamed faces
+     * @param pathPrefix path prefix the stored photo/video path must start with,
+     *                   or {@code null}/{@code ""} to return all unnamed faces
      * @return the matching unnamed faces
      * @throws SQLException on database error
      */
@@ -126,16 +127,17 @@ public class FaceDao {
 
     /**
      * Returns up to {@code limit} unnamed faces chosen at random, optionally
-     * restricted to images that have at least one stored path starting with
-     * the given prefix. A {@code null} or blank prefix disables the
+     * restricted to images that have at least one stored photo path starting
+     * with the given prefix, or (for video frames) whose video file path
+     * starts with it. A {@code null} or blank prefix disables the
      * restriction.
      *
      * <p>A non-positive limit yields an empty list (SQLite would otherwise
      * interpret a negative LIMIT as "unbounded").</p>
      *
      * @param limit      maximum number of faces to return; must not be negative
-     * @param pathPrefix path prefix the stored image path must start with, or
-     *                   {@code null}/{@code ""} to return any random faces
+     * @param pathPrefix path prefix the stored photo/video path must start with,
+     *                   or {@code null}/{@code ""} to return any random faces
      * @return up to {@code limit} random unnamed faces
      * @throws SQLException on database error
      */
@@ -148,7 +150,7 @@ public class FaceDao {
                 "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
                 + "FROM faces WHERE name_id IS NULL" + pathFilterClause() + " ORDER BY RANDOM() LIMIT ?")) {
             bindPathFilter(ps, pathPrefix);
-            ps.setInt(4, limit);
+            ps.setInt(6, limit);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
@@ -273,9 +275,10 @@ public class FaceDao {
 
     /**
      * Builds the SQL fragment that restricts results to images having at least
-     * one stored path starting with a given prefix. The fragment contains
-     * three {@code ?} placeholders, all bound to the same prefix value by
-     * {@link #bindPathFilter(PreparedStatement, String)}.
+     * one stored photo path starting with a given prefix, or (for video
+     * frames) at least one stored path of the linked video starting with the
+     * prefix. The fragment contains five {@code ?} placeholders, all bound to
+     * the same prefix value by {@link #bindPathFilter(PreparedStatement, String)}.
      *
      * @return the WHERE fragment, always starting with {@code " AND "}
      */
@@ -283,7 +286,12 @@ public class FaceDao {
         return " AND (? IS NULL OR EXISTS ("
                 + "SELECT 1 FROM image_paths p "
                 + "WHERE p.hash = faces.image_hash "
-                + "AND substr(p.path, 1, length(?)) = ?))";
+                + "AND substr(p.path, 1, length(?)) = ?)"
+                + " OR EXISTS ("
+                + "SELECT 1 FROM video_frames vf "
+                + "JOIN video_paths vp ON vp.hash = vf.video_hash "
+                + "WHERE vf.frame_hash = faces.image_hash "
+                + "AND substr(vp.path, 1, length(?)) = ?))";
     }
 
     /**
@@ -291,8 +299,8 @@ public class FaceDao {
      * {@link #pathFilterClause()} to the given prefix. The prefix is trimmed;
      * a {@code null} or blank prefix leaves the clause disabled.
      *
-     * <p>The clause's placeholders live at indexes 1..3, so a query that adds
-     * further placeholders (e.g. LIMIT) must start them at index 4.</p>
+     * <p>The clause's placeholders live at indexes 1..5, so a query that adds
+     * further placeholders (e.g. LIMIT) must start them at index 6.</p>
      *
      * @param ps         the prepared statement to bind
      * @param pathPrefix the trimmed prefix, or {@code null} for no filter
@@ -300,7 +308,7 @@ public class FaceDao {
      */
     private static void bindPathFilter(PreparedStatement ps, String pathPrefix) throws SQLException {
         String prefix = pathPrefix == null ? null : pathPrefix.trim();
-        for (int i = 1; i <= 3; i++) {
+        for (int i = 1; i <= 5; i++) {
             if (prefix == null || prefix.isEmpty()) {
                 ps.setNull(i, Types.VARCHAR);
             } else {
