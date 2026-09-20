@@ -221,7 +221,7 @@ accepted limitation for this iteration (see §10).
   - per-file errors are counted and do not abort the rest,
   - parallel multi-engine path works (mirrors `ImportServiceTest`).
   Watch them fail.
-- [ ] **Refactor (shared pipeline)**: extract the per-image logic from
+- [x] **Refactor (shared pipeline)**: extract the per-image logic from
   `ImportService.processFile` that turns a loaded `BufferedImage` into stored
   `images`/`thumbnails`/`faces` rows (downscale-to-`maxDetectionDimension` +
   `mapToOriginal` + crop/downsize-to-160 + embedding + `sub_image_jpg`) into a

@@ -7,8 +7,6 @@ import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
 
-import free.svoss.tools.faceai.DetectedFace;
-
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -18,7 +16,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -57,13 +54,8 @@ public class ImportService implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(ImportService.class.getName());
 
-    /** Maximum dimension (width or height) for face sub-image thumbnails. Face
-     * crops larger than this are downscaled before embedding and encoding, so
-     * the embedding model never sees unnecessarily large inputs. */
-    private static final int SUB_IMAGE_MAX_DIM = 160;
-
-    /** JPEG quality for face sub-image encoding. */
-    private static final float SUB_IMAGE_JPEG_QUALITY = 0.85f;
+    /** JPEG quality for thumbnail encoding. */
+    private static final float JPEG_QUALITY = 0.85f;
 
     /** Supported image file extensions (case-insensitive, without the leading dot). */
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
@@ -160,7 +152,7 @@ public class ImportService implements AutoCloseable {
         int minBbox = config.getMinBoundingBoxSize();
         double minConfidence = config.getMinConfidence();
         int maxFacesPerImage = config.getMaxFacesPerImage();
-        String criteriaJson = buildCriteriaJson(minBbox, minConfidence, maxFacesPerImage);
+        String criteriaJson = FaceDetectionUtils.buildCriteriaJson(minBbox, minConfidence, maxFacesPerImage);
 
         AtomicInteger nextFile = new AtomicInteger();
         AtomicInteger newImages = new AtomicInteger();
@@ -306,46 +298,14 @@ public class ImportService implements AutoCloseable {
         // ---- New-image branch: heavy work outside the lock ----
         BufferedImage image = ImageUtils.readImage(file);
 
-        // High-resolution images are scaled down before detection so the neural
-        // network runs on a bounded input. Bounding boxes are mapped back to the
-        // original image coordinates afterwards.
-        int maxDetectionDimension = config.getMaxDetectionDimension();
-        double detectionScale = computeDetectionScale(image, maxDetectionDimension);
-        BufferedImage detectionImage = detectionScale < 1.0
-                ? ImageUtils.downsize(image, maxDetectionDimension)
-                : image;
-        DetectedFace[] allFaces = service.detectFaces(detectionImage);
-
-        // Filter faces by criteria, working in original image coordinates
-        List<DetectedFace> qualifying = Arrays.stream(allFaces)
-                .map(face -> mapToOriginal(face, detectionScale))
-                .filter(f -> f.width() >= minBbox && f.height() >= minBbox)
-                .filter(f -> f.confidence() >= minConfidence)
-                .limit(maxFacesPerImage)
-                .toList();
-
-        // Encode face sub-images before touching the database. Each face is
-        // cropped at full resolution but immediately downscaled so that neither
-        // embedding inference nor JPEG encoding ever processes a large crop.
-        List<FaceRecord> faceRecords = new ArrayList<>();
-        int facesAdded = 0;
-        for (DetectedFace face : qualifying) {
-            try {
-                BufferedImage faceCrop = face.crop(image);
-                BufferedImage faceThumb = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
-                float[] embedding = service.getEmbedding(faceThumb);
-                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, SUB_IMAGE_JPEG_QUALITY);
-
-                faceRecords.add(new FaceRecord(
-                        0, hash,
-                        face.x(), face.y(), face.width(), face.height(),
-                        face.confidence(), embedding, subImageJpg, null));
-                facesAdded++;
-            } catch (Exception e) {
-                LOG.log(Level.WARNING,
-                        "Error processing detected face in " + file, e);
-            }
-        }
+        // Face detection runs the shared photo/frame pipeline: large images are
+        // scaled down before detection, bounding boxes are mapped back to the
+        // original coordinates, and each qualifying face is cropped, downscaled,
+        // embedded and encoded exactly like video frames are.
+        List<FaceRecord> faceRecords = FaceDetectionUtils.detectFaces(hash, image,
+                config.getMaxDetectionDimension(), minBbox, minConfidence,
+                maxFacesPerImage, service, file.toString());
+        int facesAdded = faceRecords.size();
 
         // ---- One synchronized commit unit ----
         synchronized (dbLock) {
@@ -377,46 +337,6 @@ public class ImportService implements AutoCloseable {
         generateThumbnailIfAbsent(hash, image);
 
         return FileResult.newImage(facesAdded);
-    }
-
-    /**
-     * Computes the factor used to scale an image down for face detection.
-     * Returns {@code 1.0} when the image already fits within
-     * {@code maxDimension}.
-     *
-     * @param image        the full-resolution image
-     * @param maxDimension longest allowed side of the detection input
-     * @return the scale applied to the image ({@code 0 < scale <= 1})
-     */
-    private static double computeDetectionScale(BufferedImage image, int maxDimension) {
-        int width = image.getWidth();
-        int height = image.getHeight();
-        if (width <= maxDimension && height <= maxDimension) {
-            return 1.0;
-        }
-        return Math.min((double) maxDimension / width, (double) maxDimension / height);
-    }
-
-    /**
-     * Maps a face detected on a scaled-down image back to the original image
-     * coordinates. When {@code scale} is {@code 1.0} the face is returned
-     * unchanged. Coordinates are rounded the same way {@link ImageUtils#crop}
-     * rounds them.
-     *
-     * @param face  the face detected on the scaled image
-     * @param scale the scale the image was downscaled by before detection
-     * @return an equivalent face in original image coordinates
-     */
-    private static DetectedFace mapToOriginal(DetectedFace face, double scale) {
-        if (scale >= 1.0) {
-            return face;
-        }
-        return new DetectedFace(
-                (int) Math.round(face.x() / scale),
-                (int) Math.round(face.y() / scale),
-                (int) Math.round(face.width() / scale),
-                (int) Math.round(face.height() / scale),
-                face.confidence());
     }
 
     /**
@@ -469,7 +389,7 @@ public class ImportService implements AutoCloseable {
     private byte[] encodeThumbnail(BufferedImage image) throws IOException {
         int thumbSize = config.getThumbnailSize();
         BufferedImage thumbnail = ImageUtils.downsize(image, thumbSize);
-        return ImageUtils.toJpegBytes(thumbnail, SUB_IMAGE_JPEG_QUALITY);
+        return ImageUtils.toJpegBytes(thumbnail, JPEG_QUALITY);
     }
 
     // ---- File collection ----
@@ -524,16 +444,6 @@ public class ImportService implements AutoCloseable {
             return false;
         }
         return SUPPORTED_EXTENSIONS.contains(name.substring(dot + 1));
-    }
-
-    /**
-     * Builds a compact JSON string recording the detection criteria used
-     * for this import batch.
-     */
-    private static String buildCriteriaJson(int minBbox, double minConfidence, int maxFaces) {
-        return String.format(Locale.ROOT,
-                "{\"minBbox\":%d,\"minConfidence\":%.2f,\"maxFacesPerImage\":%d}",
-                minBbox, minConfidence, maxFaces);
     }
 
     @Override
