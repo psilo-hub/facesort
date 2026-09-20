@@ -159,12 +159,15 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 2 — Frame extraction core
 
-- [ ] TDD: `VideoFrameSamplerTest` first — for short videos (<1 s for 0/1
+- [x] TDD: `VideoFrameSamplerTest` first — for short videos (<1 s for 0/1
   frame), exactly `duration` frames when `1 s ≤ duration ≤ 120 s`
   (one per second), exactly 120 frames when `duration > 120 s`, and in every
   case: every target in `[0, duration)`, ascending, spacing ≥ 1 s, at most the
   configured cap; then watch it fail.
-- [ ] Implement `FrameSampler` (pure math):
+  > Note: `max(1, floor(duration))` makes the minimum count 1, so any
+  > video with positive duration yields exactly one target; the "0/1 frame"
+  > wording in the plan is covered as "at least one, in range".
+- [x] Implement `FrameSampler` (pure math):
   `count = min(MAX_FRAMES_PER_VIDEO, max(1, floor(duration)))`,
   `spacing = duration / count`, targets at `(i + 0.5) * spacing`. No ffmpeg
   dependency — fully unit-testable.

@@ -23,6 +23,9 @@ All notable changes to Face Sort will be documented in this file.
   as the source) with a `VideoDao` for inserting videos, tracking their file
   paths production line and linking frames/faces to a video. No user-visible UI
   yet, this is the data foundation (2026-09-20)
+- Video import foundation: the frame sampling math for the upcoming video
+  import feature — at most one frame per second and at most 120 frames per
+  video, evenly spaced in time (internal, no UI yet) (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)
