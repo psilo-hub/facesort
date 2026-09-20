@@ -230,6 +230,31 @@
                                             </excludes>
                                         </filter>
                                         <filter>
+                                            <artifact>org.bytedeco:ffmpeg*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/ffmpeg/linux-arm64/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-armhf/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-ppc64le/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-x86/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/android-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:javacpp*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/javacpp/linux-arm64/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-armhf/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-ppc64le/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-x86/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/android-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/ios-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
                                             <artifact>org.openjfx:*</artifact>
                                             <excludes>
                                                 <exclude>*.dll</exclude>
@@ -325,6 +350,31 @@
                                             </excludes>
                                         </filter>
                                         <filter>
+                                            <artifact>org.bytedeco:ffmpeg*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/ffmpeg/linux-x86_64/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-armhf/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-ppc64le/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/linux-x86/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/android-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:javacpp*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/javacpp/linux-x86_64/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-armhf/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-ppc64le/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/linux-x86/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/android-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/ios-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
                                             <artifact>org.openjfx:*</artifact>
                                             <excludes>
                                                 <exclude>*.dll</exclude>
@@ -404,6 +454,25 @@
                                             </excludes>
                                         </filter>
                                         <filter>
+                                            <artifact>org.bytedeco:ffmpeg*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/ffmpeg/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/macosx-x86_64/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/android-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:javacpp*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/javacpp/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/macosx-x86_64/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/android-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/ios-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
                                             <artifact>org.openjfx:*</artifact>
                                             <excludes>
                                                 <exclude>*.dll</exclude>
@@ -479,6 +548,25 @@
                                             <artifact>ai.djl.pytorch:pytorch-jni</artifact>
                                             <excludes>
                                                 <exclude>jnilib/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:ffmpeg*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/ffmpeg/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/macosx-arm64/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/android-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:javacpp*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/javacpp/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/macosx-arm64/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/android-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/ios-*/**</exclude>
                                             </excludes>
                                         </filter>
                                         <filter>
@@ -562,6 +650,27 @@
                                                 <exclude>jnilib/linux-*/**</exclude>
                                                 <exclude>jnilib/osx-*/**</exclude>
                                                 <exclude>jnilib/win-x86_64/cu124/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:ffmpeg*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/ffmpeg/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-x86/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/windows-arm64/**</exclude>
+                                                <exclude>org/bytedeco/ffmpeg/android-*/**</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bytedeco:javacpp*</artifact>
+                                            <excludes>
+                                                <exclude>org/bytedeco/javacpp/linux-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/macosx-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-x86/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/windows-arm64/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/android-*/**</exclude>
+                                                <exclude>org/bytedeco/javacpp/ios-*/**</exclude>
                                             </excludes>
                                         </filter>
                                     </filters>

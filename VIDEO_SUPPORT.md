@@ -119,7 +119,7 @@ accepted limitation for this iteration (see §10).
   FaceAI / rawGitHubFetcher steps.
 - [x] Add the dependency to `pom.xml`:
   `com.github.manevolent:ffmpeg4j:5.1.2-1.5.8-1` (resolved from the local repo).
-- [ ] Add per-platform shade-plugin filters (same pattern as the existing
+- [x] Add per-platform shade-plugin filters (same pattern as the existing
   `pytorch-jni`/`sqlite-jdbc`/`jna` filters) to keep only the current platform's
   natives from the `org.bytedeco:ffmpeg*` and `org.bytedeco:javacpp*` artifacts:
   - `linux-x86_64` profile: exclude `linux-arm64`, `macosx-*`, `windows-*`
@@ -128,6 +128,11 @@ accepted limitation for this iteration (see §10).
   - `mac-aarch64` profile: exclude everything but `macosx-arm64`
   - `win-x86_64` profile: exclude `linux-*`, `macosx-*`, `windows-x86`,
     `windows-arm64`
+  > Note: the per-profile lists above are shorthand for "keep only the current
+  > platform's natives" (matching the existing jna/sqlite filter style). ffmpeg
+  > 5.1.2-1.5.8 / javacpp 1.5.8 also ship `linux-x86`, `linux-armhf`,
+  > `linux-ppc64le`, `android-*` (javacpp additionally `ios-*`) dirs, so the
+  > implemented filters exclude those too.
 - [ ] Verify `mvn package -DskipTests` produces a working, reasonably sized
   shaded jar for the current platform (Windows) with ffmpeg4j on board.
 - [ ] Verify in CI: each platform job still builds and the shaded jars contain
