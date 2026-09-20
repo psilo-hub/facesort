@@ -135,7 +135,7 @@ accepted limitation for this iteration (see §10).
   > implemented filters exclude those too.
 - [x] Verify `mvn package -DskipTests` produces a working, reasonably sized
   shaded jar for the current platform (Windows) with ffmpeg4j on board.
-- [ ] Verify in CI: each platform job still builds and the shaded jars contain
+- [x] Verify in CI: each platform job still builds and the shaded jars contain
   only their own platform's natives.
 - [x] Docs: update `README.md` (Requirements: mention ffmpeg via ffmpeg4j is
   bundled, nothing to install), the translated READMEs if affected, `CHANGELOG.md`
