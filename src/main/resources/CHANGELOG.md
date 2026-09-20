@@ -40,6 +40,12 @@ All notable changes to Face Sort will be documented in this file.
   frame per `FrameSampler` target, frame + real position delivery, forward-only
   seeking (rewind rejected), graceful end of stream. Internal plumbing, no UI
   yet (2026-09-20)
+- Video import foundation: `FfmpegVideoFrameSource` — the real frame-source
+  implementation wrapping ffmpeg4j (ffmpeg via JNI, nothing to install).
+  Opens any supported video, probes its duration, and streams one sampled
+  frame per second (at most 120 per video) in a single forward pass, reporting
+  each frame's real position. Videos with an unreadable header fail cleanly
+  instead of crashing. Internal plumbing, no UI yet (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

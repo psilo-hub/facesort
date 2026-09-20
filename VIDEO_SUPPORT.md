@@ -187,12 +187,22 @@ accepted limitation for this iteration (see §10).
 - [x] TDD: `FfmpegFrameSource` behaviour covered via a **fake `VideoFrameSource`**
   in service tests (duration probe, forward-only seek, frame + timestamp
   delivery, EOF handling). Real-ffmpeg smoke tests optional/manual.
-- [ ] Implement `FfmpegVideoFrameSource`: open `FFmpegIO.openInputStream(...)`,
+- [x] Implement `FfmpegVideoFrameSource`: open `FFmpegIO.openInputStream(...)`,
   `registerStreams()`, pick `VideoSourceSubstream`, probe duration (format
   context, then package scan fallback), and for each ascending target:
   `setDecoding(false)` → `seek(target)` → `setDecoding(true)` →
   `videoSubstream.next()` → convert to `BufferedImage`; report the frame's real
   `getPosition()`. Close everything with try-with-resources / `AutoCloseable`.
+  > Note: ffmpeg4j's forward-only stream (plain `InputStream`, no byte seeking)
+  > cannot rewind once decoding has advanced past the next target ("Cannot
+  > rewind"), and packet-level `seek()` is unusable when decode output lags
+  > behind the targets (long GOPs). The implemented source therefore does a
+  > single monotonic decoding pass: it captures the first frame at or after
+  > each target and reports that frame's real `getPosition()` — which satisfies
+  > the `VideoFrameSource` contract without any rewinding. Also, videos whose
+  > header does not expose a pixel format (`AV_PIX_FMT_NONE`, e.g. a truncated
+  > container) fail with a clean `IOException` instead of crashing the JVM in
+  > ffmpeg4j's swscale setup.
 - [ ] Run the new tests green (`mvn test`).
 - [ ] Docs per commit: `todo.txt`, `CHANGELOG.md`, `README.md` as needed.
 
