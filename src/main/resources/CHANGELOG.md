@@ -35,6 +35,11 @@ All notable changes to Face Sort will be documented in this file.
   reading sampled frames out of a video (duration probe, forward-only seek to a
   target, frame + real position delivery, graceful EOF). Keeps the video import
   logic testable without the ffmpeg native library (2026-09-20)
+- Video import foundation: `FakeVideoFrameSource` (in-memory test double) and
+  `VideoFrameSourceTest` pin down the frame-source contract — one ascending
+  frame per `FrameSampler` target, frame + real position delivery, forward-only
+  seeking (rewind rejected), graceful end of stream. Internal plumbing, no UI
+  yet (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

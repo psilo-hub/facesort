@@ -184,7 +184,7 @@ accepted limitation for this iteration (see §10).
   frames) with a real `FfmpegVideoFrameSource` implementation wrapping the
   ffmpeg4j API, so `VideoImportService` is testable without native libs —
   mirroring the `FaceAiService.Engine` seam.
-- [ ] TDD: `FfmpegFrameSource` behaviour covered via a **fake `VideoFrameSource`**
+- [x] TDD: `FfmpegFrameSource` behaviour covered via a **fake `VideoFrameSource`**
   in service tests (duration probe, forward-only seek, frame + timestamp
   delivery, EOF handling). Real-ffmpeg smoke tests optional/manual.
 - [ ] Implement `FfmpegVideoFrameSource`: open `FFmpegIO.openInputStream(...)`,
