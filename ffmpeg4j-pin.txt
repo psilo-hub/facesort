@@ -1,0 +1,24 @@
+ffmpeg4j dependency pin
+=======================
+
+Repository:   https://github.com/Manevolent/ffmpeg4j.git
+Pinned commit: 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
+Tag:          5.1.2-1.5.8-1
+Maven coords:  com.github.manevolent:ffmpeg4j:5.1.2-1.5.8-1
+Wraps:         org.bytedeco:ffmpeg / ffmpeg-platform:5.1.2-1.5.8 (JavaCPP
+               natives bundled in the shaded jars; no external ffmpeg.exe)
+
+This is the single source of truth for CI and local installs (VIDEO_SUPPORT.md
+Phase 0). Clone the repo at exactly this commit and install it into the local
+Maven repository:
+
+    git clone --branch 5.1.2-1.5.8-1 --depth 1 https://github.com/Manevolent/ffmpeg4j.git ffmpeg4j-deps
+    mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
+
+The tag 5.1.2-1.5.8-1 resolves to commit 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed,
+and that commit's pom.xml declares version 5.1.2-1.5.8-1, i.e. exactly the
+artifact the facesort pom requests.
+
+Note: the pin is the immutable tag 5.1.2-1.5.8-1, not master HEAD. Master of
+this repo has since moved to 5.1.2-1.5.8-4 (commit 4f7db5710c8e0b762e23365fcf5705c26092b23b);
+pinning the tag keeps builds reproducible and matches the planned dependency version.
