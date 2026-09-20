@@ -143,18 +143,18 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 1 — Database schema and DAO
 
-- [ ] TDD: write `VideoDaoTest` first (insert video, add/replace paths, dedupe
+- [x] TDD: write `VideoDaoTest` first (insert video, add/replace paths, dedupe
   known path, `linkFrame`/`findFramesForVideo`, cascade deletes, frame-link
   uniqueness) over `Database.inMemory()` and watch it fail.
-- [ ] Extend `Database.initializeSchema()` with the `videos`, `video_paths` and
+- [x] Extend `Database.initializeSchema()` with the `videos`, `video_paths` and
   `video_frames` DDL above (plus indexes on `video_frames(video_hash)`).
-- [ ] Implement `free.svoss.facesort.db.VideoDao`:
+- [x] Implement `free.svoss.facesort.db.VideoDao`:
   `exists(hash)`, `findByHash(hash)`, `insert(...)`, `addPath(hash, path)`,
   `getPaths(hash)`, `hasPath`, `linkFrame(frameHash, videoHash, timestampMs)`,
   `findFramesForVideo(videoHash)`, `findTimestamp(frameHash)`,
   `updateVideoCounts(...)`, `deleteVideo(hash)`.
-- [ ] Run the new tests green (`mvn test`).
-- [ ] Docs per commit: `todo.txt`, `CHANGELOG.md` (as applicable), `README.md`
+- [x] Run the new tests green (`mvn test`).
+- [x] Docs per commit: `todo.txt`, `CHANGELOG.md` (as applicable), `README.md`
   (data storage table: document the new tables).
 
 ### Phase 2 — Frame extraction core

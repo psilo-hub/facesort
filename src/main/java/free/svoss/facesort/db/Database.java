@@ -112,8 +112,40 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS videos (
+                    hash            TEXT PRIMARY KEY,
+                    detection_ts    INTEGER,
+                    criteria_json   TEXT,
+                    duration_secs   REAL,
+                    frame_count     INTEGER DEFAULT 0,
+                    face_count      INTEGER DEFAULT 0
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS video_paths (
+                    hash            TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    PRIMARY KEY (hash, path),
+                    FOREIGN KEY (hash) REFERENCES videos(hash) ON DELETE CASCADE
+                )
+                """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS video_frames (
+                    frame_hash      TEXT PRIMARY KEY,
+                    video_hash      TEXT NOT NULL,
+                    timestamp_ms    INTEGER NOT NULL,
+                    face_count      INTEGER DEFAULT 0,
+                    FOREIGN KEY (frame_hash) REFERENCES images(hash) ON DELETE CASCADE,
+                    FOREIGN KEY (video_hash) REFERENCES videos(hash) ON DELETE CASCADE
+                )
+                """);
+
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
         }
     }
 

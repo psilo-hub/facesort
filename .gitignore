@@ -28,3 +28,4 @@ replay_pid*
 /config
 /rebuildAndStart.bat
 /test_media
+/ffmpeg4j-deps

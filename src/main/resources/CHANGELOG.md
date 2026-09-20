@@ -1,5 +1,4 @@
-# Changelog
-
+﻿# Changelog
 All notable changes to Face Sort will be documented in this file.
 
 ## [1.0-SNAPSHOT]
@@ -19,6 +18,11 @@ All notable changes to Face Sort will be documented in this file.
   README.zh.md (2026-09-19)
 - Bundled the ffmpeg4j FFmpeg library (new scaffolded dependency for the
   upcoming video import feature) — nothing to install (2026-09-19)
+- Database schema + DAO layer for the upcoming video import feature: new
+  `videos`, `video_paths` and `video_frames` tables (referencing the video file
+  as the source) with a `VideoDao` for inserting videos, tracking their file
+  paths production line and linking frames/faces to a video. No user-visible UI
+  yet, this is the data foundation (2026-09-20)
 
 ### Changed
 - Tabs renamed (2026-09-19)

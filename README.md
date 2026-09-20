@@ -138,7 +138,7 @@ copy it to back up your library:
 
 | Path | Purpose |
 |------|---------|
-| `config/facesort.db` | Your library: photos, faces, names, tags |
+| `config/facesort.db` | Your library: photos, faces, names, tags; also holds the `videos`, `video_paths` and `video_frames` tables backing the upcoming video import feature |
 | `config/facesort-config.json` | Your settings |
 | `config/CHANGELOG.md` | Cache used by the automatic update check |
 | FaceAI model cache | Downloaded models — default `~/.djl.ai/cache` (Linux/macOS) or `%USERPROFILE%\.djl.ai\cache` (Windows); configurable via the *FaceAI cache dir* setting |
