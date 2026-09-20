@@ -113,7 +113,7 @@ accepted limitation for this iteration (see §10).
   > `30d9a734a982b9b8a36e5cc800c4994d7e5c51ed`, recorded in `ffmpeg4j-pin.txt`.
   > Master has since moved to `5.1.2-1.5.8-4`; the immutable tag is pinned
   > instead so the installed artifact matches the planned dependency version.
-- [ ] Add to BOTH jobs of `.github/workflows/build.yml` (`build-fat` and
+- [x] Add to BOTH jobs of `.github/workflows/build.yml` (`build-fat` and
   `build-platform`) a step that clones ffmpeg4j at the pinned commit and runs
   `mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml`, mirroring the existing
   FaceAI / rawGitHubFetcher steps.
