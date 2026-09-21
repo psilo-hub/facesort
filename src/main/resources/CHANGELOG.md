@@ -92,3 +92,7 @@ All notable changes to Face Sort will be documented in this file.
   platform's native libraries (~105–111 MB) with the fat jar (~243 MB) covering
   all of them. The video import feature is fully contained in the released jars
   (2026-09-21)
+- Tab headers now render with the bundled fonts: the tab emoji uses the bundled
+  Noto Emoji font and the tab text the bundled Noto Sans font, so the tabs look
+  the same on every system; the View and Settings tabs no longer show a stray
+  variation-selector character (their emoji changed to 🔎 and 🔧) (2026-09-21)

@@ -45,6 +45,18 @@
     -fx-padding: 6px 16px;
 }
 
+/* Tab titles are drawn with the bundled fonts (Noto Emoji glyph + Noto Sans
+   text) so the tab headers look the same on every system. The padding mirrors
+   the former .tab-label padding now that the title is a graphic. */
+.tab-title-emoji {
+    -fx-font-family: "Noto Emoji";
+}
+
+.tab-title-text {
+    -fx-font-family: "Noto Sans";
+    -fx-padding: 6px 16px;
+}
+
 /* ---- Name cards (View grid items) ---- */
 
 .name-card {

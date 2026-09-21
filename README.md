@@ -164,3 +164,8 @@ explanation tooltip); they are stored in `config/facesort-config.json`. The UI
 ## License
 
 Distributed under the [MIT License](LICENSE).
+
+The bundled fonts — Noto Sans and Noto Emoji — are © The Noto Project Authors
+and are licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org); the license texts
+ship inside the jar next to the fonts (`/fonts/*/OFL.txt`).

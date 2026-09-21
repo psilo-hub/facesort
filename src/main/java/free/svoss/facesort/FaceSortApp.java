@@ -31,16 +31,24 @@ import free.svoss.facesort.update.UpdateChecker;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * JavaFX application entry point for Face Sort.
@@ -60,6 +68,8 @@ import java.util.List;
  * keeping the currently selected tab selected.</p>
  */
 public class FaceSortApp extends Application {
+
+    private static final Logger LOG = Logger.getLogger(FaceSortApp.class.getName());
 
     private static final String APP_TITLE = "Face Sort";
     private static final double DOWNLOAD_SCENE_WIDTH = 680;
@@ -84,7 +94,11 @@ public class FaceSortApp extends Application {
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
         try {
-            // 0. Load configuration (falls back to defaults when the file is absent).
+            // 0. Register the bundled fonts (tab titles render identically
+            //    on every system).
+            loadBundledFonts();
+
+            // 0a. Load configuration (falls back to defaults when the file is absent).
             configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
             config = AppConfig.load(configPath);
             I18n.setLocale(I18n.localeFor(config.getLanguage()));
@@ -227,14 +241,14 @@ public class FaceSortApp extends Application {
 
         // 7. Main window with the eight tabs.
         MainWindow mainWindow = new MainWindow(
-                new Tab(I18n.get("tab.import"), importView),
-                new Tab(I18n.get("tab.nameFace"), nameFaceView),
-                new Tab(I18n.get("tab.randomName"), randomNameView),
-                new Tab(I18n.get("tab.faceName"), faceNameView),
-                new Tab(I18n.get("tab.deduplicate"), dedupeView),
-                new Tab(I18n.get("tab.view"), viewView),
-                new Tab(I18n.get("tab.settings"), settingsView),
-                new Tab(I18n.get("tab.feedback"), feedbackView));
+                tab("tab.import", importView),
+                tab("tab.nameFace", nameFaceView),
+                tab("tab.randomName", randomNameView),
+                tab("tab.faceName", faceNameView),
+                tab("tab.deduplicate", dedupeView),
+                tab("tab.view", viewView),
+                tab("tab.settings", settingsView),
+                tab("tab.feedback", feedbackView));
 
         int selected = lastSelectedTabIndex;
         mainWindow.getSelectionModel().selectedIndexProperty().addListener(
@@ -252,6 +266,64 @@ public class FaceSortApp extends Application {
             mainWindow.getSelectionModel().select(selected);
         }
         primaryStage.show();
+    }
+
+    /**
+     * Loads the fonts bundled with the application ({@code Noto Sans} for the
+     * tab text and {@code Noto Emoji} for the tab emoji glyphs) so the tab
+     * headers look the same on every system, independent of the fonts the
+     * platform happens to ship with.
+     */
+    private static void loadBundledFonts() {
+        loadBundledFont("/fonts/notosans/NotoSans.ttf");
+        loadBundledFont("/fonts/notoemoji/NotoEmoji.ttf");
+    }
+
+    private static void loadBundledFont(String resource) {
+        try (InputStream in = FaceSortApp.class.getResourceAsStream(resource)) {
+            if (in == null) {
+                LOG.log(Level.WARNING, "Bundled font resource missing: {0}", resource);
+                return;
+            }
+            if (Font.loadFont(in, 14) == null) {
+                LOG.log(Level.WARNING, "Bundled font could not be loaded: {0}", resource);
+            }
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Bundled font not readable: {0} ({1})",
+                    new Object[]{resource, e.getMessage()});
+        }
+    }
+
+    /**
+     * Builds a tab whose title is drawn with the bundled fonts — the emoji
+     * glyph in {@code Noto Emoji}, the label text in {@code Noto Sans} — so the
+     * tab headers look identical on every system. Falls back to a single label
+     * with the full title when the translated string has no emoji prefix.
+     *
+     * @param titleKey i18n key of the tab title ("emoji text")
+     * @param content  the tab content
+     * @return the tab
+     */
+    private static Tab tab(String titleKey, Node content) {
+        String title = I18n.get(titleKey);
+        String[] parts = title.split(" ", 2);
+        Tab tab = new Tab(null, content);
+        if (parts.length < 2) {
+            Label text = new Label(title);
+            text.getStyleClass().add("tab-title-text");
+            tab.setGraphic(text);
+            return tab;
+        }
+        Label emoji = new Label(parts[0]);
+        emoji.getStyleClass().add("tab-title-emoji");
+        // The emoji is the label graphic so it stays baseline-aligned with the
+        // text; each part is drawn with its bundled font.
+        Label titleLabel = new Label(parts[1], emoji);
+        titleLabel.getStyleClass().add("tab-title-text");
+        titleLabel.setContentDisplay(ContentDisplay.LEFT);
+        titleLabel.setGraphicTextGap(8);
+        tab.setGraphic(titleLabel);
+        return tab;
     }
 
     /**
