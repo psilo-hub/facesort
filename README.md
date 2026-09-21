@@ -40,7 +40,9 @@ runs locally on your own computer: **your photos never leave your machine.**
   once per second (120 frames max), and every detected face is stored like a
   photo face. Known videos are skipped on re-import.
 - **Path filter** — restrict tagging to a specific folder or file name. Video
-  faces are matched through their video file's path.
+  faces are matched through their video file's path. In *Tag random face* and
+  *Add faces to a name*, right-click any face and choose **Paste Path to Path
+  Filter** to fill the field with that face's folder.
 - **Rename & untag** — fix a typo everywhere at once, or remove a face from a name.
 - **Export a person's photos** — in *Add faces to a name*, pick anyone and copy
   every photo containing them to a folder of your choice (photos whose original
@@ -98,7 +100,8 @@ The main window is a set of tabs. Work through them roughly in this order:
 3. **Tag random face** — a random sample of unnamed faces. Click faces to select
    them, type a name and press **Tag selected**. Use the *path prefix* field to
    restrict the sample to a particular folder or file (video frames are matched
-   through their video file's path).
+   through their video file's path). Right-click a face and choose *Paste Path
+   to Path Filter* to fill the field with that face's folder.
 
 4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
@@ -107,7 +110,9 @@ The main window is a set of tabs. Work through them roughly in this order:
    select the whole range in between. Use the
    *"Exclude faces closer to another name"* checkbox to only offer faces whose
    best match is the selected person, and the *path prefix* field to filter by
-   folder. You can also **Rename...** any person here, or press
+   folder (right-click any face and choose *Paste Path to Path Filter* to fill
+   the field with that face's folder). You can also **Rename...** any person
+   here, or press
    **Export images...** to copy every photo of the selected person to a folder
    of your choice (missing originals are exported as thumbnails).
 

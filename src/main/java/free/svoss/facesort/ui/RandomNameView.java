@@ -28,6 +28,7 @@ import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -244,9 +245,10 @@ public class RandomNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Installs a right-click context menu on a face card with an "Open
-     * Original" entry, grayed out while the source image is not available on
-     * disk.
+     * Installs a right-click context menu on a face card: an "Open Original"
+     * entry, grayed out while the source image is not available on disk, and a
+     * "Paste path to path filter" entry that drops the source folder into the
+     * filter field, grayed out while the media file has no stored path.
      *
      * @param card the card to attach the menu to
      * @param face the face whose source image should be openable
@@ -256,8 +258,42 @@ public class RandomNameView extends BorderPane implements Refreshable {
             MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
-            new ContextMenu(openOriginalItem).show(card, e.getScreenX(), e.getScreenY());
+
+            MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
+            Optional<Path> filterFolder = filterFolderFor(face);
+            pasteFilterItem.setDisable(filterFolder.isEmpty());
+            pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
+
+            new ContextMenu(openOriginalItem, pasteFilterItem)
+                    .show(card, e.getScreenX(), e.getScreenY());
         });
+    }
+
+    /**
+     * Resolves the folder to paste into the path filter for a face, or empty
+     * when the media file has no stored path.
+     *
+     * @param face the face whose media file folder to resolve
+     * @return the folder to filter by, or empty when unavailable
+     */
+    private Optional<Path> filterFolderFor(FaceRecord face) {
+        try {
+            return namingService.resolveFilterFolder(face.imageHash());
+        } catch (SQLException ex) {
+            statusLabel.setText(I18n.get("common.pathUnavailable"));
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Drops a folder into the path filter field and reloads the sample.
+     *
+     * @param folder the folder to filter by
+     */
+    private void applyFilterFolder(Path folder) {
+        pathFilterField.setText(folder.toString());
+        pathFilterField.positionCaret(pathFilterField.getLength());
+        loadSample();
     }
 
     /**

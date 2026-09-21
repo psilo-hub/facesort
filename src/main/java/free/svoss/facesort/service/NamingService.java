@@ -10,6 +10,7 @@ import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +110,21 @@ public final class NamingService {
      */
     public List<String> findImagePaths(String imageHash) throws SQLException {
         return imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"));
+    }
+
+    /**
+     * Resolves the folder of the media file behind a face for use as a path
+     * filter prefix. For a video frame this is the folder of its source video,
+     * otherwise the folder of the image itself; when several paths are stored
+     * the first one that still exists on disk is preferred.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return the folder to filter by, or empty when no path is stored at all
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public Optional<Path> resolveFilterFolder(String imageHash) throws SQLException {
+        return ViewService.resolveFilterFolder(imageDao, videoDao, imageHash);
     }
 
     /**

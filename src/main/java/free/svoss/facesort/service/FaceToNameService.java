@@ -353,6 +353,21 @@ public class FaceToNameService {
     }
 
     /**
+     * Resolves the folder of the media file behind a face for use as a path
+     * filter prefix. For a video frame this is the folder of its source video,
+     * otherwise the folder of the image itself; when several paths are stored
+     * the first one that still exists on disk is preferred.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return the folder to filter by, or empty when no path is stored at all
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public Optional<Path> resolveFilterFolder(String imageHash) throws SQLException {
+        return ViewService.resolveFilterFolder(imageDao, videoDao, imageHash);
+    }
+
+    /**
      * Exports every distinct image that contains the given person to the output
      * folder.
      *

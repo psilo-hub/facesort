@@ -76,6 +76,10 @@ All notable changes to Face Sort will be documented in this file.
   folder or file works for videos too (2026-09-20)
 - "Open Original" on a video face now opens the source video the frame came
   from in the system default player (2026-09-21)
+- Right-click a face in "Tag random face" or "Add faces to a name" and choose
+  "Paste path to path filter" to fill the path filter with that face's folder —
+  the source video's folder for video faces; when several paths are stored an
+  existing one is preferred (2026-09-21)
 
 ### Changed
 - Tabs renamed (2026-09-19)

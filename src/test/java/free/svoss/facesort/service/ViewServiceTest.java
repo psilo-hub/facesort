@@ -243,4 +243,44 @@ class ViewServiceTest {
         assertEquals(tempVideo, resolved.get().toAbsolutePath(),
                 "a frame whose video vanished falls back to its stored frame path");
     }
+
+    @Test
+    void resolveFilterFolder_photoWithSinglePathReturnsItsFolder() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+        imageDao.addPath("img1", tempVideo.toString());
+
+        Optional<Path> folder = ViewService.resolveFilterFolder(imageDao, videoDao, "img1");
+
+        assertEquals(tempVideo.getParent(), folder.orElse(null),
+                "the photo's folder must be returned for the path filter");
+    }
+
+    @Test
+    void resolveFilterFolder_photoWithMultiplePathsPrefersAnExistingOne() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+        imageDao.addPath("img1", tempVideo.resolveSibling("missing-photo.jpg").toString());
+        imageDao.addPath("img1", tempVideo.toString());
+
+        Optional<Path> folder = ViewService.resolveFilterFolder(imageDao, videoDao, "img1");
+
+        assertEquals(tempVideo.getParent(), folder.orElse(null),
+                "an existing stored path must win over missing ones");
+    }
+
+    @Test
+    void resolveFilterFolder_videoFrameReturnsTheVideoFolder() throws Exception {
+        addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
+
+        Optional<Path> folder = ViewService.resolveFilterFolder(imageDao, videoDao, "frame1");
+
+        assertEquals(tempVideo.getParent(), folder.orElse(null),
+                "a video frame must resolve to its source video's folder");
+    }
+
+    @Test
+    void resolveFilterFolder_withoutAnyStoredPathReturnsEmpty() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+
+        assertTrue(ViewService.resolveFilterFolder(imageDao, videoDao, "img1").isEmpty());
+    }
 }
