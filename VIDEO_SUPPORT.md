@@ -311,14 +311,38 @@ accepted limitation for this iteration (see §10).
 
 ### Phase 6 — CI and release validation
 
-- [ ] Push through the full GitHub Actions matrix; confirm every platform jar
+- [x] Push through the full GitHub Actions matrix; confirm every platform jar
   builds, ffmpeg4j natives for other platforms are filtered out, and the fat jar
   still works.
-- [ ] Smoke-test the shaded Windows jar locally: import a video, tag faces,
+- [x] Smoke-test the shaded Windows jar locally: import a video, tag faces,
   restart and re-import.
-- [ ] Final full `mvn test` green.
-- [ ] Docs per commit: `todo.txt` (mark item 3 complete/removed),
+- [x] Final full `mvn test` green.
+- [x] Docs per commit: `todo.txt` (mark item 3 complete/removed),
   `CHANGELOG.md`, `README.md` + translated READMEs as applicable.
+
+> **Phase 6 QA notes.** Pushed the full matrix (run 44 — 2026-09-21): all seven
+> jobs green (build-fat + the five per-platform builds + Create Release) and
+> release `build-44` published with all six jars attached. The platform jars
+> ship filtered — ~105–111 MB each (vs ~243 MB fat jar) with only that
+> platform's natives: verified by listing the bundle of the published Windows
+> jar (keeps `jnilib/win-x86_64/cpu/djl_torch.dll`,
+> `org/bytedeco/ffmpeg/windows-x86_64/avcodec-59.dll`,
+> `org/sqlite/native/Windows/x86_64/sqlitejdbc.dll`, `glass.dll`; drops every
+> linux/macos/android/ios counterpart). Building a platform jar locally
+> reproduces the CI artifact exactly when started from a clean `target/`
+> (`mvn clean package -P<platform>`); a stale shaded fat jar in `target/`
+> would otherwise be fed back into the shade step, silently producing an
+> unfiltered classifier jar. Local smoke test against the published Windows
+> jar: a harness decoding the bundled H.264 sample through
+> `FfmpegVideoFrameSource` (the jar's own natives) extracted 5/5 sampled
+> frames, and the app itself boots from the jar, creates `config/` and stays
+> running. The import → tag → restart → re-import walk stays pinned by
+> `FfmpegEndToEndImportTest` (real ffmpeg, fake AI engine); interactive
+> in-app tagging of video faces remains user QA. The final full suite exposed
+> one flaky parallel assertion in `ImportServiceTest` ("every configured
+> engine must be used" raced with the shared work counter); hardened with a
+> gating engine so workers must all enter face detection before any may pull
+> the next file — 235/235 green.
 
 ---
 

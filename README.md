@@ -64,7 +64,9 @@ runs locally on your own computer: **your photos never leave your machine.**
 Grab the latest build from the
 [**Releases** page](https://github.com/psilo-hub/facesort/releases) — pick the jar
 for your platform (`facesort-<platform>.jar`). Pre-built jars for all platforms
-are attached to every release. No compilation or setup required.
+are attached to every release. No compilation or setup required. Each platform
+jar bundles only that platform's native libraries (~105–111 MB); the universal
+`facesort-1.0-SNAPSHOT.jar` (~243 MB) runs on any of them.
 
 ### First start
 

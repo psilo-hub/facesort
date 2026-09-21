@@ -86,3 +86,9 @@ All notable changes to Face Sort will be documented in this file.
 
 ### Fixed
 - Tab names no longer clip descenders (taller tab headers) (2026-09-19)
+- Release jars include video import: the CI build now publishes a jar per
+  platform (Linux x86-64/ARM64, macOS x86-64/ARM64, Windows x86-64) plus a
+  universal fat jar on every push to main, each platform jar bundling only that
+  platform's native libraries (~105–111 MB) with the fat jar (~243 MB) covering
+  all of them. The video import feature is fully contained in the released jars
+  (2026-09-21)

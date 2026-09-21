@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -287,6 +288,38 @@ class ImportServiceTest {
         }
     }
 
+    /**
+     * Engine that holds every worker at a shared gate inside
+     * {@link #detectFaces} until all configured engines have entered at least
+     * once. Makes the "every configured engine must be used" assertion
+     * deterministic: while a worker is blocked inside {@code detectFaces} it
+     * cannot pull the next file from the shared counter, so the fixed pool is
+     * forced to hand its first files to all engines before any of them finishes.
+     */
+    private static final class GatingEngine extends CountingEngine {
+
+        private final CountDownLatch gate;
+
+        GatingEngine(CountDownLatch gate) {
+            super(testFaces(), TEST_EMBEDDING);
+            this.gate = gate;
+        }
+
+        @Override
+        public DetectedFace[] detectFaces(BufferedImage image) {
+            gate.countDown();
+            try {
+                if (!gate.await(10, TimeUnit.SECONDS)) {
+                    throw new RuntimeException("Not every configured engine entered face detection");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for the gate", e);
+            }
+            return super.detectFaces(image);
+        }
+    }
+
     /** Builds a service that spreads work over the given engines. */
     private ImportService parallelService(int threads, CountingEngine... engines) {
         List<FaceAiService> services = new ArrayList<>();
@@ -461,9 +494,10 @@ class ImportServiceTest {
     @Test
     void importFolder_usesConfiguredThreadCountAndImportsEverything() throws Exception {
         Path dir = createPhotos(6);
-        CountingEngine engineA = countingEngine();
-        CountingEngine engineB = countingEngine();
-        CountingEngine engineC = countingEngine();
+        CountDownLatch gate = new CountDownLatch(3);
+        GatingEngine engineA = new GatingEngine(gate);
+        GatingEngine engineB = new GatingEngine(gate);
+        GatingEngine engineC = new GatingEngine(gate);
         try (ImportService service = parallelService(3, engineA, engineB, engineC)) {
             ImportService.ImportResult result = service.importFolder(dir, null);
 
