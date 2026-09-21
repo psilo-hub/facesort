@@ -38,7 +38,7 @@ class DeduplicationServiceTest {
         notDupeDao = new NotDupeDao(db.getConnection());
         service = new DeduplicationService(
                 new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, notDupeDao,
-                new ImageDao(db.getConnection()));
+                new ImageDao(db.getConnection()), new VideoDao(db.getConnection()));
     }
 
     @AfterEach

@@ -4,11 +4,11 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
-import java.awt.Desktop;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +37,7 @@ public class FaceToNameService {
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final ImageDao imageDao;
+    private final VideoDao videoDao;
     private final ConfigModel config;
 
     /**
@@ -46,14 +47,16 @@ public class FaceToNameService {
      * @param faceDao       data access for faces; must not be null
      * @param nameDao       data access for names; must not be null
      * @param imageDao      data access for images and image_paths; must not be null
+     * @param videoDao      data access for videos, video_paths and video_frames; must not be null
      * @param config        application settings; must not be null
      */
     public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
-                             ImageDao imageDao, ConfigModel config) {
+                             ImageDao imageDao, VideoDao videoDao, ConfigModel config) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
+        this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -329,21 +332,16 @@ public class FaceToNameService {
      * @throws SQLException         if the database operation fails
      */
     public boolean isOriginalAvailable(String imageHash) throws SQLException {
-        for (String path : imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"))) {
-            if (java.nio.file.Files.exists(java.nio.file.Path.of(path))) {
-                return true;
-            }
-        }
-        return false;
+        return ViewService.resolveOriginalFile(imageDao, videoDao, imageHash).isPresent();
     }
 
     /**
      * Opens the original file of the source image for a face in the operating
-     * system default viewer.
+     * system default viewer. For video frames this is the source video the
+     * frame came from.
      *
-     * <p>The first still-existing stored path for the image is used. Returns
-     * {@code false} without side effects when no stored path exists on disk or
-     * when the desktop platform does not support opening files.</p>
+     * <p>Returns {@code false} without side effects when no path exists on disk
+     * or when the desktop platform does not support opening files.</p>
      *
      * @param imageHash hash of the source image; must not be null
      * @return {@code true} if the file was handed to the default viewer
@@ -351,17 +349,7 @@ public class FaceToNameService {
      * @throws SQLException on database access failure
      */
     public boolean openOriginal(String imageHash) throws IOException, SQLException {
-        List<String> paths = imageDao.getPaths(Objects.requireNonNull(imageHash, "imageHash"));
-        Optional<Path> existing = ViewService.firstExistingPath(paths);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        if (!Desktop.isDesktopSupported()
-                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-            return false;
-        }
-        Desktop.getDesktop().open(existing.get().toFile());
-        return true;
+        return ViewService.openInDefaultViewer(imageDao, videoDao, imageHash);
     }
 
     /**

@@ -3,6 +3,7 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 
@@ -32,6 +33,7 @@ public class ViewService {
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final ImageDao imageDao;
+    private final VideoDao videoDao;
 
     /**
      * Creates a view service.
@@ -40,13 +42,15 @@ public class ViewService {
      * @param faceDao       DAO for the faces table; must not be null
      * @param nameDao       DAO for the names table; must not be null
      * @param imageDao      DAO for the images, image_paths and thumbnails tables; must not be null
+     * @param videoDao      DAO for the videos, video_paths and video_frames tables; must not be null
      */
     public ViewService(FaceAiService faceAiService, FaceDao faceDao,
-                       NameDao nameDao, ImageDao imageDao) {
+                       NameDao nameDao, ImageDao imageDao, VideoDao videoDao) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
+        this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
     }
 
     /**
@@ -118,20 +122,50 @@ public class ViewService {
     }
 
     /**
-     * Opens the original file of an image in the operating system default
-     * viewer.
+     * Resolves the file that represents the "original" of an image: for a video
+     * frame the source video, otherwise the image itself. The first still-existing
+     * stored path is used; when the linked video file is gone the stored
+     * frame/photo paths are considered as a fallback.
      *
-     * <p>The first still-existing stored path for the image is used. Returns
-     * {@code false} without side effects when no stored path exists on disk or
-     * when the desktop platform does not support opening files.</p>
+     * @param imageDao  DAO for the images and image_paths tables
+     * @param videoDao  DAO for the videos, video_paths and video_frames tables
+     * @param imageHash content hash of the image
+     * @return the first stored path that still exists, if any
+     * @throws SQLException on database access failure
+     */
+    public static Optional<Path> resolveOriginalFile(
+            ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
+        Objects.requireNonNull(imageDao, "imageDao");
+        Objects.requireNonNull(videoDao, "videoDao");
+        Optional<String> videoHash = videoDao.findVideoHash(
+                Objects.requireNonNull(imageHash, "imageHash"));
+        if (videoHash.isPresent()) {
+            Optional<Path> video = firstExistingPath(videoDao.getPaths(videoHash.get()));
+            if (video.isPresent()) {
+                return video;
+            }
+        }
+        return firstExistingPath(imageDao.getPaths(imageHash));
+    }
+
+    /**
+     * Opens the original file of an image — or, for a video frame, its source
+     * video — in the operating system default viewer.
      *
-     * @param hash content hash of the image
+     * <p>Returns {@code false} without side effects when no stored path exists
+     * on disk or when the desktop platform does not support opening files.</p>
+     *
+     * @param imageDao  DAO for the images and image_paths tables
+     * @param videoDao  DAO for the videos, video_paths and video_frames tables
+     * @param imageHash content hash of the image
      * @return {@code true} if the file was handed to the default viewer
      * @throws IOException  if the default viewer cannot open the file
      * @throws SQLException on database access failure
      */
-    public boolean openOriginal(String hash) throws IOException, SQLException {
-        Optional<Path> existing = firstExistingPath(imageDao.getPaths(hash));
+    public static boolean openInDefaultViewer(
+            ImageDao imageDao, VideoDao videoDao, String imageHash)
+            throws IOException, SQLException {
+        Optional<Path> existing = resolveOriginalFile(imageDao, videoDao, imageHash);
         if (existing.isEmpty()) {
             return false;
         }
@@ -144,14 +178,28 @@ public class ViewService {
     }
 
     /**
+     * Opens the original file of an image in the operating system default
+     * viewer. For video frames this is the source video the frame came from.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if the file was handed to the default viewer
+     * @throws IOException  if the default viewer cannot open the file
+     * @throws SQLException on database access failure
+     */
+    public boolean openOriginal(String hash) throws IOException, SQLException {
+        return openInDefaultViewer(imageDao, videoDao, hash);
+    }
+
+    /**
      * Tells whether an original file for the given image still exists on disk.
+     * For video frames this is the source video the frame came from.
      *
      * @param hash content hash of the image
      * @return {@code true} if at least one stored path exists on disk
      * @throws SQLException on database access failure
      */
     public boolean isOriginalAvailable(String hash) throws SQLException {
-        return firstExistingPath(imageDao.getPaths(hash)).isPresent();
+        return resolveOriginalFile(imageDao, videoDao, hash).isPresent();
     }
 
     /**

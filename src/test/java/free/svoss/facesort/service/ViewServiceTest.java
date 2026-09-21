@@ -10,9 +10,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,23 +35,28 @@ class ViewServiceTest {
     private FaceDao faceDao;
     private NameDao nameDao;
     private ImageDao imageDao;
+    private VideoDao videoDao;
     private ViewService service;
+    private Path tempVideo;
     private final Set<String> insertedImages = new HashSet<>();
     private final AtomicInteger bbox = new AtomicInteger();
 
     @BeforeEach
-    void setUp() throws SQLException {
+    void setUp() throws Exception {
         db = Database.inMemory();
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
+        videoDao = new VideoDao(db.getConnection());
         service = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao);
+                faceDao, nameDao, imageDao, videoDao);
+        tempVideo = Files.createTempFile("facesort-open-original-", ".mp4");
     }
 
     @AfterEach
-    void tearDown() throws SQLException {
+    void tearDown() throws Exception {
         db.close();
+        Files.deleteIfExists(tempVideo);
     }
 
     private long addFace(String imageHash, float[] embedding, Long nameId) throws SQLException {
@@ -68,7 +76,6 @@ class ViewServiceTest {
         if (insertedImages.add(imageHash)) {
             imageDao.insert(imageHash, 0, "{}", 1);
             imageDao.saveThumbnail(imageHash, new byte[]{9, 8, 7});
-            VideoDao videoDao = new VideoDao(db.getConnection());
             videoDao.insert("video-of-" + imageHash, 0L, "{}", 10.0);
             videoDao.addPath("video-of-" + imageHash, "/videos/sample.mp4");
             videoDao.linkFrame(imageHash, "video-of-" + imageHash, 1000L);
@@ -76,6 +83,18 @@ class ViewServiceTest {
         int offset = bbox.getAndAdd(20);
         return faceDao.insert(new FaceRecord(
                 0, imageHash, offset, 0, 80, 80, 0.9, embedding, new byte[]{1}, nameId));
+    }
+
+    /**
+     * Registers a frame image whose source video exists at {@code videoPath}.
+     */
+    private void addFrameLinkedToExistingVideo(String frameHash, String videoHash, Path videoPath)
+            throws SQLException {
+        imageDao.insert(frameHash, 0, "{}", 1);
+        imageDao.saveThumbnail(frameHash, new byte[]{9, 8, 7});
+        videoDao.insert(videoHash, 0L, "{}", 10.0);
+        videoDao.addPath(videoHash, videoPath.toString());
+        videoDao.linkFrame(frameHash, videoHash, 1000L);
     }
 
     @Test
@@ -162,20 +181,66 @@ class ViewServiceTest {
     }
 
     @Test
-    void isOriginalAvailable_videoFrameWithoutStoredPhotoPathIsFalse() throws SQLException {
+    void isOriginalAvailable_videoFrameWhoseVideoIsMissingIsFalse() throws SQLException {
         long alice = nameDao.insert("Alice");
         addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
 
         assertFalse(service.isOriginalAvailable("frame1"),
-                "a video frame has no original photo to open");
+                "a video frame whose source video is gone has no original to open");
     }
 
     @Test
-    void openOriginal_videoFrameWithoutStoredPhotoPathReturnsFalseGracefully() throws Exception {
+    void openOriginal_videoFrameWhoseVideoIsMissingReturnsFalseGracefully() throws Exception {
         long alice = nameDao.insert("Alice");
         addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
 
         assertFalse(service.openOriginal("frame1"),
                 "must report the original as unavailable without side effects");
+    }
+
+    @Test
+    void resolveOriginalFile_videoFrameResolvesToTheLinkedVideoFile() throws Exception {
+        addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
+
+        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "frame1");
+
+        assertTrue(resolved.isPresent());
+        assertEquals(tempVideo, resolved.get().toAbsolutePath(),
+                "the source video, not the frame, must be the original file");
+    }
+
+    @Test
+    void isOriginalAvailable_videoFrameWithExistingVideoIsTrue() throws Exception {
+        addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
+
+        assertTrue(service.isOriginalAvailable("frame1"),
+                "a frame whose source video exists on disk must be openable");
+    }
+
+    @Test
+    void resolveOriginalFile_plainImageResolvesToItsStoredPath() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+        imageDao.addPath("img1", tempVideo.toString());
+
+        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "img1");
+
+        assertTrue(resolved.isPresent());
+        assertEquals(tempVideo, resolved.get().toAbsolutePath(),
+                "a plain photo must resolve to its stored image path");
+    }
+
+    @Test
+    void resolveOriginalFile_missingVideoFallsBackToStoredFramePath() throws Exception {
+        imageDao.insert("frame1", 0, "{}", 1);
+        imageDao.addPath("frame1", tempVideo.toString());
+        videoDao.insert("video1", 0L, "{}", 10.0);
+        videoDao.addPath("video1", tempVideo.resolveSibling("missing.mp4").toString());
+        videoDao.linkFrame("frame1", "video1", 500L);
+
+        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "frame1");
+
+        assertTrue(resolved.isPresent());
+        assertEquals(tempVideo, resolved.get().toAbsolutePath(),
+                "a frame whose video vanished falls back to its stored frame path");
     }
 }

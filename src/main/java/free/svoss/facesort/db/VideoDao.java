@@ -178,6 +178,20 @@ public class VideoDao {
     }
 
     /**
+     * Returns the hash of the video a frame belongs to, or empty when the image
+     * is not a video frame. A frame is linked to at most one video.
+     */
+    public Optional<String> findVideoHash(String frameHash) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT video_hash FROM video_frames WHERE frame_hash = ?")) {
+            ps.setString(1, frameHash);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(rs.getString("video_hash")) : Optional.empty();
+            }
+        }
+    }
+
+    /**
      * Persists the frame and face counts on the video row after import
      * completes. The row is expected to exist (use
      * {@link #insert(String, long, String, double)} first).

@@ -120,8 +120,8 @@ The main window is a set of tabs. Work through them roughly in this order:
    representative face and the number of tagged faces. Click a card to see the
    images containing that person; click an image to open the original, or use
    the right-click menu to *Untag* it from that person. Video frames appear
-   with their frame thumbnail; they have no photo original to open, so *Open
-   Original* stays disabled for them.
+   with their frame thumbnail; *Open Original* opens the source video the frame
+   came from.
 
 7. **Settings** — tune face detection, clustering, import and model parameters;
    see each control's tooltip for details. Changes are applied via **Save** or
@@ -132,9 +132,9 @@ The main window is a set of tabs. Work through them roughly in this order:
 8. **Feedback** — send a bug report or feature request to the developers.
 
 Throughout the app you can right-click any face or thumbnail to **Open Original**
-in your system's default image viewer, and hovering a face shows the path of its
-source image. Faces found in videos have no photo original to open; opening the
-video at the frame timestamp is planned future work.
+in your system's default viewer, and hovering a face shows the path of its
+source image. For faces found in videos, **Open Original** opens the source
+video the frame came from.
 
 ### Suggested workflow
 

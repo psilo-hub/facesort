@@ -5,6 +5,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.SimilarityResult;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,8 @@ class FaceToNameServiceTest {
         imageDao = new ImageDao(db.getConnection());
         config = new ConfigModel();
         config.setMinNameSimilarity(0.0); // no cutoff by default in these tests
-        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, imageDao, config);
+        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
+                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), config);
     }
 
     @AfterEach

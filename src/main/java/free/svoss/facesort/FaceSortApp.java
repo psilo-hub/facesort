@@ -215,10 +215,10 @@ public class FaceSortApp extends Application {
         videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
                 importAiServices, config);
         clusteringService = new ClusteringService(faceAiService, faceDao, config);
-        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, config);
-        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, config);
-        dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao, imageDao);
-        viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao);
+        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao, config);
+        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, config);
+        dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao, imageDao, videoDao);
+        viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
 
         buildMainWindowUi();
     }

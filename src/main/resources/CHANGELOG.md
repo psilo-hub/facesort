@@ -74,10 +74,8 @@ All notable changes to Face Sort will be documented in this file.
 - The path-prefix filter (in "Tag random face" and "Add faces to a name") now
   also matches video faces through their video file's path, so filtering by
   folder or file works for videos too (2026-09-20)
-- "Open Original" handles video frames gracefully: the entry is disabled (or
-  reports "Original file not found") because a video frame has no photo file to
-  open; opening the video at the frame timestamp is planned future work
-  (2026-09-20)
+- "Open Original" on a video face now opens the source video the frame came
+  from in the system default player (2026-09-21)
 
 ### Changed
 - Tabs renamed (2026-09-19)

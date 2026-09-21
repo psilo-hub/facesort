@@ -4,13 +4,12 @@ import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
-import java.awt.Desktop;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +49,7 @@ public final class NamingService {
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final ImageDao imageDao;
+    private final VideoDao videoDao;
     private final ConfigModel config;
 
     /**
@@ -60,6 +60,7 @@ public final class NamingService {
      * @param faceDao           access to the faces table
      * @param nameDao           access to the names table
      * @param imageDao          access to the images and image_paths tables
+     * @param videoDao          access to the videos, video_paths and video_frames tables
      * @param config            application settings; reserved for tuning the
      *                          flow (e.g. similarity thresholds)
      */
@@ -68,12 +69,14 @@ public final class NamingService {
                          FaceDao faceDao,
                          NameDao nameDao,
                          ImageDao imageDao,
+                         VideoDao videoDao,
                          ConfigModel config) {
         this.clusteringService = Objects.requireNonNull(clusteringService, "clusteringService");
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
+        this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -118,21 +121,16 @@ public final class NamingService {
      * @throws SQLException         if the database operation fails
      */
     public boolean isOriginalAvailable(String imageHash) throws SQLException {
-        for (String path : findImagePaths(imageHash)) {
-            if (java.nio.file.Files.exists(java.nio.file.Path.of(path))) {
-                return true;
-            }
-        }
-        return false;
+        return ViewService.resolveOriginalFile(imageDao, videoDao, imageHash).isPresent();
     }
 
     /**
      * Opens the original file of the source image for a face in the operating
-     * system default viewer.
+     * system default viewer. For video frames this is the source video the
+     * frame came from.
      *
-     * <p>The first still-existing stored path for the image is used. Returns
-     * {@code false} without side effects when no stored path exists on disk or
-     * when the desktop platform does not support opening files.</p>
+     * <p>Returns {@code false} without side effects when no path exists on disk
+     * or when the desktop platform does not support opening files.</p>
      *
      * @param imageHash hash of the source image; must not be null
      * @return {@code true} if the file was handed to the default viewer
@@ -140,17 +138,7 @@ public final class NamingService {
      * @throws SQLException on database access failure
      */
     public boolean openOriginal(String imageHash) throws IOException, SQLException {
-        Optional<Path> existing = ViewService.firstExistingPath(
-                findImagePaths(Objects.requireNonNull(imageHash, "imageHash")));
-        if (existing.isEmpty()) {
-            return false;
-        }
-        if (!Desktop.isDesktopSupported()
-                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-            return false;
-        }
-        Desktop.getDesktop().open(existing.get().toFile());
-        return true;
+        return ViewService.openInDefaultViewer(imageDao, videoDao, imageHash);
     }
 
     /**

@@ -46,7 +46,8 @@ class NamingServiceTest {
         service = new NamingService(
                 new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao, config),
                 new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, new ImageDao(db.getConnection()), config);
+                faceDao, nameDao, new ImageDao(db.getConnection()),
+                new VideoDao(db.getConnection()), config);
     }
 
     @AfterEach

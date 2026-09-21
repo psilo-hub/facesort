@@ -45,7 +45,7 @@ class FaceToNameServiceExportTest {
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
         service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao, new ConfigModel());
+                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), new ConfigModel());
     }
 
     @AfterEach
