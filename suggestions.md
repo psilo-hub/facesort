@@ -140,7 +140,14 @@ Adding `BEGIN`/`COMMIT` (or SQLite savepoints) around these units is the fix.
 
 ---
 
-## 5. Heavy work performed while holding `dbLock` (Medium)
+## ~~5. Heavy work performed while holding `dbLock`~~ ✅ DONE
+
+**Solved 2026-09-22** — the per-service `dbLock` monitors no longer exist (removed
+by the `SynchronizedConnection` refactor, see item 1). Database access is now
+serialized per DAO call, so JPEG encoding never runs under a lock: thumbnail,
+crop, downscale and full-frame encoding all happen in `FaceDetectionUtils` and
+the import services' `encodeThumbnail` helpers, i.e. between individually
+synchronized DAO calls. The DAO layer itself performs no image work.
 
 JPEG encoding is done **inside** the synchronized DB lock, stalling every parallel
 import worker:
