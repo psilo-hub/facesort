@@ -2,5 +2,5 @@ Do the following until all items in the file @suggestions.md are implemented or 
 
 1. Read the @suggestions.md file and pick 4 items as candidates for the next implementation round. Present them to the user and let him choose one (or let him dismiss items permanently or skip items for this session). If there are options for how to implement this item, ask the user about it.
 2. Do the implementation work, including running the tests
-3. Update necessary .txt and .md files
+3. Update necessary .txt and .md files including the suggestions.md to cross off work that has been done. I think item 1 (thread safety) is solved already.
 4. Commit the changes
