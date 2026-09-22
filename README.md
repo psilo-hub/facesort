@@ -141,9 +141,10 @@ The main window is a set of tabs. Work through them roughly in this order:
 8. **Feedback** — send a bug report or feature request to the developers.
 
 Throughout the app you can right-click any face or thumbnail to **Open Original**
-in your system's default viewer, and hovering a face shows the path of its
+in your system's default viewer or **Open containing folder** to locate its
+folder in the file manager, and hovering a face shows the path of its
 source image. For faces found in videos, **Open Original** opens the source
-video the frame came from.
+video the frame came from and **Open containing folder** opens its folder.
 
 ### Suggested workflow
 

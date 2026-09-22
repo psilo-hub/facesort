@@ -364,7 +364,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
 
     /**
      * Installs a right-click context menu on a face card: an "Open Original"
-     * entry, grayed out while the source image is not available on disk, and a
+     * entry, grayed out while the source image is not available on disk, an
+     * "Open containing folder" entry with the same availability, and a
      * "Paste path to path filter" entry that drops the source folder into the
      * filter field, grayed out while the media file has no stored path. For
      * unnamed candidate cards a "Tag with a different name" entry is added,
@@ -378,12 +379,17 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void installContextMenu(VBox card, FaceRecord face, boolean tagWithDifferentName) {
         card.setOnContextMenuRequested(e -> {
-            List<MenuItem> items = new ArrayList<>(3);
+            List<MenuItem> items = new ArrayList<>(4);
 
             MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
             items.add(openOriginalItem);
+
+            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
+            openContainingFolderItem.setDisable(!isContainingFolderAvailable(face));
+            openContainingFolderItem.setOnAction(ev -> openContainingFolder(face.imageHash()));
+            items.add(openContainingFolderItem);
 
             MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
             Optional<Path> filterFolder = filterFolderFor(face);
@@ -505,6 +511,38 @@ public class FaceNameView extends BorderPane implements Refreshable {
         } catch (IOException | SQLException ex) {
             statusLabel.setText(I18n.get("common.openOriginalFailed"));
             handleFailure(I18n.get("common.openOriginalFailed"), ex);
+        }
+    }
+
+    /**
+     * Tells whether the folder containing the original file of a face's source
+     * image exists on disk.
+     *
+     * @param face the face whose containing folder to check
+     * @return {@code true} if the containing folder is available
+     */
+    private boolean isContainingFolderAvailable(FaceRecord face) {
+        try {
+            return faceToNameService.isContainingFolderAvailable(face.imageHash());
+        } catch (SQLException ex) {
+            statusLabel.setText(I18n.get("common.originalCheckFailed"));
+            return false;
+        }
+    }
+
+    /**
+     * Opens the folder containing the original file of a face's source image in
+     * the file manager.
+     *
+     * @param hash content hash of the source image
+     */
+    private void openContainingFolder(String hash) {
+        try {
+            boolean opened = faceToNameService.openContainingFolder(hash);
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
+        } catch (IOException | SQLException ex) {
+            statusLabel.setText(I18n.get("common.openContainingFolderFailed"));
+            handleFailure(I18n.get("common.openContainingFolderFailed"), ex);
         }
     }
 

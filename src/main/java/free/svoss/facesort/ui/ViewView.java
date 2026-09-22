@@ -262,7 +262,7 @@ public class ViewView extends BorderPane implements Refreshable {
 
     /**
      * Installs a right-click context menu on an image thumbnail with "Open
-     * Original" and "Untag from ..." entries.
+     * Original", "Open containing folder" and "Untag from ..." entries.
      *
      * @param box   the thumbnail box to attach the menu to
      * @param image the named image the box displays
@@ -273,9 +273,12 @@ public class ViewView extends BorderPane implements Refreshable {
             MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(hash));
             openOriginalItem.setOnAction(ev -> openOriginal(hash));
+            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
+            openContainingFolderItem.setDisable(!isContainingFolderAvailable(hash));
+            openContainingFolderItem.setOnAction(ev -> openContainingFolder(hash));
             MenuItem untagItem = new MenuItem(I18n.format("ui.view.untagFrom", activeNameText));
             untagItem.setOnAction(ev -> untagFaces(hash));
-            new ContextMenu(openOriginalItem, untagItem)
+            new ContextMenu(openOriginalItem, openContainingFolderItem, untagItem)
                     .show(box, e.getScreenX(), e.getScreenY());
         });
     }
@@ -296,6 +299,22 @@ public class ViewView extends BorderPane implements Refreshable {
     }
 
     /**
+     * Tells whether the folder containing the original file for the given image
+     * exists on disk.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if the containing folder is available
+     */
+    private boolean isContainingFolderAvailable(String hash) {
+        try {
+            return viewService.isContainingFolderAvailable(hash);
+        } catch (SQLException ex) {
+            LOG.log(Level.WARNING, "Could not check containing folder for " + hash, ex);
+            return false;
+        }
+    }
+
+    /**
      * Opens the original file of an image in the default viewer.
      *
      * @param hash content hash of the image
@@ -307,6 +326,22 @@ public class ViewView extends BorderPane implements Refreshable {
         } catch (IOException | SQLException ex) {
             LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
             handleFailure(I18n.get("common.openOriginalFailed"), ex);
+        }
+    }
+
+    /**
+     * Opens the folder containing the original file of an image in the file
+     * manager.
+     *
+     * @param hash content hash of the image
+     */
+    private void openContainingFolder(String hash) {
+        try {
+            boolean opened = viewService.openContainingFolder(hash);
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
+        } catch (IOException | SQLException ex) {
+            LOG.log(Level.WARNING, "Could not open containing folder of " + hash, ex);
+            handleFailure(I18n.get("common.openContainingFolderFailed"), ex);
         }
     }
 

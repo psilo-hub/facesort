@@ -456,6 +456,37 @@ public class FaceToNameService {
     }
 
     /**
+     * Opens the folder that contains the source image for a face in the
+     * operating system file manager. For video frames this is the folder of the
+     * source video the frame came from.
+     *
+     * <p>Returns {@code false} without side effects when no original file
+     * exists on disk or when the desktop platform does not support opening
+     * folders.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if the folder was handed to the file manager
+     * @throws IOException  if the file manager cannot open the folder
+     * @throws SQLException on database access failure
+     */
+    public boolean openContainingFolder(String imageHash) throws IOException, SQLException {
+        return ViewService.openContainingFolder(imageDao, videoDao, imageHash);
+    }
+
+    /**
+     * Tells whether the folder containing the original file for the given image
+     * hash exists on disk and can be opened.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if a containing folder can be opened
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public boolean isContainingFolderAvailable(String imageHash) throws SQLException {
+        return ViewService.resolveContainingFolder(imageDao, videoDao, imageHash).isPresent();
+    }
+
+    /**
      * Resolves the folder of the media file behind a face for use as a path
      * filter prefix. For a video frame this is the folder of its source video,
      * otherwise the folder of the image itself; when several paths are stored

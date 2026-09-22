@@ -283,4 +283,54 @@ class ViewServiceTest {
 
         assertTrue(ViewService.resolveFilterFolder(imageDao, videoDao, "img1").isEmpty());
     }
+
+    @Test
+    void resolveContainingFolder_photoWithExistingPathReturnsItsFolder() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+        imageDao.addPath("img1", tempVideo.toString());
+
+        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "img1");
+
+        assertEquals(tempVideo.getParent(), folder.orElse(null),
+                "the folder of the existing original must be returned");
+    }
+
+    @Test
+    void resolveContainingFolder_videoFrameReturnsTheVideoFolder() throws Exception {
+        addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
+
+        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "frame1");
+
+        assertEquals(tempVideo.getParent(), folder.orElse(null),
+                "a video frame's containing folder is the source video's folder");
+    }
+
+    @Test
+    void resolveContainingFolder_withoutAnExistingStoredPathReturnsEmpty() throws Exception {
+        imageDao.insert("img1", 0, "{}", 1);
+        imageDao.addPath("img1", tempVideo.resolveSibling("missing-photo.jpg").toString());
+
+        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "img1");
+
+        assertTrue(folder.isEmpty(),
+                "without an existing original there is no folder to open");
+    }
+
+    @Test
+    void openContainingFolder_missingOriginalReturnsFalseGracefully() throws Exception {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        assertFalse(service.openContainingFolder("frame1"),
+                "must report the containing folder as unavailable without side effects");
+    }
+
+    @Test
+    void isContainingFolderAvailable_videoFrameWhoseVideoIsMissingIsFalse() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addVideoFrameFace("frame1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        assertFalse(service.isContainingFolderAvailable("frame1"),
+                "a video frame whose source video is gone has no folder to open");
+    }
 }

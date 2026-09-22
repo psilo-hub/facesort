@@ -234,6 +234,83 @@ public class ViewService {
     }
 
     /**
+     * Resolves the folder that contains the original media file behind an
+     * image: for a video frame the folder of its source video, otherwise the
+     * folder of the image itself. Only folders of files that still exist on
+     * disk are returned.
+     *
+     * @param imageDao  DAO for the images and image_paths tables
+     * @param videoDao  DAO for the videos, video_paths and video_frames tables
+     * @param imageHash content hash of the image
+     * @return the containing folder, or empty when no original exists on disk
+     * @throws SQLException on database access failure
+     */
+    public static Optional<Path> resolveContainingFolder(
+            ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
+        return resolveOriginalFile(imageDao, videoDao, imageHash).map(Path::getParent);
+    }
+
+    /**
+     * Opens the folder that contains the original media file behind an image —
+     * or, for a video frame, the folder of its source video — in the operating
+     * system file manager.
+     *
+     * <p>Returns {@code false} without side effects when no original file
+     * exists on disk or when the desktop platform does not support opening
+     * folders.</p>
+     *
+     * @param imageDao  DAO for the images and image_paths tables
+     * @param videoDao  DAO for the videos, video_paths and video_frames tables
+     * @param imageHash content hash of the image
+     * @return {@code true} if the folder was handed to the file manager
+     * @throws IOException  if the file manager cannot open the folder
+     * @throws SQLException on database access failure
+     */
+    public static boolean openContainingFolder(
+            ImageDao imageDao, VideoDao videoDao, String imageHash)
+            throws IOException, SQLException {
+        Optional<Path> original = resolveOriginalFile(imageDao, videoDao, imageHash);
+        if (original.isEmpty()) {
+            return false;
+        }
+        Path folder = original.get().getParent();
+        if (folder == null
+                || !Desktop.isDesktopSupported()
+                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            return false;
+        }
+        Desktop.getDesktop().open(folder.toFile());
+        return true;
+    }
+
+    /**
+     * Opens the folder that contains the original file of an image in the
+     * operating system file manager. For video frames this is the folder of the
+     * source video the frame came from.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if the folder was handed to the file manager
+     * @throws IOException  if the file manager cannot open the folder
+     * @throws SQLException on database access failure
+     */
+    public boolean openContainingFolder(String hash) throws IOException, SQLException {
+        return openContainingFolder(imageDao, videoDao, hash);
+    }
+
+    /**
+     * Tells whether the folder containing the original file for the given image
+     * exists on disk and can be opened. For video frames this is the folder of
+     * the source video the frame came from.
+     *
+     * @param hash content hash of the image
+     * @return {@code true} if a containing folder can be opened
+     * @throws SQLException on database access failure
+     */
+    public boolean isContainingFolderAvailable(String hash) throws SQLException {
+        return resolveContainingFolder(imageDao, videoDao, hash).isPresent();
+    }
+
+    /**
      * Returns the first path in the list that still exists on disk.
      *
      * <p>Package-private for unit testing.</p>

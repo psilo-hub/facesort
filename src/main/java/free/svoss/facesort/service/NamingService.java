@@ -158,6 +158,37 @@ public final class NamingService {
     }
 
     /**
+     * Opens the folder that contains the source image for a face in the
+     * operating system file manager. For video frames this is the folder of the
+     * source video the frame came from.
+     *
+     * <p>Returns {@code false} without side effects when no original file
+     * exists on disk or when the desktop platform does not support opening
+     * folders.</p>
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if the folder was handed to the file manager
+     * @throws IOException  if the file manager cannot open the folder
+     * @throws SQLException on database access failure
+     */
+    public boolean openContainingFolder(String imageHash) throws IOException, SQLException {
+        return ViewService.openContainingFolder(imageDao, videoDao, imageHash);
+    }
+
+    /**
+     * Tells whether the folder containing the original file for the given image
+     * hash exists on disk and can be opened.
+     *
+     * @param imageHash hash of the source image; must not be null
+     * @return {@code true} if a containing folder can be opened
+     * @throws NullPointerException if {@code imageHash} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public boolean isContainingFolderAvailable(String imageHash) throws SQLException {
+        return ViewService.resolveContainingFolder(imageDao, videoDao, imageHash).isPresent();
+    }
+
+    /**
      * Returns up to {@code limit} random unnamed faces, for review-and-tag
      * browsing.
      *

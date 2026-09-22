@@ -331,9 +331,9 @@ public class DedupeView extends BorderPane {
     }
 
     /**
-     * Installs a right-click context menu on a face thumbnail with an "Open
-     * Original" entry, grayed out while the source image is not available on
-     * disk.
+     * Installs a right-click context menu on a face thumbnail with "Open
+     * Original" and "Open containing folder" entries, grayed out while the
+     * source image is not available on disk.
      *
      * @param node the node to attach the menu to
      * @param face the face whose source image should be openable
@@ -347,7 +347,11 @@ public class DedupeView extends BorderPane {
             MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
-            new ContextMenu(openOriginalItem).show(node, e.getScreenX(), e.getScreenY());
+            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
+            openContainingFolderItem.setDisable(!isContainingFolderAvailable(face));
+            openContainingFolderItem.setOnAction(ev -> openContainingFolder(face.imageHash()));
+            new ContextMenu(openOriginalItem, openContainingFolderItem)
+                    .show(node, e.getScreenX(), e.getScreenY());
         });
     }
 
@@ -368,6 +372,23 @@ public class DedupeView extends BorderPane {
     }
 
     /**
+     * Tells whether the folder containing the original file of a face's source
+     * image exists on disk.
+     *
+     * @param face the face whose containing folder to check
+     * @return {@code true} if the containing folder is available
+     */
+    private boolean isContainingFolderAvailable(FaceRecord face) {
+        try {
+            return dedupService.isContainingFolderAvailable(face.imageHash());
+        } catch (SQLException ex) {
+            LOG.log(Level.WARNING, "Could not check containing folder for "
+                    + face.imageHash(), ex);
+            return false;
+        }
+    }
+
+    /**
      * Opens the original file of a face's source image in the default viewer.
      *
      * @param hash content hash of the source image
@@ -379,6 +400,22 @@ public class DedupeView extends BorderPane {
         } catch (IOException | SQLException ex) {
             LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
             showError(I18n.get("common.openOriginalFailed"), ex);
+        }
+    }
+
+    /**
+     * Opens the folder containing the original file of a face's source image in
+     * the file manager.
+     *
+     * @param hash content hash of the source image
+     */
+    private void openContainingFolder(String hash) {
+        try {
+            boolean opened = dedupService.openContainingFolder(hash);
+            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
+        } catch (IOException | SQLException ex) {
+            LOG.log(Level.WARNING, "Could not open containing folder of " + hash, ex);
+            showError(I18n.get("common.openContainingFolderFailed"), ex);
         }
     }
 

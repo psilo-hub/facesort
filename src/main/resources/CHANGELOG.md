@@ -85,6 +85,10 @@ All notable changes to Face Sort will be documented in this file.
   it was offered under: a dialog shows the selected face, lets you type a name,
   announces new names and previews existing names with their most representative
   face and the similarity to the name's average embedding (2026-09-22)
+- Every context menu that offers "Open Original" now also offers "Open
+  containing folder", opening the folder of the original source file (the
+  source video's folder for video frames) in the system file manager
+  (2026-09-22)
 
 ### Changed
 - Tabs renamed (2026-09-19)
