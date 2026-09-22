@@ -68,13 +68,6 @@ public class ImportService implements AutoCloseable {
     private final ConfigModel config;
 
     /**
-     * Serializes every database access. The shared SQLite connection used by
-     * the DAOs is not thread-safe, so all DAO calls must happen under this
-     * lock even though the files themselves are processed in parallel.
-     */
-    private final Object dbLock = new Object();
-
-    /**
      * Creates an import service that processes files sequentially through a
      * single {@link FaceAiService}.
      *
@@ -271,22 +264,20 @@ public class ImportService implements AutoCloseable {
         String hash = HashUtils.hashFile(file);
         String absolutePath = file.toAbsolutePath().toString();
 
-        // ---- Known-image branch: one synchronized unit ----
+        // ---- Known-image branch: one serialized unit ----
         boolean knownImage;
         boolean needThumbnail;
-        synchronized (dbLock) {
-            if (imageDao.exists(hash)) {
-                List<String> existingPaths = imageDao.getPaths(hash);
-                if (existingPaths.contains(absolutePath)) {
-                    return FileResult.skipped();
-                }
-                imageDao.addPath(hash, absolutePath);
-                needThumbnail = !imageDao.hasThumbnail(hash);
-                knownImage = true;
-            } else {
-                knownImage = false;
-                needThumbnail = false;
+        if (imageDao.exists(hash)) {
+            List<String> existingPaths = imageDao.getPaths(hash);
+            if (existingPaths.contains(absolutePath)) {
+                return FileResult.skipped();
             }
+            imageDao.addPath(hash, absolutePath);
+            needThumbnail = !imageDao.hasThumbnail(hash);
+            knownImage = true;
+        } else {
+            knownImage = false;
+            needThumbnail = false;
         }
         if (knownImage) {
             if (needThumbnail) {
@@ -295,7 +286,7 @@ public class ImportService implements AutoCloseable {
             return FileResult.newPath();
         }
 
-        // ---- New-image branch: heavy work outside the lock ----
+        // ---- new-image branch: heavy work happens outside the DB ----
         BufferedImage image = ImageUtils.readImage(file);
 
         // Face detection runs the shared photo/frame pipeline: large images are
@@ -307,30 +298,28 @@ public class ImportService implements AutoCloseable {
                 maxFacesPerImage, service, file.toString());
         int facesAdded = faceRecords.size();
 
-        // ---- One synchronized commit unit ----
-        synchronized (dbLock) {
-            try {
-                imageDao.insert(hash, System.currentTimeMillis(), criteriaJson,
-                        faceRecords.size());
-            } catch (SQLException e) {
-                // Another worker imported the same content first: record only
-                // the additional path for this file.
-                if (!imageDao.exists(hash)) {
-                    throw e;
-                }
-                List<String> existingPaths = imageDao.getPaths(hash);
-                if (!existingPaths.contains(absolutePath)) {
-                    imageDao.addPath(hash, absolutePath);
-                }
-                if (!imageDao.hasThumbnail(hash)) {
-                    generateThumbnailIfAbsent(hash, file);
-                }
-                return FileResult.newPath();
+        // ---- One serialized commit unit ----
+        try {
+            imageDao.insert(hash, System.currentTimeMillis(), criteriaJson,
+                    faceRecords.size());
+        } catch (SQLException e) {
+            // Another worker imported the same content first: record only
+            // the additional path for this file.
+            if (!imageDao.exists(hash)) {
+                throw e;
             }
-            imageDao.addPath(hash, absolutePath);
-            for (FaceRecord faceRecord : faceRecords) {
-                faceDao.insert(faceRecord);
+            List<String> existingPaths = imageDao.getPaths(hash);
+            if (!existingPaths.contains(absolutePath)) {
+                imageDao.addPath(hash, absolutePath);
             }
+            if (!imageDao.hasThumbnail(hash)) {
+                generateThumbnailIfAbsent(hash, file);
+            }
+            return FileResult.newPath();
+        }
+        imageDao.addPath(hash, absolutePath);
+        for (FaceRecord faceRecord : faceRecords) {
+            faceDao.insert(faceRecord);
         }
 
         // Generate thumbnail for the full image (reusing the loaded image)
@@ -341,8 +330,8 @@ public class ImportService implements AutoCloseable {
 
     /**
      * Generates a JPEG thumbnail for the image if one is not already stored.
-     * Database lookups and writes are serialized; image encoding happens
-     * outside the lock.
+     * Database lookups and writes are serialized by the synchronized
+     * connection; image encoding happens outside the DB.
      *
      * @param hash  content hash of the image
      * @param image already-loaded image to derive the thumbnail from
@@ -357,8 +346,9 @@ public class ImportService implements AutoCloseable {
 
     /**
      * Generates a JPEG thumbnail for the image if one is not already stored.
-     * Database lookups and writes are serialized; decoding the image and
-     * encoding the thumbnail happen outside the lock.
+     * Database lookups and writes are serialized by the synchronized
+     * connection; decoding the image and encoding the thumbnail happen
+     * outside the DB.
      *
      * @param hash content hash of the image
      * @param file path to the image file on disk
@@ -373,16 +363,12 @@ public class ImportService implements AutoCloseable {
     }
 
     private boolean thumbnailPresent(String hash) throws SQLException {
-        synchronized (dbLock) {
-            return imageDao.hasThumbnail(hash);
-        }
+        return imageDao.hasThumbnail(hash);
     }
 
     private void saveThumbnailIfAbsent(String hash, byte[] thumbJpg) throws SQLException {
-        synchronized (dbLock) {
-            if (!imageDao.hasThumbnail(hash)) {
-                imageDao.saveThumbnail(hash, thumbJpg);
-            }
+        if (!imageDao.hasThumbnail(hash)) {
+            imageDao.saveThumbnail(hash, thumbJpg);
         }
     }
 

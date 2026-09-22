@@ -12,6 +12,7 @@ import java.nio.file.Path;
 public class Database implements AutoCloseable {
 
     private final Connection connection;
+    private final Connection sharedConnection;
 
     /**
      * Opens or creates a database at the given path.
@@ -24,6 +25,7 @@ public class Database implements AutoCloseable {
             stmt.execute("PRAGMA foreign_keys = ON");
         }
         initializeSchema();
+        this.sharedConnection = SynchronizedConnection.wrap(connection);
     }
 
     /**
@@ -40,13 +42,18 @@ public class Database implements AutoCloseable {
             stmt.execute("PRAGMA foreign_keys = ON");
         }
         initializeSchema();
+        this.sharedConnection = SynchronizedConnection.wrap(connection);
     }
 
     /**
-     * Returns the raw JDBC connection.
+     * Returns the JDBC connection used by the DAOs, wrapped in a
+     * {@link SynchronizedConnection} proxy so that every call — from any
+     * service or worker thread — is serialized behind a single monitor.
+     * The SQLite connection is not thread-safe, but app and tests share it
+     * across threads.
      */
     public Connection getConnection() {
-        return connection;
+        return sharedConnection;
     }
 
     private void initializeSchema() throws SQLException {

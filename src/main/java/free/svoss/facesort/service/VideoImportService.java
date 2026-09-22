@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -74,13 +75,6 @@ public class VideoImportService implements AutoCloseable {
     private final List<FaceAiService> faceAiServices;
     private final ConfigModel config;
     private final VideoFrameSourceOpener sourceOpener;
-
-    /**
-     * Serializes every database access. The shared SQLite connection used by
-     * the DAOs is not thread-safe, so all DAO calls must happen under this
-     * lock even though the videos themselves are processed in parallel.
-     */
-    private final Object dbLock = new Object();
 
     /**
      * Creates a video import service that processes videos sequentially through
@@ -294,18 +288,16 @@ public class VideoImportService implements AutoCloseable {
         String hash = HashUtils.hashFile(file);
         String absolutePath = file.toAbsolutePath().toString();
 
-        // ---- Known-video branch: one synchronized unit ----
-        synchronized (dbLock) {
-            if (videoDao.exists(hash)) {
-                if (videoDao.hasPath(hash, absolutePath)) {
-                    return VideoFileResult.skipped();
-                }
-                videoDao.addPath(hash, absolutePath);
-                return VideoFileResult.newPath();
+        // ---- Known-video branch: one serialized unit ----
+        if (videoDao.exists(hash)) {
+            if (videoDao.hasPath(hash, absolutePath)) {
+                return VideoFileResult.skipped();
             }
+            videoDao.addPath(hash, absolutePath);
+            return VideoFileResult.newPath();
         }
 
-        // ---- New-video branch: heavy work outside the lock ----
+        // ---- New-video branch: heavy work happens outside the DB ----
         int framesAdded = 0;
         int facesAdded = 0;
         int linkedFrames = 0;
@@ -316,10 +308,8 @@ public class VideoImportService implements AutoCloseable {
 
             // Register the video row before extracting any frames so the frame
             // links can resolve their foreign key.
-            synchronized (dbLock) {
-                videoDao.insert(hash, detectionTs, criteriaJson, duration);
-                videoDao.addPath(hash, absolutePath);
-            }
+            videoDao.insert(hash, detectionTs, criteriaJson, duration);
+            videoDao.addPath(hash, absolutePath);
 
             for (double target : targets) {
                 VideoFrameSource.SampledFrame sampled = source.seekTo(target);
@@ -334,18 +324,15 @@ public class VideoImportService implements AutoCloseable {
                 // Frame content already known (identical frame, or a photo with
                 // identical content): keep the existing image row and only link
                 // it, so costly detection runs only for genuinely new frames.
-                boolean knownFrame;
-                synchronized (dbLock) {
-                    knownFrame = imageDao.exists(frameHash);
-                }
+                boolean knownFrame = imageDao.exists(frameHash);
                 List<FaceRecord> faceRecords = knownFrame ? List.of()
                         : FaceDetectionUtils.detectFaces(frameHash, frame,
                                 maxDetectionDimension, minBbox, minConfidence,
                                 maxFacesPerImage, service,
                                 file + " @ " + timestampMs + " ms");
 
-                synchronized (dbLock) {
-                    boolean newFrame = false;
+                boolean newFrame = false;
+                try {
                     if (!imageDao.exists(frameHash)) {
                         // New frame: image row + thumbnail + faces.
                         imageDao.insert(frameHash, detectionTs, criteriaJson,
@@ -356,27 +343,33 @@ public class VideoImportService implements AutoCloseable {
                         }
                         newFrame = true;
                     }
-                    // The link is dropped when another video already imported
-                    // the same frame (a frame belongs to at most one video), so
-                    // linkedFrames only counts links that actually exist.
-                    linkedFrames += videoDao.linkFrame(frameHash, hash, timestampMs);
-                    if (newFrame) {
-                        framesAdded++;
-                        facesAdded += faceRecords.size();
+                } catch (SQLException e) {
+                    // Another worker (video or photo import) stored the same
+                    // frame first while this worker was detecting: keep the
+                    // existing image row and only link it below. A genuine
+                    // failure still propagates.
+                    if (!imageDao.exists(frameHash)) {
+                        throw e;
                     }
+                }
+                // The link is dropped when another video already imported
+                // the same frame (a frame belongs to at most one video), so
+                // linkedFrames only counts links that actually exist.
+                linkedFrames += videoDao.linkFrame(frameHash, hash, timestampMs);
+                if (newFrame) {
+                    framesAdded++;
+                    facesAdded += faceRecords.size();
                 }
             }
 
             // Persist the final counts on the video row, derived from the links
             // and their stored faces so the videos row stays consistent with
             // the video_frames and images tables.
-            synchronized (dbLock) {
-                int linkedFaces = 0;
-                for (VideoFrameLinkRecord link : videoDao.findFramesForVideo(hash)) {
-                    linkedFaces += faceDao.findByImageHash(link.frameHash()).size();
-                }
-                videoDao.updateVideoCounts(hash, linkedFrames, linkedFaces);
+            int linkedFaces = 0;
+            for (VideoFrameLinkRecord link : videoDao.findFramesForVideo(hash)) {
+                linkedFaces += faceDao.findByImageHash(link.frameHash()).size();
             }
+            videoDao.updateVideoCounts(hash, linkedFrames, linkedFaces);
             return VideoFileResult.newVideo(framesAdded, facesAdded);
         }
     }

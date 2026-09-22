@@ -94,6 +94,13 @@ All notable changes to Face Sort will be documented in this file.
 - Tabs renamed (2026-09-19)
 - Changelog shortened (2026-09-19)
 - The UI refreshes immediately when the language is switched (2026-09-19)
+- Database access is now single-lock: all DAO calls from any thread are
+  serialized through one synchronized connection, so concurrent import
+  workers, video import and the clustering/naming/dedup services can never
+  interleave on the shared SQLite connection. Redundant per-service locks were
+  removed, and importing the same content from parallel workers (photos or the
+  same video frame) now resolves to "already imported" instead of an error
+  (2026-09-22)
 
 ### Fixed
 - Tab names no longer clip descenders (taller tab headers) (2026-09-19)
