@@ -80,6 +80,11 @@ All notable changes to Face Sort will be documented in this file.
   "Paste path to path filter" to fill the path filter with that face's folder —
   the source video's folder for video faces; when several paths are stored an
   existing one is preferred (2026-09-21)
+- Right-click an unnamed candidate face in "Add faces to a name" and choose
+  "Tag with a different name" to tag that face with a name other than the one
+  it was offered under: a dialog shows the selected face, lets you type a name,
+  announces new names and previews existing names with their most representative
+  face and the similarity to the name's average embedding (2026-09-22)
 
 ### Changed
 - Tabs renamed (2026-09-19)

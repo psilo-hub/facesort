@@ -113,7 +113,10 @@ este orden:
    puedes **Renombrar…** a cualquier persona aquí, o pulsar **Exportar
    imágenes…** para copiar todas las fotos de la persona seleccionada a una
    carpeta de tu elección (los originales que falten se exportan como
-   miniaturas).
+   miniaturas). Al hacer clic derecho en una cara candidata sin nombre, elige
+   *Etiquetar con otro nombre* para etiquetarla con un nombre distinto del
+   ofrecido: el diálogo previsualiza los nombres existentes con su cara más
+   representativa y la similitud con el embedding medio del nombre.
 
 5. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
    similitud. En cada par decide: *Son duplicados* (a continuación, elige qué

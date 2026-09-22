@@ -114,7 +114,11 @@ The main window is a set of tabs. Work through them roughly in this order:
    the field with that face's folder). You can also **Rename...** any person
    here, or press
    **Export images...** to copy every photo of the selected person to a folder
-   of your choice (missing originals are exported as thumbnails).
+   of your choice (missing originals are exported as thumbnails). Right-click an
+   unnamed candidate face and choose *Tag with a different name* to tag it with
+   a name other than the one it was offered under: the dialog previews existing
+   names with their most representative face and the similarity to the name's
+   average embedding.
 
 5. **Deduplicate** — press **Start** to compare name pairs by similarity. For
    each pair decide: *These are dupes* (then choose which name survives — all

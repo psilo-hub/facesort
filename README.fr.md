@@ -119,7 +119,10 @@ ordre :
    **Renommer…** n'importe quelle personne ici, ou appuyer sur
    **Exporter les images…** pour copier chaque photo de la personne sélectionnée
    dans un dossier de votre choix (les originaux manquants sont exportés comme
-   vignettes).
+   vignettes). Un clic droit sur un visage candidat non nommé permet de choisir
+   *Étiqueter avec un autre nom* pour l'étiqueter avec un nom autre que celui
+   proposé : la boîte de dialogue prévisualise les noms existants avec leur
+   visage le plus représentatif et la similarité avec l'embedding moyen du nom.
 
 5. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
    de noms par similitude. Pour chaque paire, décidez : *Ce sont des doublons*

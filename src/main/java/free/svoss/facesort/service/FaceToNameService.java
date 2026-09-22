@@ -236,6 +236,27 @@ public class FaceToNameService {
     }
 
     /**
+     * Picks the face whose embedding is most similar to the given average
+     * embedding. The caller guarantees at least one face.
+     *
+     * @param faces   the faces to choose from; must not be empty
+     * @param average the average embedding to compare against
+     * @return the closest face
+     */
+    private FaceRecord mostSimilarToAverage(List<FaceRecord> faces, float[] average) {
+        FaceRecord best = faces.get(0);
+        double bestScore = -1.0;
+        for (FaceRecord face : faces) {
+            double score = faceAiService.calcSimilarity(average, face.embedding());
+            if (score > bestScore) {
+                bestScore = score;
+                best = face;
+            }
+        }
+        return best;
+    }
+
+    /**
      * Returns the top {@code limit} faces already tagged with the given name
      * that are most similar to the name's average embedding, sorted by
      * descending similarity.
@@ -320,6 +341,88 @@ public class FaceToNameService {
         nameDao.rename(nameId, trimmed);
         return nameDao.findById(nameId)
                 .orElseThrow(() -> new SQLException("Could not reload renamed name"));
+    }
+
+    /**
+     * Assigns the given name to the given face.
+     *
+     * @param faceId id of the face to tag
+     * @param nameId id of the name to assign
+     * @throws SQLException if the update fails
+     */
+    public void tagFace(long faceId, long nameId) throws SQLException {
+        faceDao.assignName(faceId, nameId);
+    }
+
+    /**
+     * Returns the existing name record for the given display name, or empty
+     * when the name has not been created yet. The lookup is trimmed.
+     *
+     * @param name the display name; must not be null or blank
+     * @return the existing record, or empty if the name is new
+     * @throws NullPointerException if {@code name} is null
+     * @throws SQLException         if the database operation fails
+     */
+    public Optional<NameRecord> findName(String name) throws SQLException {
+        return nameDao.findByName(Objects.requireNonNull(name, "name").trim());
+    }
+
+    /**
+     * Returns the id of the name, creating it if it does not exist yet.
+     *
+     * <p>The input is trimmed before lookup so accidental leading/trailing
+     * whitespace does not create duplicate names.</p>
+     *
+     * @param name the display name; must not be null or blank
+     * @return the existing or newly created name id
+     * @throws NullPointerException     if {@code name} is null
+     * @throws IllegalArgumentException if {@code name} is blank
+     * @throws SQLException             if the database operation fails
+     */
+    public long createOrFindName(String name) throws SQLException {
+        String trimmed = Objects.requireNonNull(name, "name").trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("name must not be blank");
+        }
+        Optional<NameRecord> existing = nameDao.findByName(trimmed);
+        if (existing.isPresent()) {
+            return existing.get().id();
+        }
+        return nameDao.insert(trimmed);
+    }
+
+    /**
+     * Computes a preview for tagging the given face with the given name: when
+     * the name already exists, the face tagged with it that is closest to its
+     * average embedding and the similarity between the given face's embedding
+     * and that average. Empty when the name is blank or new, or when the
+     * existing name has no faces yet.
+     *
+     * @param name            the typed display name; may be null
+     * @param candidateFaceId the id of the face the user wants to tag
+     * @return the preview for an existing name, or empty otherwise
+     * @throws IllegalArgumentException if {@code candidateFaceId} is unknown
+     * @throws SQLException             if the database operation fails
+     */
+    public Optional<NamePreview> previewTagWithName(String name, long candidateFaceId) throws SQLException {
+        String trimmed = name == null ? "" : name.trim();
+        if (trimmed.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<NameRecord> existing = nameDao.findByName(trimmed);
+        if (existing.isEmpty()) {
+            return Optional.empty();
+        }
+        List<FaceRecord> namedFaces = faceDao.findByNameId(existing.get().id());
+        if (namedFaces.isEmpty()) {
+            return Optional.empty();
+        }
+        float[] average = averageOf(namedFaces);
+        FaceRecord representative = mostSimilarToAverage(namedFaces, average);
+        FaceRecord candidate = faceDao.findById(candidateFaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Face not found: " + candidateFaceId));
+        return Optional.of(new NamePreview(representative,
+                faceAiService.calcSimilarity(average, candidate.embedding())));
     }
 
     /**
@@ -499,5 +602,16 @@ public class FaceToNameService {
      */
     public record ExportResult(int images, int originalsCopied,
                                int thumbnailsCopied, int missing) {
+    }
+
+    /**
+     * Preview of what tagging a face with an already-existing name entails.
+     *
+     * @param representative the face tagged with the name that is closest to
+     *                       its average embedding
+     * @param similarity     similarity between the candidate face and the
+     *                       name's average embedding, in [0, 1]
+     */
+    public record NamePreview(FaceRecord representative, double similarity) {
     }
 }

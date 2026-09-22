@@ -357,7 +357,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
                     }
                 });
             }
-            installContextMenu(card, face);
+            installContextMenu(card, face, selectable);
             pane.getChildren().add(card);
         }
     }
@@ -366,25 +366,86 @@ public class FaceNameView extends BorderPane implements Refreshable {
      * Installs a right-click context menu on a face card: an "Open Original"
      * entry, grayed out while the source image is not available on disk, and a
      * "Paste path to path filter" entry that drops the source folder into the
-     * filter field, grayed out while the media file has no stored path.
+     * filter field, grayed out while the media file has no stored path. For
+     * unnamed candidate cards a "Tag with a different name" entry is added,
+     * opening a dialog that tags the face with a name of the user's choosing.
      *
-     * @param card the card to attach the menu to
-     * @param face the face whose source image should be openable
+     * @param card                 the card to attach the menu to
+     * @param face                 the face whose source image should be openable
+     * @param tagWithDifferentName whether to offer tagging the face with a
+     *                             different name (only meaningful for unnamed
+     *                             candidate faces)
      */
-    private void installContextMenu(VBox card, FaceRecord face) {
+    private void installContextMenu(VBox card, FaceRecord face, boolean tagWithDifferentName) {
         card.setOnContextMenuRequested(e -> {
+            List<MenuItem> items = new ArrayList<>(3);
+
             MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
             openOriginalItem.setDisable(!isOriginalAvailable(face));
             openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
+            items.add(openOriginalItem);
 
             MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
             Optional<Path> filterFolder = filterFolderFor(face);
             pasteFilterItem.setDisable(filterFolder.isEmpty());
             pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
+            items.add(pasteFilterItem);
 
-            new ContextMenu(openOriginalItem, pasteFilterItem)
+            if (tagWithDifferentName) {
+                MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
+                differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
+                items.add(differentNameItem);
+            }
+
+            new ContextMenu(items.toArray(new MenuItem[0]))
                     .show(card, e.getScreenX(), e.getScreenY());
         });
+    }
+
+    /**
+     * Offers to tag the given face with a name different from the one it was
+     * offered under. A modal dialog shows the face, takes the name, previews
+     * the name's representative face when it already exists, and tags the face
+     * on confirm.
+     *
+     * @param face the unnamed candidate face to tag
+     */
+    private void onTagWithDifferentName(FaceRecord face) {
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        TagWithNameDialog dialog = new TagWithNameDialog(owner, face,
+                name -> faceToNameService.previewTagWithName(name, face.id()));
+        Optional<String> chosen = dialog.showAndWait();
+        chosen.ifPresent(name -> tagFaceWithDifferentName(face, name));
+    }
+
+    /**
+     * Tags a single face with the given name (creating the name when it does
+     * not exist yet) and reloads the candidates so the tagged face disappears.
+     *
+     * @param face the face to tag
+     * @param name the name to tag it with
+     */
+    private void tagFaceWithDifferentName(FaceRecord face, String name) {
+        statusLabel.setText(I18n.format("ui.faceName.tagging", 1, name));
+        setTask(new Task<Void>() {
+            @Override
+            protected Void call() throws SQLException {
+                long nameId = faceToNameService.createOrFindName(name);
+                faceToNameService.tagFaces(List.of(face.id()), nameId);
+                return null;
+            }
+        });
+
+        activeTask.setOnSucceeded(e -> {
+            statusLabel.setText(I18n.format("ui.faceName.differentName.tagged", name));
+            selectName(activeName); // refresh: the tagged face disappears
+        });
+
+        activeTask.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.differentName.tagFailed"),
+                        activeTask.getException()));
+
+        startTask("facename-different-name-tagger");
     }
 
     /**

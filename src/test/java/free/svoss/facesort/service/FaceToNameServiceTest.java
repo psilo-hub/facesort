@@ -8,12 +8,14 @@ import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.SimilarityResult;
+import free.svoss.facesort.util.EmbeddingUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -345,5 +347,70 @@ class FaceToNameServiceTest {
 
         assertEquals("Alice", renamed.name());
         assertEquals(1, nameDao.count());
+    }
+
+    @Test
+    void createOrFindName_reusesExistingName() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        assertEquals(alice, service.createOrFindName("Alice"));
+    }
+
+    @Test
+    void createOrFindName_createsAndTrimsNewName() throws SQLException {
+        long id = service.createOrFindName("  Alice  ");
+
+        assertEquals("Alice", nameDao.findById(id).orElseThrow().name());
+    }
+
+    @Test
+    void createOrFindName_blankNameThrows() {
+        assertThrows(IllegalArgumentException.class, () -> service.createOrFindName("  "));
+        assertThrows(NullPointerException.class, () -> service.createOrFindName(null));
+    }
+
+    @Test
+    void previewTagWithName_newNameReturnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        assertTrue(service.previewTagWithName("Nobody", candidate).isEmpty());
+    }
+
+    @Test
+    void previewTagWithName_blankOrEmptyNameReturnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        assertTrue(service.previewTagWithName("", candidate).isEmpty());
+        assertTrue(service.previewTagWithName("   ", candidate).isEmpty());
+        assertTrue(service.previewTagWithName(null, candidate).isEmpty());
+    }
+
+    @Test
+    void previewTagWithName_existingNameReturnsRepresentativeAndSimilarity() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long representative = addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", new float[]{0.8f, 0.2f, 0, 0, 0, 0, 0, 0}, alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        Optional<FaceToNameService.NamePreview> preview = service.previewTagWithName("Alice", candidate);
+
+        assertTrue(preview.isPresent());
+        assertEquals(representative, preview.get().representative().id(),
+                "the face closest to the name's average embedding must be presented");
+        assertEquals(EmbeddingUtils.cosineSimilarity(
+                        new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, xLike()),
+                preview.get().similarity(), 1e-6,
+                "the similarity between the candidate face and the name's average must be reported");
+    }
+
+    @Test
+    void previewTagWithName_nameWithNoFacesReturnsEmpty() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        assertTrue(service.previewTagWithName("Alice", candidate).isEmpty());
     }
 }
