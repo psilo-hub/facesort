@@ -65,7 +65,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
 
     private List<ClusteringService.Cluster> clusters;
     private int clusterIndex = -1;
-    private Task<?> activeTask;
+    private final TaskRunner taskRunner = new TaskRunner();
     private long candidateRepId = -1;
 
     /**
@@ -128,17 +128,15 @@ public class NameFaceView extends BorderPane implements Refreshable {
         clusters = null;
         clusterIndex = -1;
 
-        setTask(new Task<>() {
+        Task<List<ClusteringService.Cluster>> task = new Task<>() {
             @Override
             protected List<ClusteringService.Cluster> call() throws SQLException {
                 return namingService.getClusters();
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<ClusteringService.Cluster> result =
-                    (List<ClusteringService.Cluster>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<ClusteringService.Cluster> result = task.getValue();
             clusters = result;
             setBusy(false, clusters.isEmpty());
             if (clusters.isEmpty()) {
@@ -148,12 +146,12 @@ public class NameFaceView extends BorderPane implements Refreshable {
             }
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false, true);
-            handleFailure(I18n.get("ui.nameFace.clusterFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.clusterFailed"), task.getException());
         });
 
-        startTask("nameface-cluster-loader");
+        taskRunner.start(task, "nameface-cluster-loader");
     }
 
     /**
@@ -216,29 +214,27 @@ public class NameFaceView extends BorderPane implements Refreshable {
             return;
         }
 
-        setTask(new Task<List<SimilarityResult>>() {
+        Task<List<SimilarityResult>> task = new Task<>() {
             @Override
             protected List<SimilarityResult> call() {
                 return namingService.rankSimilar(representative, members, CANDIDATE_LIMIT);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<SimilarityResult> similar =
-                    (List<SimilarityResult>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<SimilarityResult> similar = task.getValue();
             if (candidateRepId == representative.id()) {
                 showCandidates(similar);
             }
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             if (candidateRepId == representative.id()) {
-                handleFailure(I18n.get("ui.nameFace.rankFailed"), activeTask.getException());
+                handleFailure(I18n.get("ui.nameFace.rankFailed"), task.getException());
             }
         });
 
-        startTask("nameface-cluster-candidates");
+        taskRunner.start(task, "nameface-cluster-candidates");
     }
 
     /**
@@ -257,20 +253,19 @@ public class NameFaceView extends BorderPane implements Refreshable {
             return;
         }
 
-        setTask(new Task<Optional<NameRecord>>() {
+        Task<Optional<NameRecord>> task = new Task<>() {
             @Override
             protected Optional<NameRecord> call() throws SQLException {
                 return namingService.findName(name);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             String current = nameField.getText() == null ? "" : nameField.getText().trim();
             if (!name.equals(current)) {
                 return; // user kept typing; ignore the stale result
             }
-            @SuppressWarnings("unchecked")
-            Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
+            Optional<NameRecord> existing = task.getValue();
             if (existing.isPresent()) {
                 nameExistsLabel.setText(I18n.format("ui.nameFace.nameExists",
                         existing.get().faceCount()));
@@ -281,11 +276,11 @@ public class NameFaceView extends BorderPane implements Refreshable {
             }
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             // name lookup failing should not block tagging
         });
 
-        startTask("nameface-name-exists");
+        taskRunner.start(task, "nameface-name-exists");
     }
 
     /**
@@ -306,19 +301,17 @@ public class NameFaceView extends BorderPane implements Refreshable {
         setBusy(true, true);
         statusLabel.setText(I18n.get("ui.nameFace.taggingSearching"));
 
-        setTask(new Task<List<SimilarityResult>>() {
+        Task<List<SimilarityResult>> task = new Task<>() {
             @Override
             protected List<SimilarityResult> call() throws SQLException {
                 long nameId = namingService.createOrFindName(name);
                 namingService.tagFace(representative.id(), nameId);
                 return namingService.findSimilarUnnamed(representative.id(), CANDIDATE_LIMIT);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<SimilarityResult> similar =
-                    (List<SimilarityResult>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<SimilarityResult> similar = task.getValue();
             setBusy(false, clusters.isEmpty());
             statusLabel.setText(I18n.format("ui.nameFace.taggedSuggest",
                     name, similar.size()));
@@ -327,12 +320,12 @@ public class NameFaceView extends BorderPane implements Refreshable {
             showCandidates(similar);
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
-            handleFailure(I18n.get("ui.nameFace.tagFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.tagFailed"), task.getException());
         });
 
-        startTask("nameface-tagger");
+        taskRunner.start(task, "nameface-tagger");
     }
 
     /**
@@ -387,28 +380,28 @@ public class NameFaceView extends BorderPane implements Refreshable {
         setBusy(true, true);
         statusLabel.setText(I18n.format("ui.nameFace.taggingFace", faceId));
 
-        setTask(new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws SQLException {
                 long nameId = namingService.createOrFindName(name);
                 namingService.tagFace(faceId, nameId);
                 return null;
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
             statusLabel.setText(I18n.format("ui.nameFace.taggedFace", faceId, name));
             candidatesPane.getChildren().removeIf(node ->
                     node.getUserData() instanceof Long id && id == faceId);
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
-            handleFailure(I18n.get("ui.nameFace.tagFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.nameFace.tagFailed"), task.getException());
         });
 
-        startTask("nameface-tag-candidate");
+        taskRunner.start(task, "nameface-tag-candidate");
     }
 
     /**
@@ -564,32 +557,6 @@ public class NameFaceView extends BorderPane implements Refreshable {
         tagButton.setDisable(busy);
         nextButton.setDisable(busy || noClusters);
         nameField.setDisable(busy);
-    }
-
-    /**
-     * Replaces the active task, cancelling any previous one.
-     *
-     * @param task the new task
-     */
-    private void setTask(Task<?> task) {
-        if (activeTask != null) {
-            activeTask.cancel(true);
-        }
-        activeTask = task;
-    }
-
-    /**
-     * Starts the active task on a daemon background thread.
-     *
-     * @param threadName the thread name
-     */
-    private void startTask(String threadName) {
-        if (activeTask == null) {
-            return;
-        }
-        Thread thread = new Thread(activeTask, threadName);
-        thread.setDaemon(true);
-        thread.start();
     }
 
     /**

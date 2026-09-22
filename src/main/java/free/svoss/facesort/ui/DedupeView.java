@@ -56,7 +56,7 @@ public class DedupeView extends BorderPane {
     private final Label nameALabel = new Label();
     private final Label nameBLabel = new Label();
 
-    private Task<Optional<DeduplicationService.DupeCandidate>> activeTask;
+    private final TaskRunner taskRunner = new TaskRunner();
     private DeduplicationService.DupeCandidate current;
     private int round;
     private boolean sessionActive;
@@ -141,18 +141,18 @@ public class DedupeView extends BorderPane {
         }
         setDecisionEnabled(false);
 
-        activeTask = new Task<>() {
+        Task<Optional<DeduplicationService.DupeCandidate>> task = new Task<>() {
             @Override
             protected Optional<DeduplicationService.DupeCandidate> call() throws SQLException {
                 return dedupService.nextPair();
             }
         };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             if (!sessionActive) {
                 return;
             }
-            Optional<DeduplicationService.DupeCandidate> next = activeTask.getValue();
+            Optional<DeduplicationService.DupeCandidate> next = task.getValue();
             if (next.isEmpty()) {
                 endSession(I18n.get("ui.dedupe.noneLeft"));
             } else {
@@ -160,8 +160,8 @@ public class DedupeView extends BorderPane {
             }
         });
 
-        activeTask.setOnFailed(e -> {
-            Throwable error = activeTask.getException();
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
             LOG.log(Level.WARNING, "Failed to load the next pair", error);
             if (sessionActive) {
                 endSession(I18n.get("ui.dedupe.loadFailed"));
@@ -169,9 +169,7 @@ public class DedupeView extends BorderPane {
             showError(I18n.get("ui.dedupe.loadFailed"), error);
         });
 
-        Thread thread = new Thread(activeTask, "dedupe-pair-loader");
-        thread.setDaemon(true);
-        thread.start();
+        taskRunner.start(task, "dedupe-pair-loader");
     }
 
     /**
@@ -264,10 +262,7 @@ public class DedupeView extends BorderPane {
     private void stopSession() {
         sessionActive = false;
         current = null;
-        if (activeTask != null) {
-            activeTask.cancel(true);
-            activeTask = null;
-        }
+        taskRunner.cancelActive();
         endSession(I18n.get("ui.dedupe.sessionStopped"));
     }
 

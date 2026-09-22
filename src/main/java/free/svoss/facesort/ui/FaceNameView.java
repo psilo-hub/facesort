@@ -79,7 +79,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final Button exportButton = new Button(I18n.get("ui.faceName.export"));
 
     private NameRecord activeName;
-    private Task<?> activeTask;
+    private final TaskRunner taskRunner = new TaskRunner();
     private VBox rangeAnchor;
 
     /**
@@ -194,26 +194,25 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void loadNames(boolean refreshActiveName) {
         statusLabel.setText(I18n.get("ui.faceName.loadingNames"));
 
-        setTask(new Task<List<NameRecord>>() {
+        Task<List<NameRecord>> task = new Task<>() {
             @Override
             protected List<NameRecord> call() throws SQLException {
                 return faceToNameService.getAllNames();
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<NameRecord> names = (List<NameRecord>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<NameRecord> names = task.getValue();
             applyNames(names);
             if (refreshActiveName && activeName != null) {
                 selectName(activeName); // reload candidates for the still-active name
             }
         });
 
-        activeTask.setOnFailed(e ->
-                handleFailure(I18n.get("ui.faceName.loadNamesFailed"), activeTask.getException()));
+        task.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.loadNamesFailed"), task.getException()));
 
-        startTask("facename-name-loader");
+        taskRunner.start(task, "facename-name-loader");
     }
 
     /**
@@ -253,7 +252,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
         candidatesPane.getChildren().clear();
         tagSelectedButton.setDisable(true);
 
-        setTask(new Task<NameContent>() {
+        Task<NameContent> task = new Task<>() {
             @Override
             protected NameContent call() throws SQLException {
                 List<SimilarityResult> named =
@@ -264,11 +263,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
                                 excludeOtherNamesBox.isSelected(), pathPrefix);
                 return new NameContent(named, candidates);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            NameContent content = (NameContent) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            NameContent content = task.getValue();
             showNamedFaces(name, content.namedFaces());
             showCandidates(content.candidates());
             statusLabel.setText(content.candidates().isEmpty()
@@ -279,10 +277,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
                             content.candidates().size(), name.name()));
         });
 
-        activeTask.setOnFailed(e ->
-                handleFailure(I18n.get("ui.faceName.similarLoadFailed"), activeTask.getException()));
+        task.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.similarLoadFailed"), task.getException()));
 
-        startTask("facename-similar-loader");
+        taskRunner.start(task, "facename-similar-loader");
     }
 
     /**
@@ -433,25 +431,25 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void tagFaceWithDifferentName(FaceRecord face, String name) {
         statusLabel.setText(I18n.format("ui.faceName.tagging", 1, name));
-        setTask(new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws SQLException {
                 long nameId = faceToNameService.createOrFindName(name);
                 faceToNameService.tagFaces(List.of(face.id()), nameId);
                 return null;
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             statusLabel.setText(I18n.format("ui.faceName.differentName.tagged", name));
             selectName(activeName); // refresh: the tagged face disappears
         });
 
-        activeTask.setOnFailed(e ->
+        task.setOnFailed(e ->
                 handleFailure(I18n.get("ui.faceName.differentName.tagFailed"),
-                        activeTask.getException()));
+                        task.getException()));
 
-        startTask("facename-different-name-tagger");
+        taskRunner.start(task, "facename-different-name-tagger");
     }
 
     /**
@@ -649,23 +647,23 @@ public class FaceNameView extends BorderPane implements Refreshable {
         }
 
         statusLabel.setText(I18n.format("ui.faceName.tagging", faceIds.size(), activeName.name()));
-        setTask(new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws SQLException {
                 faceToNameService.tagFaces(faceIds, activeName.id());
                 return null;
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             statusLabel.setText(I18n.format("ui.faceName.tagged", faceIds.size(), activeName.name()));
             selectName(activeName); // refresh: tagged faces disappear
         });
 
-        activeTask.setOnFailed(e ->
-                handleFailure(I18n.get("ui.faceName.tagFailed"), activeTask.getException()));
+        task.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.tagFailed"), task.getException()));
 
-        startTask("facename-tagger");
+        taskRunner.start(task, "facename-tagger");
     }
 
     /**
@@ -699,21 +697,21 @@ public class FaceNameView extends BorderPane implements Refreshable {
         }
 
         statusLabel.setText(I18n.format("ui.faceName.renaming", newName));
-        setTask(new Task<NameRecord>() {
+        Task<NameRecord> task = new Task<>() {
             @Override
             protected NameRecord call() throws SQLException {
                 return faceToNameService.renameName(activeName.id(), newName);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            activeName = (NameRecord) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            activeName = task.getValue();
             statusLabel.setText(I18n.format("ui.faceName.renamed", activeName.name()));
             loadNames(true); // refresh list and candidates for the renamed name
         });
 
-        activeTask.setOnFailed(e -> {
-            Throwable error = activeTask.getException();
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
             statusLabel.setText(error instanceof IllegalArgumentException
                     ? error.getMessage()
                     : I18n.get("ui.faceName.renameFailed"));
@@ -722,7 +720,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
             }
         });
 
-        startTask("facename-renamer");
+        taskRunner.start(task, "facename-renamer");
     }
 
     /**
@@ -746,16 +744,15 @@ public class FaceNameView extends BorderPane implements Refreshable {
         NameRecord name = activeName;
 
         statusLabel.setText(I18n.format("ui.faceName.exporting", name.name()));
-        setTask(new Task<FaceToNameService.ExportResult>() {
+        Task<FaceToNameService.ExportResult> task = new Task<>() {
             @Override
             protected FaceToNameService.ExportResult call() throws Exception {
                 return faceToNameService.exportImagesForName(name.id(), outputDir);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            FaceToNameService.ExportResult result =
-                    (FaceToNameService.ExportResult) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            FaceToNameService.ExportResult result = task.getValue();
             if (result.images() == 0) {
                 statusLabel.setText(I18n.format("ui.faceName.exportNone", name.name()));
             } else {
@@ -769,10 +766,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
             }
         });
 
-        activeTask.setOnFailed(e ->
-                handleFailure(I18n.get("ui.faceName.exportFailed"), activeTask.getException()));
+        task.setOnFailed(e ->
+                handleFailure(I18n.get("ui.faceName.exportFailed"), task.getException()));
 
-        startTask("facename-exporter");
+        taskRunner.start(task, "facename-exporter");
     }
 
     /**
@@ -802,32 +799,6 @@ public class FaceNameView extends BorderPane implements Refreshable {
         } else {
             view.setImage(null);
         }
-    }
-
-    /**
-     * Replaces the active task, cancelling any previous one.
-     *
-     * @param task the new task
-     */
-    private void setTask(Task<?> task) {
-        if (activeTask != null) {
-            activeTask.cancel(true);
-        }
-        activeTask = task;
-    }
-
-    /**
-     * Starts the active task on a daemon background thread.
-     *
-     * @param threadName the thread name
-     */
-    private void startTask(String threadName) {
-        if (activeTask == null) {
-            return;
-        }
-        Thread thread = new Thread(activeTask, threadName);
-        thread.setDaemon(true);
-        thread.start();
     }
 
     /**

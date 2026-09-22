@@ -61,7 +61,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
     private final Button nextButton = new Button(I18n.get("ui.randomName.next"));
     private final FlowPane facesPane = new FlowPane(10, 10);
 
-    private Task<?> activeTask;
+    private final TaskRunner taskRunner = new TaskRunner();
 
     /**
      * Creates the random-tagging tab.
@@ -125,16 +125,15 @@ public class RandomNameView extends BorderPane implements Refreshable {
         statusLabel.setText(I18n.get("ui.randomName.loading"));
         facesPane.getChildren().clear();
 
-        setTask(new Task<>() {
+        Task<List<FaceRecord>> task = new Task<>() {
             @Override
             protected List<FaceRecord> call() throws SQLException {
                 return namingService.findRandomUnnamed(BATCH_SIZE, pathPrefix);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<FaceRecord> faces = (List<FaceRecord>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<FaceRecord> faces = task.getValue();
             showFaces(faces);
             setBusy(false);
             statusLabel.setText(faces.isEmpty()
@@ -144,12 +143,12 @@ public class RandomNameView extends BorderPane implements Refreshable {
                     : I18n.format("ui.randomName.sampleInfo", faces.size()));
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false);
-            handleFailure(I18n.get("ui.randomName.loadFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.randomName.loadFailed"), task.getException());
         });
 
-        startTask("random-sample-loader");
+        taskRunner.start(task, "random-sample-loader");
     }
 
     /**
@@ -168,20 +167,19 @@ public class RandomNameView extends BorderPane implements Refreshable {
             return;
         }
 
-        setTask(new Task<Optional<NameRecord>>() {
+        Task<Optional<NameRecord>> task = new Task<>() {
             @Override
             protected Optional<NameRecord> call() throws SQLException {
                 return namingService.findName(name);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             String current = nameField.getText() == null ? "" : nameField.getText().trim();
             if (!name.equals(current)) {
                 return; // user kept typing; ignore the stale result
             }
-            @SuppressWarnings("unchecked")
-            Optional<NameRecord> existing = (Optional<NameRecord>) activeTask.getValue();
+            Optional<NameRecord> existing = task.getValue();
             if (existing.isPresent()) {
                 nameExistsLabel.setText(I18n.format("ui.randomName.nameExists",
                         existing.get().faceCount()));
@@ -192,11 +190,11 @@ public class RandomNameView extends BorderPane implements Refreshable {
             }
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             // name lookup failing should not block tagging
         });
 
-        startTask("randomname-name-exists");
+        taskRunner.start(task, "randomname-name-exists");
     }
 
     /**
@@ -412,7 +410,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
         setBusy(true);
         statusLabel.setText(I18n.format("ui.randomName.tagging", faceIds.size(), name));
 
-        setTask(new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws SQLException {
                 long nameId = namingService.createOrFindName(name);
@@ -421,21 +419,21 @@ public class RandomNameView extends BorderPane implements Refreshable {
                 }
                 return null;
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
+        task.setOnSucceeded(e -> {
             facesPane.getChildren().removeIf(node ->
                     node.getUserData() instanceof Long id && faceIds.contains(id));
             setBusy(false);
             statusLabel.setText(I18n.format("ui.randomName.tagged", faceIds.size(), name));
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false);
-            handleFailure(I18n.get("ui.randomName.tagFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.randomName.tagFailed"), task.getException());
         });
 
-        startTask("random-tagger");
+        taskRunner.start(task, "random-tagger");
     }
 
     /**
@@ -493,32 +491,6 @@ public class RandomNameView extends BorderPane implements Refreshable {
         pathFilterField.setDisable(busy);
         nameField.setDisable(busy);
         tagSelectedButton.setDisable(busy || selectedFaceIds().isEmpty());
-    }
-
-    /**
-     * Replaces the active task, cancelling any previous one.
-     *
-     * @param task the new task
-     */
-    private void setTask(Task<?> task) {
-        if (activeTask != null) {
-            activeTask.cancel(true);
-        }
-        activeTask = task;
-    }
-
-    /**
-     * Starts the active task on a daemon background thread.
-     *
-     * @param threadName the thread name
-     */
-    private void startTask(String threadName) {
-        if (activeTask == null) {
-            return;
-        }
-        Thread thread = new Thread(activeTask, threadName);
-        thread.setDaemon(true);
-        thread.start();
     }
 
     /**

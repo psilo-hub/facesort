@@ -53,7 +53,7 @@ public class ViewView extends BorderPane implements Refreshable {
     private final FlowPane namesPane = new FlowPane(12, 12);
     private final FlowPane imagesPane = new FlowPane(12, 12);
 
-    private Task<?> activeTask;
+    private final TaskRunner taskRunner = new TaskRunner();
     private boolean imagesMode;
     private long activeNameId;
     private String activeNameText = "";
@@ -105,16 +105,15 @@ public class ViewView extends BorderPane implements Refreshable {
         setBusy(true);
         statusLabel.setText(I18n.get("ui.view.loadingNames"));
 
-        setTask(new Task<>() {
+        Task<List<ViewService.NameSummary>> task = new Task<>() {
             @Override
             protected List<ViewService.NameSummary> call() throws SQLException {
                 return viewService.getNameSummaries();
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<ViewService.NameSummary> summaries = (List<ViewService.NameSummary>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<ViewService.NameSummary> summaries = task.getValue();
             namesPane.getChildren().clear();
             for (ViewService.NameSummary summary : summaries) {
                 namesPane.getChildren().add(buildNameCard(summary));
@@ -127,12 +126,12 @@ public class ViewView extends BorderPane implements Refreshable {
                     summaries.isEmpty() ? I18n.get("ui.view.noNames") : "");
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false);
-            handleFailure(I18n.get("ui.view.loadNamesFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.view.loadNamesFailed"), task.getException());
         });
 
-        startTask("view-names-loader");
+        taskRunner.start(task, "view-names-loader");
     }
 
     /**
@@ -162,16 +161,15 @@ public class ViewView extends BorderPane implements Refreshable {
         setBusy(true);
         statusLabel.setText(I18n.format("ui.view.loadingImages", displayName));
 
-        setTask(new Task<>() {
+        Task<List<ViewService.NamedImage>> task = new Task<>() {
             @Override
             protected List<ViewService.NamedImage> call() throws SQLException {
                 return viewService.getImagesForName(nameId);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            @SuppressWarnings("unchecked")
-            List<ViewService.NamedImage> images = (List<ViewService.NamedImage>) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            List<ViewService.NamedImage> images = task.getValue();
             imagesPane.getChildren().clear();
             for (ViewService.NamedImage image : images) {
                 imagesPane.getChildren().add(buildImageThumbnail(image));
@@ -183,12 +181,12 @@ public class ViewView extends BorderPane implements Refreshable {
             statusLabel.setText(images.isEmpty() ? I18n.get("ui.view.noImages") : "");
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             setBusy(false);
-            handleFailure(I18n.get("ui.view.loadImagesFailed"), activeTask.getException());
+            handleFailure(I18n.get("ui.view.loadImagesFailed"), task.getException());
         });
 
-        startTask("view-images-loader");
+        taskRunner.start(task, "view-images-loader");
     }
 
     /**
@@ -354,25 +352,25 @@ public class ViewView extends BorderPane implements Refreshable {
      */
     private void untagFaces(String hash) {
         statusLabel.setText(I18n.format("ui.view.untagging", activeNameText));
-        setTask(new Task<Integer>() {
+        Task<Integer> task = new Task<>() {
             @Override
             protected Integer call() throws SQLException {
                 return viewService.untagFacesFromImage(hash, activeNameId);
             }
-        });
+        };
 
-        activeTask.setOnSucceeded(e -> {
-            int count = (Integer) activeTask.getValue();
+        task.setOnSucceeded(e -> {
+            int count = task.getValue();
             statusLabel.setText(I18n.format("ui.view.untagged", count, activeNameText));
             openNameImages(activeNameId, activeNameText);
         });
 
-        activeTask.setOnFailed(e -> {
+        task.setOnFailed(e -> {
             statusLabel.setText(I18n.get("ui.view.untagFailed"));
-            handleFailure(I18n.get("ui.view.untagFailedHeader"), activeTask.getException());
+            handleFailure(I18n.get("ui.view.untagFailedHeader"), task.getException());
         });
 
-        startTask("view-untagger");
+        taskRunner.start(task, "view-untagger");
     }
 
     /**
@@ -404,32 +402,6 @@ public class ViewView extends BorderPane implements Refreshable {
     private void setBusy(boolean busy) {
         backButton.setDisable(busy);
         scrollPane.setDisable(busy);
-    }
-
-    /**
-     * Replaces the active task, cancelling any previous one.
-     *
-     * @param task the new task
-     */
-    private void setTask(Task<?> task) {
-        if (activeTask != null) {
-            activeTask.cancel(true);
-        }
-        activeTask = task;
-    }
-
-    /**
-     * Starts the active task on a daemon background thread.
-     *
-     * @param name the thread name
-     */
-    private void startTask(String name) {
-        if (activeTask == null) {
-            return;
-        }
-        Thread thread = new Thread(activeTask, name);
-        thread.setDaemon(true);
-        thread.start();
     }
 
     /**

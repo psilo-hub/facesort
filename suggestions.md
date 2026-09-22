@@ -8,7 +8,13 @@ All line numbers refer to the state of the codebase at the time of writing.
 
 ---
 
-## 1. Thread-safety of the shared SQLite connection (High risk)
+## ~~1. Thread-safety of the shared SQLite connection (High risk)~~ ✅ DONE
+
+**Solved 2026-09-22** — `Database.getConnection()` now returns a
+`SynchronizedConnection` proxy (`db/SynchronizedConnection.java`) that
+serializes every DAO call behind a single monitor; all service/worker threads
+share that one lock, and the per-service `dbLock` monitors were removed. See
+todo.txt item 7.
 
 The entire app shares a single non-thread-safe SQLite `Connection` created in
 `FaceSortApp.showMainWindow()` (`FaceSortApp.java:185-193`) and handed to all five
@@ -35,7 +41,17 @@ Suggested directions (pick one, in increasing effort):
 
 ---
 
-## 2. UI stale-task race — `activeTask.getValue()` in handlers (High risk)
+## ~~2. UI stale-task race — `activeTask.getValue()` in handlers~~ ✅ DONE
+
+**Solved 2026-09-22** — all five views (View, FaceName, NameFace, RandomName,
+Dedupe) now bind success/failure handlers to the **local** task instance they
+start and read that instance's value, instead of the shared `activeTask` field.
+A shared `ui/TaskRunner.java` helper centralizes "cancel the previous task +
+start on a daemon thread" and returns the started task; the per-view
+`activeTask`/`setTask`/`startTask` plumbing was removed. The existing staleness
+guards (`checkNameExists` name-equality, `NameFaceView.candidateRepId`,
+`DedupeView.sessionActive`) are preserved. A handler can no longer observe a
+newer task's result once an older task finishes late.
 
 In the four `Refreshable` views and their close relatives, every
 `setOnSucceeded`/`setOnFailed` handler reads the **shared mutable field** `activeTask`

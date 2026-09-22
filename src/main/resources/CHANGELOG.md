@@ -103,6 +103,11 @@ All notable changes to Face Sort will be documented in this file.
   (2026-09-22)
 
 ### Fixed
+- No more cross-wired results in the tagging views: when actions overlap (switching
+  names, re-loading samples, typing a name, running a dedupe session), a finished
+  background task can no longer apply a newer task's value. Every background
+  operation now reports its own result, so face lists, similarity lists, name
+  previews and dedupe pairs always match the action that started them (2026-09-22)
 - Tab names no longer clip descenders (taller tab headers) (2026-09-19)
 - Release jars include video import: the CI build now publishes a jar per
   platform (Linux x86-64/ARM64, macOS x86-64/ARM64, Windows x86-64) plus a
