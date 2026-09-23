@@ -2,13 +2,13 @@
 
 Checklist of the improvement suggestions that are still **open**. The implemented
 ones (suggestions 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9) have been removed — their
-resolutions are recorded in `todo.txt` items 7–17 and `CHANGELOG.md`. HNSW index
+resolutions are recorded in `todo.txt` items 7–21 and `CHANGELOG.md`. HNSW index
 closing was dismissed with evidence (no `close()` on the pure-Java `HnswIndex`; the
 index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-23, full suite green: 309 tests / 35 classes, 0 failures).
+(2026-09-23, full suite green: 313 tests / 36 classes, 0 failures).
 
 ---
 
@@ -32,10 +32,13 @@ All line numbers below refer to the current state of the codebase
   is duplicated 3× (`NameDao.java:45,61,78-81`). Done — the SELECT prefix is now the
   `SELECT_WITH_FACE_COUNT` constant + a shared `mapRow`, with a new test asserting the
   correlated count populates in all three read methods (todo.txt item 18). **Low effort.**
-- [ ] **Single source of truth for video extensions** — `VideoImportService.SUPPORTED_EXTENSIONS`
+- [x] **Single source of truth for video extensions** — `VideoImportService.SUPPORTED_EXTENSIONS`
   (`VideoImportService.java:48-51`) and `FfmpegVideoFrameSource.demuxerName`
   (`FfmpegVideoFrameSource.java:163-180`) are two parallel extension tables that can drift
-  (they agree today: mp4/m4v, mkv, mov, avi, webm, flv, mpg/mpeg, 3gp, ts, wmv). **Low effort.**
+  (they agree today: mp4/m4v, mkv, mov, avi, webm, flv, mpg/mpeg, 3gp, ts, wmv). Done — both
+  now read from a new `VideoFormats` map (extension → ffmpeg demuxer), pinned by `VideoFormatsTest`
+  (parity with the import set, the exact extension list, the demuxer table, unknown-extension
+  rejection; todo.txt item 21). **Low effort.**
 
 ---
 

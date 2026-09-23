@@ -136,6 +136,10 @@ All notable changes to Face Sort will be documented in this file.
   (`~/.m2`) per platform, so the JavaFX/native dependency downloads no longer
   repeat on every run. The FaceAI / rawGitHubFetcher / ffmpeg4j dependency
   builds still run fresh, so build results are unchanged (2026-09-23)
+- Supported video formats are defined in one place (internal, no visible
+  behavior change): the import walk and the ffmpeg frame source now share a
+  single extension → demuxer map (`VideoFormats`) instead of two parallel
+  tables that could drift, with tests pinning them together (2026-09-23)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -6,6 +6,7 @@ import com.github.manevolent.ffmpeg4j.FFmpegException;
 import com.github.manevolent.ffmpeg4j.VideoFrame;
 import com.github.manevolent.ffmpeg4j.source.VideoSourceSubstream;
 import com.github.manevolent.ffmpeg4j.stream.source.FFmpegSourceStream;
+import free.svoss.facesort.util.VideoFormats;
 import free.svoss.facesort.util.VideoFrameUtils;
 import org.bytedeco.ffmpeg.avformat.AVFormatContext;
 import org.bytedeco.ffmpeg.avformat.AVStream;
@@ -158,25 +159,14 @@ public final class FfmpegVideoFrameSource implements VideoFrameSource {
     }
 
     /**
-     * Maps a supported video file extension to the ffmpeg demuxer format name.
+     * Extracts the file extension and resolves the ffmpeg demuxer format name
+     * via {@link VideoFormats}.
      */
     private static String demuxerName(Path file) {
         String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
         int dot = name.lastIndexOf('.');
         String ext = dot < 0 ? "" : name.substring(dot + 1);
-        return switch (ext) {
-            case "mp4", "m4v" -> "mp4";
-            case "mkv" -> "matroska";
-            case "mov" -> "mov";
-            case "avi" -> "avi";
-            case "webm" -> "webm";
-            case "flv" -> "flv";
-            case "mpg", "mpeg" -> "mpeg";
-            case "3gp" -> "3gp";
-            case "ts" -> "mpegts";
-            case "wmv" -> "asf";
-            default -> throw new IllegalArgumentException("unsupported video extension: " + ext);
-        };
+        return VideoFormats.demuxerName(ext);
     }
 
     /**

@@ -8,6 +8,7 @@ import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
+import free.svoss.facesort.util.VideoFormats;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -44,11 +45,11 @@ import java.util.function.BooleanSupplier;
  */
 public class VideoImportService implements AutoCloseable {
 
-    /** Supported video file extensions (case-insensitive, without the leading dot). */
-    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
-            "mp4", "mkv", "mov", "avi", "webm", "m4v", "flv", "mpg", "mpeg",
-            "3gp", "ts", "wmv"
-    );
+    /**
+     * Supported video file extensions (case-insensitive, without the leading
+     * dot). Package-private so tests can pin it to {@link VideoFormats}.
+     */
+    static final Set<String> SUPPORTED_EXTENSIONS = VideoFormats.supportedExtensions();
 
     private final ImageDao imageDao;
     private final FaceDao faceDao;
