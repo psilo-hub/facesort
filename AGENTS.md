@@ -4,8 +4,8 @@ Guidelines for AI coding agents working in this repository.
 
 ## Before committing
 
-After every verified change (passing build and tests), update all three files
-**in the same commit** that contains the change:
+After every verified change (passing build and tests), update the relevant
+files **in the same commit** that contains the change:
 
 1. `todo.txt` — keep it in sync with the project's current state. Mark completed
    items, remove finished tasks, and add newly discovered work items.
@@ -17,6 +17,11 @@ After every verified change (passing build and tests), update all three files
 3. `README.md` — reflect any change that affects how the app is built, run,
    configured, or used (new features, changed behavior, new settings, altered
    build steps).
+
+4. The translated READMEs — `README.de.md`, `README.es.md`, `README.fr.md`,
+   `README.ru.md` and `README.zh.md` are part of the deliverable too: any change
+   that touches `README.md` (per item 3) must also be reflected in all five
+   translations, so they cannot drift out of sync with the English original.
 
 These files are part of the deliverable, not afterthoughts. Do not omit them.
 

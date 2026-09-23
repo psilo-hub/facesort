@@ -73,9 +73,11 @@ All line numbers below refer to the current state of the codebase
 - [ ] **Translated READMEs lack video support** — `README.md` documents video import, but
   `README.de.md`, `README.es.md`, `README.fr.md`, `README.ru.md`, `README.zh.md` have zero
   mentions of "video". Each needs the video-import section added. **Low effort.**
-- [ ] **AGENTS.md doc-sync rule is English-only** — `AGENTS.md:10-19` lists `todo.txt`,
+- [x] **AGENTS.md doc-sync rule is English-only** — `AGENTS.md:10-19` lists `todo.txt`,
   `CHANGELOG.md` and `README.md` but not the five translated READMEs, which are part of the
-  deliverable and can drift out of sync. **Low effort.**
+  deliverable and can drift out of sync. Done — the "Before committing" rule now covers
+  `README.de.md`, `README.es.md`, `README.fr.md`, `README.ru.md` and `README.zh.md` as item 4
+  (todo.txt item 20). **Low effort.**
 - [ ] **Stale claims in `todo.txt` item 3** — the video-import progress note still claims
   "Final full suite green 235/235" and "pushed the full matrix (run 44…)" (suite is now
   306), and the progress docs contain the "tagging facces" typo at `todo.txt:5`. **Low effort.**
