@@ -3,6 +3,7 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
@@ -66,19 +67,22 @@ public class ImportService implements AutoCloseable {
     private final FaceDao faceDao;
     private final List<FaceAiService> faceAiServices;
     private final ConfigModel config;
+    private final TransactionRunner transactionRunner;
 
     /**
      * Creates an import service that processes files sequentially through a
      * single {@link FaceAiService}.
      *
-     * @param imageDao      DAO for the images and image_paths tables
-     * @param faceDao       DAO for the faces table
-     * @param faceAiService face detection and embedding service
-     * @param config        application configuration (detection thresholds, etc.)
+     * @param imageDao          DAO for the images and image_paths tables
+     * @param faceDao           DAO for the faces table
+     * @param faceAiService     face detection and embedding service
+     * @param config            application configuration (detection thresholds, etc.)
+     * @param transactionRunner runner for atomic multi-statement write units
      */
     public ImportService(ImageDao imageDao, FaceDao faceDao,
-                         FaceAiService faceAiService, ConfigModel config) {
-        this(imageDao, faceDao, List.of(faceAiService), config);
+                         FaceAiService faceAiService, ConfigModel config,
+                         TransactionRunner transactionRunner) {
+        this(imageDao, faceDao, List.of(faceAiService), config, transactionRunner);
     }
 
     /**
@@ -87,13 +91,15 @@ public class ImportService implements AutoCloseable {
      * own {@link FaceAiService} from the given list, so at most
      * {@code faceAiServices.size()} workers can run concurrently.
      *
-     * @param imageDao      DAO for the images and image_paths tables
-     * @param faceDao       DAO for the faces table
-     * @param faceAiServices one face service per parallel worker (must not be empty)
-     * @param config        application configuration (detection thresholds, etc.)
+     * @param imageDao          DAO for the images and image_paths tables
+     * @param faceDao           DAO for the faces table
+     * @param faceAiServices    one face service per parallel worker (must not be empty)
+     * @param config            application configuration (detection thresholds, etc.)
+     * @param transactionRunner runner for atomic multi-statement write units
      */
     public ImportService(ImageDao imageDao, FaceDao faceDao,
-                         List<FaceAiService> faceAiServices, ConfigModel config) {
+                         List<FaceAiService> faceAiServices, ConfigModel config,
+                         TransactionRunner transactionRunner) {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         if (faceAiServices == null || faceAiServices.isEmpty()) {
@@ -101,6 +107,7 @@ public class ImportService implements AutoCloseable {
         }
         this.faceAiServices = List.copyOf(faceAiServices);
         this.config = Objects.requireNonNull(config, "config");
+        this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
 
     /**
@@ -298,10 +305,17 @@ public class ImportService implements AutoCloseable {
                 maxFacesPerImage, service, file.toString());
         int facesAdded = faceRecords.size();
 
-        // ---- One serialized commit unit ----
+        // ---- One atomic commit unit (insert + path + faces) ----
         try {
-            imageDao.insert(hash, System.currentTimeMillis(), criteriaJson,
-                    faceRecords.size());
+            transactionRunner.inTransaction(() -> {
+                imageDao.insert(hash, System.currentTimeMillis(), criteriaJson,
+                        faceRecords.size());
+                imageDao.addPath(hash, absolutePath);
+                for (FaceRecord faceRecord : faceRecords) {
+                    faceDao.insert(faceRecord);
+                }
+                return null;
+            });
         } catch (SQLException e) {
             // Another worker imported the same content first: record only
             // the additional path for this file.
@@ -316,10 +330,6 @@ public class ImportService implements AutoCloseable {
                 generateThumbnailIfAbsent(hash, file);
             }
             return FileResult.newPath();
-        }
-        imageDao.addPath(hash, absolutePath);
-        for (FaceRecord faceRecord : faceRecords) {
-            faceDao.insert(faceRecord);
         }
 
         // Generate thumbnail for the full image (reusing the loaded image)

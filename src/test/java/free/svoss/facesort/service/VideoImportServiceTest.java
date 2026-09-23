@@ -82,14 +82,14 @@ class VideoImportServiceTest {
 
     private VideoImportService newService(FaceAiService service) {
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(service),
-                config(), VideoImportServiceTest::openSource);
+                config(), VideoImportServiceTest::openSource, db.getTransactionRunner());
     }
 
     private VideoImportService parallelService(int threads, FaceAiService... services) {
         ConfigModel config = config();
         config.setMaxImportThreads(threads);
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(services),
-                config, VideoImportServiceTest::openSource);
+                config, VideoImportServiceTest::openSource, db.getTransactionRunner());
     }
 
     /**

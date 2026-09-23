@@ -211,13 +211,15 @@ public class FaceSortApp extends Application {
         for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
             importAiServices.add(new FaceAiService(config));
         }
-        importService = new ImportService(imageDao, faceDao, importAiServices, config);
+        importService = new ImportService(imageDao, faceDao, importAiServices, config,
+                database.getTransactionRunner());
         videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
-                importAiServices, config);
+                importAiServices, config, database.getTransactionRunner());
         clusteringService = new ClusteringService(faceAiService, faceDao, config);
         namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao, config);
         faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, config);
-        dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao, imageDao, videoDao);
+        dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
+                imageDao, videoDao, database.getTransactionRunner());
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
 
         buildMainWindowUi();

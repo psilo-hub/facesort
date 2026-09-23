@@ -123,7 +123,15 @@ create one `UiUtils`/`FacesTabs` helper to absorb the four-method cluster.
 
 ---
 
-## 4. Transactions (Medium risk)
+## ~~4. Transactions (Medium risk)~~ ✅ DONE
+
+**Solved 2026-09-23** — new `db/TransactionRunner` (exposed as
+`Database.getTransactionRunner()`) runs `TransactionUnit`s as real
+BEGIN/COMMIT transactions, holding the `SynchronizedConnection` monitor for the
+whole unit so an open transaction can never absorb statements from other
+workers. The three write units named below now commit atomically and roll back
+as a whole on any SQLException or runtime failure (covered by
+`db/TransactionRunnerTest`).
 
 There are **no transactions** anywhere (`setAutoCommit`/`commit`/`rollback` have no
 calls in main code). Multi-statement write units can leave partial state on failure:

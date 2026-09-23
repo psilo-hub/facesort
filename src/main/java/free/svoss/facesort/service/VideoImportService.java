@@ -3,6 +3,7 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.VideoFrameLinkRecord;
@@ -75,20 +76,23 @@ public class VideoImportService implements AutoCloseable {
     private final List<FaceAiService> faceAiServices;
     private final ConfigModel config;
     private final VideoFrameSourceOpener sourceOpener;
+    private final TransactionRunner transactionRunner;
 
     /**
      * Creates a video import service that processes videos sequentially through
      * a single {@link FaceAiService}.
      *
-     * @param imageDao      DAO for the images and thumbnails tables
-     * @param faceDao       DAO for the faces table
-     * @param videoDao      DAO for the videos, video_paths and video_frames tables
-     * @param faceAiService face detection and embedding service
-     * @param config        application configuration (detection thresholds, etc.)
+     * @param imageDao          DAO for the images and thumbnails tables
+     * @param faceDao           DAO for the faces table
+     * @param videoDao          DAO for the videos, video_paths and video_frames tables
+     * @param faceAiService     face detection and embedding service
+     * @param config            application configuration (detection thresholds, etc.)
+     * @param transactionRunner runner for atomic multi-statement write units
      */
     public VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
-                              FaceAiService faceAiService, ConfigModel config) {
-        this(imageDao, faceDao, videoDao, List.of(faceAiService), config);
+                              FaceAiService faceAiService, ConfigModel config,
+                              TransactionRunner transactionRunner) {
+        this(imageDao, faceDao, videoDao, List.of(faceAiService), config, transactionRunner);
     }
 
     /**
@@ -97,16 +101,18 @@ public class VideoImportService implements AutoCloseable {
      * uses its own {@link FaceAiService} from the given list, so at most
      * {@code faceAiServices.size()} workers can run concurrently.
      *
-     * @param imageDao       DAO for the images and thumbnails tables
-     * @param faceDao        DAO for the faces table
-     * @param videoDao       DAO for the videos, video_paths and video_frames tables
-     * @param faceAiServices one face service per parallel worker (must not be empty)
-     * @param config         application configuration (detection thresholds, etc.)
+     * @param imageDao          DAO for the images and thumbnails tables
+     * @param faceDao           DAO for the faces table
+     * @param videoDao          DAO for the videos, video_paths and video_frames tables
+     * @param faceAiServices    one face service per parallel worker (must not be empty)
+     * @param config            application configuration (detection thresholds, etc.)
+     * @param transactionRunner runner for atomic multi-statement write units
      */
     public VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
-                              List<FaceAiService> faceAiServices, ConfigModel config) {
+                              List<FaceAiService> faceAiServices, ConfigModel config,
+                              TransactionRunner transactionRunner) {
         this(imageDao, faceDao, videoDao, faceAiServices, config,
-                FfmpegVideoFrameSource::new);
+                FfmpegVideoFrameSource::new, transactionRunner);
     }
 
     /**
@@ -116,7 +122,8 @@ public class VideoImportService implements AutoCloseable {
      */
     VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
                        List<FaceAiService> faceAiServices, ConfigModel config,
-                       VideoFrameSourceOpener sourceOpener) {
+                       VideoFrameSourceOpener sourceOpener,
+                       TransactionRunner transactionRunner) {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
@@ -126,6 +133,7 @@ public class VideoImportService implements AutoCloseable {
         this.faceAiServices = List.copyOf(faceAiServices);
         this.config = Objects.requireNonNull(config, "config");
         this.sourceOpener = Objects.requireNonNull(sourceOpener, "sourceOpener");
+        this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
 
     /**
@@ -331,34 +339,35 @@ public class VideoImportService implements AutoCloseable {
                                 maxFacesPerImage, service,
                                 file + " @ " + timestampMs + " ms");
 
-                boolean newFrame = false;
-                try {
+                // The thumbnail is encoded before the transaction starts: JPEG
+                // encoding must never run while holding the connection monitor.
+                byte[] thumbJpg = knownFrame ? null : encodeThumbnail(frame);
+
+                // ---- One atomic unit per frame (insert + thumbnail + faces
+                //      + link) ----
+                FrameOutcome outcome = transactionRunner.inTransaction(() -> {
+                    boolean stored = false;
                     if (!imageDao.exists(frameHash)) {
                         // New frame: image row + thumbnail + faces.
                         imageDao.insert(frameHash, detectionTs, criteriaJson,
                                 faceRecords.size());
-                        imageDao.saveThumbnail(frameHash, encodeThumbnail(frame));
+                        imageDao.saveThumbnail(frameHash, thumbJpg);
                         for (FaceRecord faceRecord : faceRecords) {
                             faceDao.insert(faceRecord);
                         }
-                        newFrame = true;
+                        stored = true;
                     }
-                } catch (SQLException e) {
-                    // Another worker (video or photo import) stored the same
-                    // frame first while this worker was detecting: keep the
-                    // existing image row and only link it below. A genuine
-                    // failure still propagates.
-                    if (!imageDao.exists(frameHash)) {
-                        throw e;
-                    }
-                }
-                // The link is dropped when another video already imported
-                // the same frame (a frame belongs to at most one video), so
-                // linkedFrames only counts links that actually exist.
-                linkedFrames += videoDao.linkFrame(frameHash, hash, timestampMs);
-                if (newFrame) {
+                    // The link is dropped when another video already imported
+                    // the same frame (a frame belongs to at most one video), so
+                    // only links that actually exist are counted.
+                    int links = videoDao.linkFrame(frameHash, hash, timestampMs);
+                    return new FrameOutcome(stored, links, faceRecords.size());
+                });
+
+                linkedFrames += outcome.linksAdded;
+                if (outcome.storedNewFrame) {
                     framesAdded++;
-                    facesAdded += faceRecords.size();
+                    facesAdded += outcome.facesAdded;
                 }
             }
 
@@ -480,6 +489,16 @@ public class VideoImportService implements AutoCloseable {
     }
 
     // ---- Private inner type ----
+
+    /**
+     * Outcome of storing one sampled frame.
+     *
+     * @param storedNewFrame whether a new image row (thumbnail + faces) was written
+     * @param linksAdded     how many {@code video_frames} links were inserted
+     * @param facesAdded     faces detected on the frame when it was new
+     */
+    private record FrameOutcome(boolean storedNewFrame, int linksAdded, int facesAdded) {
+    }
 
     /**
      * Internal result of processing a single video file.

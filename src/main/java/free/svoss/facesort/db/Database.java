@@ -13,6 +13,7 @@ public class Database implements AutoCloseable {
 
     private final Connection connection;
     private final Connection sharedConnection;
+    private final TransactionRunner transactionRunner;
 
     /**
      * Opens or creates a database at the given path.
@@ -25,7 +26,9 @@ public class Database implements AutoCloseable {
             stmt.execute("PRAGMA foreign_keys = ON");
         }
         initializeSchema();
-        this.sharedConnection = SynchronizedConnection.wrap(connection);
+        SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
+        this.sharedConnection = synchronizing.proxy();
+        this.transactionRunner = new TransactionRunner(synchronizing);
     }
 
     /**
@@ -42,7 +45,9 @@ public class Database implements AutoCloseable {
             stmt.execute("PRAGMA foreign_keys = ON");
         }
         initializeSchema();
-        this.sharedConnection = SynchronizedConnection.wrap(connection);
+        SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
+        this.sharedConnection = synchronizing.proxy();
+        this.transactionRunner = new TransactionRunner(synchronizing);
     }
 
     /**
@@ -54,6 +59,14 @@ public class Database implements AutoCloseable {
      */
     public Connection getConnection() {
         return sharedConnection;
+    }
+
+    /**
+     * Returns the runner that executes multi-statement write units as single
+     * transactions (see {@link TransactionRunner}).
+     */
+    public TransactionRunner getTransactionRunner() {
+        return transactionRunner;
     }
 
     private void initializeSchema() throws SQLException {

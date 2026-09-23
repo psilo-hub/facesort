@@ -70,7 +70,8 @@ class ImportServiceTest {
         FakeFaceAiEngine engine = new FakeFaceAiEngine()
                 .withFaces(new DetectedFace(10, 10, 100, 100, 0.95f))
                 .withEmbedding(new float[]{1, 0, 0, 0, 0, 0, 0, 0});
-        return new ImportService(imageDao, faceDao, new FaceAiService(engine), config());
+        return new ImportService(imageDao, faceDao, new FaceAiService(engine), config(),
+                db.getTransactionRunner());
     }
 
     private Path createPhotos(int count) throws Exception {
@@ -328,7 +329,7 @@ class ImportServiceTest {
         }
         ConfigModel config = config();
         config.setMaxImportThreads(threads);
-        return new ImportService(imageDao, faceDao, services, config);
+        return new ImportService(imageDao, faceDao, services, config, db.getTransactionRunner());
     }
 
     private static CountingEngine countingEngine() {
@@ -612,7 +613,8 @@ class ImportServiceTest {
         long start = System.nanoTime();
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                List.of(new FaceAiService(e1), new FaceAiService(e2)), c)) {
+                List.of(new FaceAiService(e1), new FaceAiService(e2)), c,
+                db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
         long elapsedMs = (System.nanoTime() - start) / 1_000_000;
@@ -657,7 +659,7 @@ class ImportServiceTest {
         config.setMaxDetectionDimension(500);
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config)) {
+                new FaceAiService(engine), config, db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
 
@@ -693,7 +695,7 @@ class ImportServiceTest {
         RecordingEngine engine = new RecordingEngine(testFaces(), TEST_EMBEDDING);
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config())) {
+                new FaceAiService(engine), config(), db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
 

@@ -101,6 +101,11 @@ All notable changes to Face Sort will be documented in this file.
   removed, and importing the same content from parallel workers (photos or the
   same video frame) now resolves to "already imported" instead of an error
   (2026-09-22)
+- Multi-statement database writes are now transactional: a photo import (image
+  row + file path + faces), a video frame import (frame row + thumbnail +
+  faces + video link) and a dedupe merge (reassign faces + delete name) each
+  commit as one atomic unit, so a failure mid-write no longer leaves orphaned
+  or half-updated rows behind (2026-09-23)
 
 ### Fixed
 - No more cross-wired results in the tagging views: when actions overlap (switching

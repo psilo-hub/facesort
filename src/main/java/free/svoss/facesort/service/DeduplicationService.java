@@ -4,6 +4,7 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
@@ -36,6 +37,7 @@ public class DeduplicationService {
     private final NotDupeDao notDupeDao;
     private final ImageDao imageDao;
     private final VideoDao videoDao;
+    private final TransactionRunner transactionRunner;
 
     /** Candidate pairs sorted by descending similarity; built lazily. */
     private List<DupeCandidate> candidates;
@@ -49,22 +51,24 @@ public class DeduplicationService {
     /**
      * Creates a deduplication service.
      *
-     * @param faceAiService face similarity and embedding service
-     * @param faceDao       DAO for the faces table
-     * @param nameDao       DAO for the names table
-     * @param notDupeDao    DAO for the not_dupes table
-     * @param imageDao      DAO for the images and image_paths tables
-     * @param videoDao      DAO for the videos, video_paths and video_frames tables
+     * @param faceAiService     face similarity and embedding service
+     * @param faceDao           DAO for the faces table
+     * @param nameDao           DAO for the names table
+     * @param notDupeDao        DAO for the not_dupes table
+     * @param imageDao          DAO for the images and image_paths tables
+     * @param videoDao          DAO for the videos, video_paths and video_frames tables
+     * @param transactionRunner runner for the atomic merge write unit
      */
     public DeduplicationService(FaceAiService faceAiService, FaceDao faceDao,
                                 NameDao nameDao, NotDupeDao notDupeDao, ImageDao imageDao,
-                                VideoDao videoDao) {
+                                VideoDao videoDao, TransactionRunner transactionRunner) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notDupeDao = Objects.requireNonNull(notDupeDao, "notDupeDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
+        this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
 
     /**
@@ -125,8 +129,13 @@ public class DeduplicationService {
         if (survivorNameId == eliminatedNameId) {
             throw new IllegalArgumentException("survivor and eliminated name must differ");
         }
-        faceDao.reassignAll(eliminatedNameId, survivorNameId);
-        nameDao.delete(eliminatedNameId);
+        // Reassign and delete atomically: a failed merge must not leave the
+        // eliminated name without its faces (or half-moved faces).
+        transactionRunner.inTransaction(() -> {
+            faceDao.reassignAll(eliminatedNameId, survivorNameId);
+            nameDao.delete(eliminatedNameId);
+            return null;
+        });
         invalidate(eliminatedNameId);
     }
 

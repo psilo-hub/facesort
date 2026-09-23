@@ -70,12 +70,13 @@ class ImportCoordinatorTest {
     }
 
     private ImportService imageService(FaceAiService service) {
-        return new ImportService(imageDao, faceDao, List.of(service), config());
+        return new ImportService(imageDao, faceDao, List.of(service), config(),
+                db.getTransactionRunner());
     }
 
     private VideoImportService videoService(FaceAiService service) {
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(service),
-                config(), ImportCoordinatorTest::openSource);
+                config(), ImportCoordinatorTest::openSource, db.getTransactionRunner());
     }
 
     /**

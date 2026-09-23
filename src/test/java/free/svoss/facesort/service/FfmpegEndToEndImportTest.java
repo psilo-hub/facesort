@@ -104,7 +104,7 @@ class FfmpegEndToEndImportTest {
                     new ImageDao(db.getConnection()),
                     new FaceDao(db.getConnection()),
                     new VideoDao(db.getConnection()),
-                    List.of(faceAiService), config);
+                    List.of(faceAiService), config, db.getTransactionRunner());
             return service.importFolder(folder, null, () -> false);
         } finally {
             db.close();
