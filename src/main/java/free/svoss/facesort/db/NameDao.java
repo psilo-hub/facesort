@@ -13,6 +13,16 @@ import java.util.Optional;
  */
 public class NameDao {
 
+    /**
+     * SELECT prefix projecting each name together with the correlated count of
+     * faces currently tagged with it. All three read methods append their own
+     * WHERE/ORDER clause, and all three map rows through {@link #mapRow}.
+     */
+    private static final String SELECT_WITH_FACE_COUNT =
+            "SELECT id, name, "
+                    + "(SELECT COUNT(*) FROM faces f WHERE f.name_id = names.id) AS face_count "
+                    + "FROM names";
+
     private final Connection conn;
 
     public NameDao(Connection conn) {
@@ -42,12 +52,11 @@ public class NameDao {
      */
     public Optional<NameRecord> findByName(String name) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, name, (SELECT COUNT(*) FROM faces f WHERE f.name_id = names.id) AS face_count "
-                        + "FROM names WHERE name = ?")) {
+                SELECT_WITH_FACE_COUNT + " WHERE name = ?")) {
             ps.setString(1, name);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                return Optional.of(new NameRecord(rs.getLong("id"), rs.getString("name"), null, rs.getInt("face_count")));
+                return Optional.of(mapRow(rs));
             }
             return Optional.empty();
         }
@@ -58,12 +67,11 @@ public class NameDao {
      */
     public Optional<NameRecord> findById(long id) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, name, (SELECT COUNT(*) FROM faces f WHERE f.name_id = names.id) AS face_count "
-                        + "FROM names WHERE id = ?")) {
+                SELECT_WITH_FACE_COUNT + " WHERE id = ?")) {
             ps.setLong(1, id);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                return Optional.of(new NameRecord(rs.getLong("id"), rs.getString("name"), null, rs.getInt("face_count")));
+                return Optional.of(mapRow(rs));
             }
             return Optional.empty();
         }
@@ -75,10 +83,9 @@ public class NameDao {
     public List<NameRecord> findAll() throws SQLException {
         List<NameRecord> names = new ArrayList<>();
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, (SELECT COUNT(*) FROM faces f WHERE f.name_id = names.id) AS face_count "
-                     + "FROM names ORDER BY name")) {
+             ResultSet rs = stmt.executeQuery(SELECT_WITH_FACE_COUNT + " ORDER BY name")) {
             while (rs.next()) {
-                names.add(new NameRecord(rs.getLong("id"), rs.getString("name"), null, rs.getInt("face_count")));
+                names.add(mapRow(rs));
             }
         }
         return names;
@@ -124,5 +131,9 @@ public class NameDao {
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM names")) {
             return rs.next() ? rs.getInt(1) : 0;
         }
+    }
+
+    private NameRecord mapRow(ResultSet rs) throws SQLException {
+        return new NameRecord(rs.getLong("id"), rs.getString("name"), null, rs.getInt("face_count"));
     }
 }

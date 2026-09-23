@@ -138,4 +138,27 @@ class NameDaoTest {
         dao.delete(dao.findByName("Alice").orElseThrow().id());
         assertEquals(1, dao.count());
     }
+
+    @Test
+    void readMethods_populateTheCorrelatedFaceCount() throws Exception {
+        long alice = dao.insert("Alice");
+        long bob = dao.insert("Bob");
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        FaceDao faceDao = new FaceDao(db.getConnection());
+        imageDao.insert("imgA", 0, "{}", 1);
+        for (int i = 0; i < 3; i++) {
+            faceDao.insert(new FaceRecord(0, "imgA", i * 10, 0, 80, 80, 0.9,
+                    new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+        }
+        for (int i = 0; i < 2; i++) {
+            faceDao.insert(new FaceRecord(0, "imgA", i * 10, 100, 80, 80, 0.9,
+                    new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, bob));
+        }
+
+        assertEquals(3, dao.findById(alice).orElseThrow().faceCount());
+        assertEquals(3, dao.findByName("Alice").orElseThrow().faceCount());
+        assertEquals(2, dao.findById(bob).orElseThrow().faceCount());
+        NameRecord bobFromAll = dao.findAll().stream().filter(n -> n.id() == bob).findFirst().orElseThrow();
+        assertEquals(2, bobFromAll.faceCount(), "findAll must compute the same correlated count");
+    }
 }

@@ -127,6 +127,11 @@ All notable changes to Face Sort will be documented in this file.
   query live in one `SELECT_COLUMNS` constant instead of six duplicates, with a
   test pinning it to the columns the row mapper reads and to the physical
   schema (2026-09-23)
+- Names are always read through a single shared SELECT + row mapping (internal,
+  no visible behavior change): the correlated face-count subquery and the
+  `NameRecord` mapping that were repeated in each `NameDao` read method now live
+  in one place, covered by a test that all three readers compute the same face
+  count (2026-09-23)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -8,7 +8,7 @@ index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-23, full suite green: 308 tests / 35 classes, 0 failures).
+(2026-09-23, full suite green: 309 tests / 35 classes, 0 failures).
 
 ---
 
@@ -28,8 +28,10 @@ All line numbers below refer to the current state of the codebase
   column count matches `mapRow`) stops silent drift. Done — the shared `SELECT_COLUMNS`
   constant + two tests (constant ↔ `mapRow` columns, constant ↔ physical schema) landed
   in todo.txt item 17. **Low effort.**
-- [ ] **`NameDao` query dedup** — the correlated `face_count` subquery + name-row mapping
-  is duplicated 3× (`NameDao.java:45,61,78-81`). **Low effort.**
+- [x] **`NameDao` query dedup** — the correlated `face_count` subquery + name-row mapping
+  is duplicated 3× (`NameDao.java:45,61,78-81`). Done — the SELECT prefix is now the
+  `SELECT_WITH_FACE_COUNT` constant + a shared `mapRow`, with a new test asserting the
+  correlated count populates in all three read methods (todo.txt item 18). **Low effort.**
 - [ ] **Single source of truth for video extensions** — `VideoImportService.SUPPORTED_EXTENSIONS`
   (`VideoImportService.java:48-51`) and `FfmpegVideoFrameSource.demuxerName`
   (`FfmpegVideoFrameSource.java:163-180`) are two parallel extension tables that can drift
