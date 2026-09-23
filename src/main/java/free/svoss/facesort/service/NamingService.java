@@ -52,6 +52,7 @@ public final class NamingService {
     private final ImageDao imageDao;
     private final VideoDao videoDao;
     private final ConfigModel config;
+    private final NameService nameService;
 
     /**
      * Creates a naming service.
@@ -79,6 +80,7 @@ public final class NamingService {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.config = Objects.requireNonNull(config, "config");
+        this.nameService = new NameService(nameDao);
     }
 
     /**
@@ -237,15 +239,7 @@ public final class NamingService {
      * @throws SQLException             if the database operation fails
      */
     public long createOrFindName(String name) throws SQLException {
-        String trimmed = Objects.requireNonNull(name, "name").trim();
-        if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException("name must not be blank");
-        }
-        Optional<NameRecord> existing = nameDao.findByName(trimmed);
-        if (existing.isPresent()) {
-            return existing.get().id();
-        }
-        return nameDao.insert(trimmed);
+        return nameService.createOrFindName(name);
     }
 
     /**
@@ -259,7 +253,7 @@ public final class NamingService {
      * @throws SQLException         if the database operation fails
      */
     public Optional<NameRecord> findName(String name) throws SQLException {
-        return nameDao.findByName(Objects.requireNonNull(name, "name").trim());
+        return nameService.findName(name);
     }
 
     /**

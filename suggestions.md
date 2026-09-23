@@ -2,21 +2,24 @@
 
 Checklist of the improvement suggestions that are still **open**. The implemented
 ones (suggestions 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9) have been removed — their
-resolutions are recorded in `todo.txt` items 7–21 and `CHANGELOG.md`. HNSW index
+resolutions are recorded in `todo.txt` items 7–22 and `CHANGELOG.md`. HNSW index
 closing was dismissed with evidence (no `close()` on the pure-Java `HnswIndex`; the
 index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-23, full suite green: 313 tests / 36 classes, 0 failures).
+(2026-09-23, full suite green: 318 tests / 37 classes, 0 failures).
 
 ---
 
 ## 3c. Service-level duplication
 
-- [ ] **Extract a `NameService`** — `createOrFindName` / `findName` are near-identical
+- [x] **Extract a `NameService`** — `createOrFindName` / `findName` are near-identical
   in `NamingService.java:239-249,261-263` and `FaceToNameService.java:382-391,366-368`
-  (trim, `findByName`, insert). **High effort payoff, mostly mechanical.**
+  (trim, `findByName`, insert). Done — the trim/find/insert logic now lives once in the new
+  `NameService` (built over `NameDao`), both services delegate their public methods to it, and
+  `NameServiceTest` (5 cases) pins reuse/trim/blank/unknown behavior (todo.txt item 22).
+  **High effort payoff, mostly mechanical.**
 - [ ] **Extract an `EmbeddingMath`/`FaceSelector` utility** — "representative = face
   closest to the average embedding" is reimplemented 4×: `ClusteringService.pickRepresentative`
   (`ClusteringService.java:226-240`), `DeduplicationService.loadNamesWithAverages` argmax

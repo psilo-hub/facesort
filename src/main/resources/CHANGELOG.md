@@ -140,6 +140,10 @@ All notable changes to Face Sort will be documented in this file.
   behavior change): the import walk and the ffmpeg frame source now share a
   single extension → demuxer map (`VideoFormats`) instead of two parallel
   tables that could drift, with tests pinning them together (2026-09-23)
+- The name lookup/create logic is shared (internal, no visible behavior change):
+  the trim → find → insert helper behind "create or find name" and "find name"
+  now lives once in a shared `NameService`, used by both tagging workflows
+  (2026-09-23)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and
