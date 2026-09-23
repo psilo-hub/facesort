@@ -26,6 +26,17 @@ public class ConfigModel {
     /** Language code for the UI, one of the codes shipped in {@code i18n/messages*.properties}. */
     public static final String DEFAULT_LANGUAGE = "en";
 
+    // Lower bounds enforced by normalize() on load so hand-edited config files
+    // cannot produce degenerate values that surface as runtime errors later.
+    private static final int MIN_BOUNDING_BOX_SIZE = 1;
+    private static final int MIN_MAX_FACES_PER_IMAGE = 1;
+    private static final int MIN_MAX_DETECTION_DIMENSION = 16;
+    private static final int MIN_THUMBNAIL_SIZE = 1;
+    private static final int MIN_HNSW_M = 2;
+    private static final int MIN_HNSW_EF = 1;
+    private static final int MIN_KNN_K = 1;
+    private static final int MIN_FACE_NAME_MAX_IMAGES = 1;
+
     private String lastImportFolder = "";
 
     // Face detection criteria
@@ -78,6 +89,43 @@ public class ConfigModel {
 
     public ConfigModel() {
         // No-arg constructor required by Jackson for deserialization.
+    }
+
+    /**
+     * Normalizes the values of a deserialized config (or a hand-edited one)
+     * into ranges the rest of the application can rely on. Counts, dimensions
+     * and HNSW parameters are clamped to sensible lower bounds, ratios and
+     * similarities are clamped to [0, 1], and the import thread pool is capped
+     * at {@link #MAX_IMPORT_THREADS}. The defaults are already in range, so a
+     * fresh {@code ConfigModel} is left untouched.
+     *
+     * <p>The application's config file is only produced by this application and
+     * its UI constrains every field, so the main concern is a config file that
+     * was hand-edited (or written by a newer/or older build). Loading must not
+     * let such values surface later as FaceAI library or HNSW index errors.</p>
+     */
+    public void normalize() {
+        minBoundingBoxSize = clamp(minBoundingBoxSize, MIN_BOUNDING_BOX_SIZE, Integer.MAX_VALUE);
+        minConfidence = clamp(minConfidence, 0.0, 1.0);
+        maxFacesPerImage = clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE);
+        maxDetectionDimension = clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE);
+        clusteringThreshold = clamp(clusteringThreshold, 0.0, 1.0);
+        hnswM = clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE);
+        hnswEfConstruction = clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE);
+        hnswEfSearch = clamp(hnswEfSearch, MIN_HNSW_EF, Integer.MAX_VALUE);
+        knnK = clamp(knnK, MIN_KNN_K, Integer.MAX_VALUE);
+        thumbnailSize = clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE);
+        maxImportThreads = clamp(maxImportThreads, 1, MAX_IMPORT_THREADS);
+        minNameSimilarity = clamp(minNameSimilarity, 0.0, 1.0);
+        faceNameMaxImages = clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     public String getLastImportFolder() {

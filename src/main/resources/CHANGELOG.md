@@ -106,8 +106,20 @@ All notable changes to Face Sort will be documented in this file.
   faces + video link) and a dedupe merge (reassign faces + delete name) each
   commit as one atomic unit, so a failure mid-write no longer leaves orphaned
   or half-updated rows behind (2026-09-23)
+- The database schema is now versioned: `PRAGMA user_version` tracks the schema
+  version and existing databases are brought up to the current schema when they
+  are opened, so future schema changes can migrate old data instead of silently
+  missing columns (internal, no visible behavior change) (2026-09-23)
 
 ### Fixed
+- Feedback submissions and the automatic update check now give up instead of
+  hanging: both requests have a bounded network timeout (15 s feedback, 20 s
+  update check), so a stalled connection cannot leave the app waiting. The
+  update check's downloaded changelog is also written atomically, so an
+  interrupted write can never leave a truncated cache behind (2026-09-23)
+- Hand-edited config files can no longer break the app at runtime: values such
+  as a confidence above 100 %, a zero HNSW `M`, or a negative thread count are
+  clamped to safe ranges when the config is loaded (2026-09-23)
 - The "Saved" confirmation after changing the UI language is now actually visible:
   it is shown on the freshly rebuilt window instead of being attached to the view
   that the rebuild replaces (2026-09-23)

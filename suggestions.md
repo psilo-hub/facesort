@@ -262,27 +262,61 @@ migration (24+ `setStyle` sites; a pure-presentation change with no functional b
 
 ---
 
-## 8. Configuration, schema evolution & resource lifecycle (Medium)
+## ~~8. Configuration, schema evolution & resource lifecycle (Medium)~~ ✅ DONE
 
-- **No schema versioning**: all DDL is `CREATE TABLE IF NOT EXISTS` (`Database.java:
-  52-149`), with no `PRAGMA user_version` and no way to `ALTER` an existing table. The
-  schema cannot evolve non-additively. Consider a tiny versioned-migration helper.
-- **No `ConfigModel` validation on load**: hand-edited config can carry
-  `minConfidence = -1`, `hnswM = 0`, etc., which surface as library errors at runtime
-  (`ClusteringService.java:127-132`). Normalize/clamp after deserialization.
-- **HNSW index never closed**: `ClusteringService` builds an `HnswIndex` locally
-  (`ClusteringService.java:125-137`) and never releases it — a native/heap memory
-  leak if clustering runs repeatedly.
-- **Un-timed network calls**: `UpdateChecker` fetches a raw GitHub URL with no timeout
-  (`UpdateChecker.java:79`) and `FeedbackService` (`FeedbackService.java:62-88`) has no
-  explicit request timeout; add timeouts. Non-atomic cache write at
-  `UpdateChecker.java:87` (truncation risk).
-- **Hardcoded integrations**: `FeedbackService.ACCESS_KEY` (`FeedbackService.java:30`)
-  and `SUBMIT_URL`; `UpdateChecker.RELEASES_URL` + 2-day `CHECK_INTERVAL`
-  (`UpdateChecker.java:35`). The access key is a public form key (safe by design) but
-  could live in config for easier rotation.
-- **`FaceAiService.DEVICE = "CPU"`** (`FaceAiService.java:28`): GPU users get no choice;
-  this is a natural config field.
+**Solved 2026-09-23** — version migrations, clamp-on-load, network timeouts and an
+atomic cache write landed as one round. The HNSW-close concern was dismissed with
+evidence and two integrations were deferred deliberately (see below). See todo.txt
+item 12.
+
+Original findings, with the resolution of each:
+
+- **No schema versioning** ✅ FIXED: `Database.initializeSchema()` now reads
+  `PRAGMA user_version`; unversioned/older databases (version 0) are migrated by
+  the idempotent baseline DDL and stamped with the new `Database.SCHEMA_VERSION`
+  (currently 1). A `migrate(stmt, fromVersion)` seam is in place for future
+  non-additive changes, and opening a database stamped by a *newer* build is
+  tolerated (logged as a warning, nothing downgraded or dropped). Covered by the
+  new `db/DatabaseTest` (fresh stamping, tables/indexes present, idempotent
+  reopen that keeps data, unversioned legacy DB migration, newer-version
+  tolerance).
+- **No `ConfigModel` validation on load** ✅ FIXED: `ConfigModel.normalize()` is
+  invoked from `AppConfig.load` right after deserialization and clamps
+  hand-edited config into usable ranges: ratios/similarities
+  (`minConfidence`, `clusteringThreshold`, `minNameSimilarity`) to [0,1], counts
+  and HNSW parameters to documented minimums (`minBoundingBoxSize`,
+  `maxFacesPerImage`, `maxDetectionDimension`, `thumbnailSize`, `hnswM`,
+  `hnswEfConstruction`, `hnswEfSearch`, `knnK`, `faceNameMaxImages`), and
+  `maxImportThreads` to [1, `MAX_IMPORT_THREADS`]. Covered by `ConfigModelTest`
+  and an `AppConfigTest` load-clamp case.
+- **HNSW index never closed** ⏭️ DISMISSED (with evidence): the project's
+  hnswlib is the pure-Java `hnswlib-core` (no JNI/native heap), and its public
+  `HnswIndex` implements only `Index` — there is no `close()` to call. The index
+  built in `ClusteringService.buildIndex` is a method-local that becomes
+  GC-eligible as soon as `clusterUnnamed` returns, so repeated runs leak nothing.
+- **Un-timed network calls** ✅ FIXED: `FeedbackService` sets a bounded request
+  timeout (default 15s, `FeedbackService.REQUEST_TIMEOUT`, injectable for tests;
+  new test proves a server that never answers surfaces as a timeout instead of a
+  hang). `UpdateChecker` fetches through a package-private `RemoteFetcher` seam,
+  bounded by a 20s timeout on a daemon thread so a stalled network can neither
+  block startup nor the JVM exit. The changelog cache is now written atomically
+  (temp file + `ATOMIC_MOVE`, fallback to plain move) so an interrupted write
+  can no longer leave a truncated cache. Covered by seven new
+  `UpdateCheckerTest` cases driven through the seam.
+- **Hardcoded integrations** ⏭️ DEFERRED: `FeedbackService.ACCESS_KEY`/
+  `SUBMIT_URL` and `UpdateChecker`'s URL/`CHECK_INTERVAL` stay in code for now.
+  The access key is a public client-side form key (safe by design), and rotating
+  it would need either a config UI or a documented/config-validated JSON key —
+  neither pays off for a public key. Keeping it in code also preserves the
+  bundled-by-default behavior. Revisit only if key rotation ever becomes a real
+  workflow.
+- **`FaceAiService.DEVICE = "CPU"`** ⏭️ DEFERRED: the current `faceai` snapshot
+  does **not** consume the `device` setting — its DJL `Criteria` builders
+  (`RetinaFaceDetector.buildCriteria`, `FaceNetRecognizer.buildCriteria`) neither
+  set `optDevice` nor reference the config device. Exposing a device option now
+  would be a user-visible no-op. The right move is to add device support to the
+  `faceai` library first, then surface an app config field wired through
+  `FaceAiService.toFaceAIConfig`.
 
 ---
 

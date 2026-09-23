@@ -47,7 +47,9 @@ public final class AppConfig {
         if (!Files.exists(configFile)) {
             return getDefault();
         }
-        return MAPPER.readValue(configFile.toFile(), ConfigModel.class);
+        ConfigModel config = MAPPER.readValue(configFile.toFile(), ConfigModel.class);
+        config.normalize();
+        return config;
     }
 
     /**

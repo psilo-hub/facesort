@@ -29,6 +29,20 @@ class AppConfigTest {
     }
 
     @Test
+    void load_invalidHandEditedValues_areClampedByNormalize() throws Exception {
+        Path file = tempDir.resolve("tampered.json");
+        Files.writeString(file, "{ \"minConfidence\": 1.7, \"hnswM\": 0, \"maxImportThreads\": -2 }\n");
+
+        ConfigModel config = AppConfig.load(file);
+
+        assertEquals(1.0, config.getMinConfidence(),
+                "a detection threshold above 100% must be clamped");
+        assertEquals(2, config.getHnswM(), "a zero HNSW M would surface as an index error");
+        assertEquals(1, config.getMaxImportThreads(),
+                "a negative thread count must be clamped");
+    }
+
+    @Test
     void load_fileWithoutNewKeys_keepsDefaults() throws Exception {
         Path file = tempDir.resolve("old-config.json");
         Files.writeString(file, "{ \"dbName\": \"custom.db\", \"minNameSimilarity\": 0.5 }\n");

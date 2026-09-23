@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,6 +96,42 @@ class FeedbackServiceTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void submit_silentServer_hitsRequestTimeoutInsteadOfHanging() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/submit", exchange -> {
+            try {
+                Thread.sleep(2_000);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        server.start();
+        try {
+            FeedbackService service = new FeedbackService(
+                    HttpClient.newHttpClient(), serverUrl(server), Duration.ofMillis(500));
+
+            IOException ex = assertThrows(IOException.class,
+                    () -> service.submit("Report an error", "A definitely long enough message"));
+
+            assertTrue(isHttpTimeoutException(ex),
+                    "a server that never answers must surface as a timeout, got: " + ex);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static boolean isHttpTimeoutException(Throwable t) {
+        Throwable current = t;
+        while (current != null) {
+            if (current instanceof java.net.http.HttpTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static HttpServer mockServer(int status, String responseBody,

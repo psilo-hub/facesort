@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -27,17 +28,21 @@ public class FeedbackService {
     /** web3forms submission endpoint. */
     public static final String SUBMIT_URL = "https://api.web3forms.com/submit";
 
+    /** Maximum time a single submission may take before it is given up on. */
+    public static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
+
     private static final String ACCESS_KEY = "84f96b52-64e6-488a-910f-cb597637439f";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final HttpClient httpClient;
     private final String submitUrl;
+    private final Duration timeout;
 
     /**
      * Creates a feedback service that posts to the web3forms endpoint.
      */
     public FeedbackService() {
-        this(HttpClient.newHttpClient(), SUBMIT_URL);
+        this(HttpClient.newHttpClient(), SUBMIT_URL, REQUEST_TIMEOUT);
     }
 
     /**
@@ -47,8 +52,20 @@ public class FeedbackService {
      * @param submitUrl  the submission endpoint to post to; must not be null
      */
     FeedbackService(HttpClient httpClient, String submitUrl) {
+        this(httpClient, submitUrl, REQUEST_TIMEOUT);
+    }
+
+    /**
+     * Creates a feedback service with an explicit request timeout.
+     *
+     * @param httpClient the HTTP client to use; must not be null
+     * @param submitUrl  the submission endpoint to post to; must not be null
+     * @param timeout    maximum duration of a single submission; must be positive
+     */
+    FeedbackService(HttpClient httpClient, String submitUrl, Duration timeout) {
         this.httpClient = httpClient;
         this.submitUrl = submitUrl;
+        this.timeout = timeout;
     }
 
     /**
@@ -68,6 +85,7 @@ public class FeedbackService {
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(submitUrl))
                 .header("Content-Type", "application/json")
+                .timeout(timeout)
                 .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(payload),
                         StandardCharsets.UTF_8))
                 .build();

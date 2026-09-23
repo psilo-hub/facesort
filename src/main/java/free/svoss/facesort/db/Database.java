@@ -2,14 +2,26 @@ package free.svoss.facesort.db;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.nio.file.Path;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Manages SQLite database connection and schema initialization.
  */
 public class Database implements AutoCloseable {
+
+    private static final Logger LOG = Logger.getLogger(Database.class.getName());
+
+    /**
+     * Latest schema version, stored in the SQLite {@code PRAGMA user_version}.
+     * Old unversioned databases (version 0) are brought up to this version by
+     * applying the idempotent baseline DDL.
+     */
+    public static final int SCHEMA_VERSION = 1;
 
     private final Connection connection;
     private final Connection sharedConnection;
@@ -71,7 +83,47 @@ public class Database implements AutoCloseable {
 
     private void initializeSchema() throws SQLException {
         try (Statement stmt = connection.createStatement()) {
-            stmt.execute("""
+            int version = userVersion(stmt);
+            if (version > SCHEMA_VERSION) {
+                LOG.log(Level.WARNING,
+                        "Database schema version {0} is newer than the version this build supports "
+                                + "({1}); opening without migrating",
+                        new Object[]{version, SCHEMA_VERSION});
+            } else if (version < SCHEMA_VERSION) {
+                migrate(stmt, version);
+                stmt.execute("PRAGMA user_version = " + SCHEMA_VERSION);
+            }
+        }
+    }
+
+    /**
+     * Returns the schema version recorded in {@code PRAGMA user_version}.
+     * Databases created by older builds have no version stamp and report 0.
+     */
+    private static int userVersion(Statement stmt) throws SQLException {
+        try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    /**
+     * Brings the schema from {@code fromVersion} up to the current schema
+     * version. Version 0 means either a brand-new database or an unversioned
+     * database created by an older build, so the baseline DDL is applied; as
+     * the DDL is written with {@code IF NOT EXISTS} throughout it safely
+     * covers both cases. Future non-additive changes append further versioned
+     * statements here, chained from the version they start at.
+     */
+    private static void migrate(Statement stmt, int fromVersion) throws SQLException {
+        if (fromVersion <= 0) {
+            createBaselineSchema(stmt);
+        }
+        // Future migrations, e.g.:
+        // if (fromVersion < 2) { stmt.execute(...); }
+    }
+
+    private static void createBaselineSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS images (
                     hash            TEXT PRIMARY KEY,
                     detection_ts    INTEGER,
@@ -80,7 +132,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS image_paths (
                     hash  TEXT NOT NULL,
                     path  TEXT NOT NULL,
@@ -89,7 +141,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS thumbnails (
                     hash        TEXT PRIMARY KEY,
                     jpg_data    BLOB NOT NULL,
@@ -97,14 +149,14 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS names (
                     id   INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS faces (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
                     image_hash      TEXT NOT NULL,
@@ -122,7 +174,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS not_dupes (
                     name_id_a  INTEGER NOT NULL,
                     name_id_b  INTEGER NOT NULL,
@@ -132,7 +184,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS videos (
                     hash            TEXT PRIMARY KEY,
                     detection_ts    INTEGER,
@@ -143,7 +195,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS video_paths (
                     hash            TEXT NOT NULL,
                     path            TEXT NOT NULL,
@@ -152,7 +204,7 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("""
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS video_frames (
                     frame_hash      TEXT PRIMARY KEY,
                     video_hash      TEXT NOT NULL,
@@ -163,10 +215,9 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
-            stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
-            stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
-            stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
-        }
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
     }
 
     @Override
