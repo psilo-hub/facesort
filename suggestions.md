@@ -108,6 +108,9 @@ All line numbers below refer to the current state of the codebase
   (`VERSION_PATTERN`, `UpdateChecker.java:58`) to the GitHub Releases API, which already
   generates release notes in CI (`softprops/action-gh-release` with `generate_release_notes: true`,
   `.github/workflows/build.yml:108-114`). **Medium effort.**
-- [ ] **Build caching in CI** — every job re-clones and rebuilds FaceAI, rawGitHubFetcher and
+- [x] **Build caching in CI** — every job re-clones and rebuilds FaceAI, rawGitHubFetcher and
   ffmpeg4j from scratch (`.github/workflows/build.yml:19-35,71-87`); an `actions/cache` on
-  `~/.m2` would cut minutes per job. **Low effort, high payoff for CI time.**
+  `~/.m2` would cut minutes per job. Done — both build jobs now cache `~/.m2` per runner OS,
+  keyed on the repo pom (`actions/cache@v4`, `restore-keys` reuse across runs), so the
+  JavaFX/native dependency downloads no longer repeat on every run (todo.txt item 19).
+  **Low effort, high payoff for CI time.**

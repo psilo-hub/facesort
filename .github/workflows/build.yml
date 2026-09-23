@@ -16,6 +16,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Cache ~/.m2
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: m2-${{ runner.os }}-
       - name: Install FaceAI dependency
         shell: bash
         run: |
@@ -68,6 +74,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Cache ~/.m2
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: m2-${{ runner.os }}-
       - name: Install FaceAI dependency
         shell: bash
         run: |
