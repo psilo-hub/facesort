@@ -98,26 +98,31 @@ by the new `ImportWorkerPoolTest` and `ImportFilesTest`; full suite green.
 
 Extract a shared `ImportWorkerPool<T>` (or helper) and a `Thumbnailer` utility.
 
-### 3b. UI copy-paste across the five face-related views
-- `checkNameExists` is duplicated verbatim (`NameFaceView.java:249-289`,
-  `RandomNameView.java:160-200`), including the same green/red hex colors.
-- `installPathTooltip` is identical (`NameFaceView.java:453-472`,
-  `RandomNameView.java:465-484`).
-- The `isOriginalAvailable` / `isContainingFolderAvailable` / `openOriginal` /
-  `openContainingFolder` quartet is repeated across **five** views
-  (`DedupeView.java:364-420`, `ViewView.java:292-346`, `FaceNameView.java:493-547`,
-  `NameFaceView.java:501-555`, `RandomNameView.java:310-364`), along with the
-  near-identical context-menu builders and a `handleFailure`/`showError` Alert
-  (`ViewView.java:441-452`, `FaceNameView.java:839-850`, `NameFaceView.java:601-612`,
-  `RandomNameView.java:530-541`, `DedupeView.java:428-438`).
-- `setTask`/`startTask` (4×), `setImage(ImageView, FaceRecord)` (3× +
-  `ViewView.thumbnail`), the candidate-card `VBox` render loop (3×), and the
-  `tooltip(String)` helper (2×).
+### ~~3b. UI copy-paste across the five face-related views~~ ✅ DONE
 
-These are exactly the responsibilities of the two currently-unused components
-`FaceThumbnail` (`ui/components/FaceThumbnail.java`) and `ProgressDialog`
-(`ui/components/ProgressDialog.java`) — wire them in rather than deleting them, or
-create one `UiUtils`/`FacesTabs` helper to absorb the four-method cluster.
+**Solved 2026-09-23** — new `ui/FaceUi.java` absorbs the whole duplicated
+cluster; all five views (`View`, `Dedupe`, `FaceName`, `NameFace`, `RandomName`)
+now keep only their small private wiring:
+- `FaceUi.faceCard(FaceRecord, double)` renders the candidate card via the
+  shared `.candidate-card` CSS (8:5 internal thumbnail + wrapped tooltip);
+  `FaceUi.setImage` / `thumb(FaceRecord, double)` / `toImage(FaceRecord)`
+  centralize the `ImageView`-from-`FaceRecord` conversion that was inlined in
+  each view.
+- `FaceUi.installPathTooltip(Node, FaceRecord, String threadName,
+  Lookup<List<String>>)` + `wrappedTooltip` replace the per-view
+  `installPathTooltip`/`tooltip` pair.
+- `FaceUi.checkNameExistence(TextField, Label, TaskRunner, String, String,
+  String, Lookup<Optional<NameRecord>>)` unifies the duplicated `checkNameExists`
+  bodies (same green/red hex colors) while the per-view name-equality staleness
+  guard and i18n key prefixes are kept.
+- `FaceUi.FaceActions` (nested `Source` seam — `isOriginalAvailable` /
+  `isContainingFolderAvailable` / `openOriginal` / `openContainingFolder`) plus
+  `installFaceMenu(Node, FaceRecord, MenuItem...)` / `installMenu` replace the
+  `isOriginalAvailable`/`isContainingFolderAvailable`/`openOriginal`/
+  `openContainingFolder` quartet + `installContextMenu` in all five views.
+- `FaceUi.showError(Window, String, String, Throwable)` replaces each view's
+  `handleFailure`/Alert block.
+Full suite green (306 tests).
 
 ### 3c. Service-level duplication
 - `createOrFindName` / `findName` duplicated in `NamingService.java:239-263` and

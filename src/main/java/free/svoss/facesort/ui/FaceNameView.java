@@ -10,11 +10,8 @@ import free.svoss.facesort.service.FaceToNameService;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -24,8 +21,6 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -35,8 +30,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Window;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -77,8 +70,10 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private final Button renameButton = new Button(I18n.get("ui.faceName.rename"));
     private final Button exportButton = new Button(I18n.get("ui.faceName.export"));
 
-    private NameRecord activeName;
     private final TaskRunner taskRunner = new TaskRunner();
+    private final FaceUi.FaceActions faceActions;
+
+    private NameRecord activeName;
     private VBox rangeAnchor;
 
     /**
@@ -90,6 +85,34 @@ public class FaceNameView extends BorderPane implements Refreshable {
     public FaceNameView(FaceToNameService faceToNameService, ConfigModel config) {
         this.faceToNameService = faceToNameService;
         this.config = config;
+        this.faceActions = new FaceUi.FaceActions(
+                new FaceUi.FaceActions.Source() {
+                    @Override
+                    public boolean isOriginalAvailable(String hash) throws SQLException {
+                        return faceToNameService.isOriginalAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
+                        return faceToNameService.isContainingFolderAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean openOriginal(String hash) throws java.io.IOException, SQLException {
+                        return faceToNameService.openOriginal(hash);
+                    }
+
+                    @Override
+                    public boolean openContainingFolder(String hash) throws java.io.IOException, SQLException {
+                        return faceToNameService.openContainingFolder(hash);
+                    }
+                },
+                statusLabel::setText,
+                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
+                (message, ex) -> {
+                    statusLabel.setText(message);
+                    handleFailure(message, ex);
+                });
         buildUi();
         loadNames(false);
     }
@@ -126,16 +149,14 @@ public class FaceNameView extends BorderPane implements Refreshable {
         renameButton.setOnAction(e -> onRename());
         renameButton.disableProperty().bind(
                 nameList.getSelectionModel().selectedItemProperty().isNull());
-        renameButton.setTooltip(tooltip(I18n.get("ui.faceName.renameTooltip")));
+        renameButton.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.renameTooltip")));
 
         exportButton.setOnAction(e -> onExport());
         exportButton.disableProperty().bind(
                 nameList.getSelectionModel().selectedItemProperty().isNull());
-        exportButton.setTooltip(tooltip(I18n.get("ui.faceName.exportTooltip")));
+        exportButton.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.exportTooltip")));
 
-        Tooltip exclusionTip = new Tooltip(I18n.get("ui.faceName.excludeTooltip"));
-        exclusionTip.setWrapText(true);
-        exclusionTip.setMaxWidth(420);
+        Tooltip exclusionTip = FaceUi.wrappedTooltip(I18n.get("ui.faceName.excludeTooltip"));
         excludeOtherNamesBox.setTooltip(exclusionTip);
         excludeOtherNamesBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
             if (activeName != null) {
@@ -152,8 +173,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
         left.setPadding(new Insets(10));
         VBox.setVgrow(nameList, Priority.ALWAYS);
 
-        unnamedLabel.setTooltip(tooltip(I18n.get("ui.faceName.selectionHint")));
-        pathFilterField.setTooltip(tooltip(I18n.get("ui.faceName.pathFilterTooltip")));
+        unnamedLabel.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.selectionHint")));
+        pathFilterField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> {
             if (activeName != null) {
                 selectName(activeName);
@@ -323,23 +344,12 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private void renderCards(FlowPane pane, List<SimilarityResult> results, boolean selectable) {
         for (SimilarityResult candidate : results) {
             FaceRecord face = candidate.faceRecord();
-            VBox card = new VBox(4);
-            card.setAlignment(Pos.TOP_CENTER);
-            card.setPadding(new Insets(4));
-            card.setUserData(face.id());
-            card.getStyleClass().add("candidate-card");
-
-            ImageView thumb = new ImageView();
-            setImage(thumb, face);
-            thumb.setFitWidth(THUMBNAIL_SIZE);
-            thumb.setFitHeight(THUMBNAIL_SIZE);
-            thumb.setPreserveRatio(true);
-            thumb.setSmooth(true);
+            VBox card = FaceUi.faceCard(face, THUMBNAIL_SIZE);
 
             Label sim = new Label(I18n.percent(candidate.similarity()));
             sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
-            card.getChildren().addAll(thumb, sim);
+            card.getChildren().add(sim);
             if (selectable) {
                 card.setOnMouseClicked(e -> {
                     if (e.getButton() == MouseButton.PRIMARY) {
@@ -374,34 +384,17 @@ public class FaceNameView extends BorderPane implements Refreshable {
      *                             candidate faces)
      */
     private void installContextMenu(VBox card, FaceRecord face, boolean tagWithDifferentName) {
-        card.setOnContextMenuRequested(e -> {
-            List<MenuItem> items = new ArrayList<>(4);
-
-            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
-            openOriginalItem.setDisable(!isOriginalAvailable(face));
-            openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
-            items.add(openOriginalItem);
-
-            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
-            openContainingFolderItem.setDisable(!isContainingFolderAvailable(face));
-            openContainingFolderItem.setOnAction(ev -> openContainingFolder(face.imageHash()));
-            items.add(openContainingFolderItem);
-
-            MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
-            Optional<Path> filterFolder = filterFolderFor(face);
-            pasteFilterItem.setDisable(filterFolder.isEmpty());
-            pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
-            items.add(pasteFilterItem);
-
-            if (tagWithDifferentName) {
-                MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
-                differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
-                items.add(differentNameItem);
-            }
-
-            new ContextMenu(items.toArray(new MenuItem[0]))
-                    .show(card, e.getScreenX(), e.getScreenY());
-        });
+        MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
+        Optional<Path> filterFolder = filterFolderFor(face);
+        pasteFilterItem.setDisable(filterFolder.isEmpty());
+        pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
+        if (tagWithDifferentName) {
+            MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
+            differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
+            faceActions.installFaceMenu(card, face, pasteFilterItem, differentNameItem);
+        } else {
+            faceActions.installFaceMenu(card, face, pasteFilterItem);
+        }
     }
 
     /**
@@ -477,68 +470,6 @@ public class FaceNameView extends BorderPane implements Refreshable {
         pathFilterField.positionCaret(pathFilterField.getLength());
         if (activeName != null) {
             selectName(activeName);
-        }
-    }
-
-    /**
-     * Tells whether the original file of a face's source image exists on disk.
-     *
-     * @param face the face whose source image to check
-     * @return {@code true} if the original file is available
-     */
-    private boolean isOriginalAvailable(FaceRecord face) {
-        try {
-            return faceToNameService.isOriginalAvailable(face.imageHash());
-        } catch (SQLException ex) {
-            statusLabel.setText(I18n.get("common.originalCheckFailed"));
-            return false;
-        }
-    }
-
-    /**
-     * Opens the original file of a face's source image in the default viewer.
-     *
-     * @param hash content hash of the source image
-     */
-    private void openOriginal(String hash) {
-        try {
-            boolean opened = faceToNameService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            statusLabel.setText(I18n.get("common.openOriginalFailed"));
-            handleFailure(I18n.get("common.openOriginalFailed"), ex);
-        }
-    }
-
-    /**
-     * Tells whether the folder containing the original file of a face's source
-     * image exists on disk.
-     *
-     * @param face the face whose containing folder to check
-     * @return {@code true} if the containing folder is available
-     */
-    private boolean isContainingFolderAvailable(FaceRecord face) {
-        try {
-            return faceToNameService.isContainingFolderAvailable(face.imageHash());
-        } catch (SQLException ex) {
-            statusLabel.setText(I18n.get("common.originalCheckFailed"));
-            return false;
-        }
-    }
-
-    /**
-     * Opens the folder containing the original file of a face's source image in
-     * the file manager.
-     *
-     * @param hash content hash of the source image
-     */
-    private void openContainingFolder(String hash) {
-        try {
-            boolean opened = faceToNameService.openContainingFolder(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            statusLabel.setText(I18n.get("common.openContainingFolderFailed"));
-            handleFailure(I18n.get("common.openContainingFolderFailed"), ex);
         }
     }
 
@@ -771,35 +702,6 @@ public class FaceNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Builds a wrapped tooltip for a control explanation.
-     *
-     * @param text the tooltip text
-     * @return a tooltip that wraps its text within a maximum width
-     */
-    private static Tooltip tooltip(String text) {
-        Tooltip tooltip = new Tooltip(text);
-        tooltip.setWrapText(true);
-        tooltip.setMaxWidth(420);
-        return tooltip;
-    }
-
-    /**
-     * Shows the face's JPEG thumbnail in the given view, or clears it when
-     * the sub-image is unavailable.
-     *
-     * @param view the image view to update
-     * @param face the face whose bytes should be shown
-     */
-    private static void setImage(ImageView view, FaceRecord face) {
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg != null && jpg.length > 0) {
-            view.setImage(new Image(new ByteArrayInputStream(jpg)));
-        } else {
-            view.setImage(null);
-        }
-    }
-
-    /**
      * Raises a modal error dialog and resets the status bar.
      *
      * @param message the header text
@@ -807,15 +709,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
      */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(I18n.get("ui.faceName.alertTitle"));
-        alert.setHeaderText(message);
-        alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;
-        if (window != null) {
-            alert.initOwner(window);
-        }
-        alert.showAndWait();
+        FaceUi.showError(window, "ui.faceName.alertTitle", message, error);
     }
 
     /** Result bundle for a selected name: its best tagged faces and the

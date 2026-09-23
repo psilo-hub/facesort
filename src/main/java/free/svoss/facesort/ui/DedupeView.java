@@ -1,25 +1,19 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
-import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.service.DeduplicationService;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -51,12 +45,13 @@ public class DedupeView extends BorderPane {
 
     private final Label statusLabel = new Label(I18n.get("ui.dedupe.idleHint"));
     private final Label pairLabel = new Label();
-    private final ImageView faceAView = new ImageView();
-    private final ImageView faceBView = new ImageView();
+    private final ImageView faceAView = FaceUi.thumb(null, THUMBNAIL_SIZE);
+    private final ImageView faceBView = FaceUi.thumb(null, THUMBNAIL_SIZE);
     private final Label nameALabel = new Label();
     private final Label nameBLabel = new Label();
 
     private final TaskRunner taskRunner = new TaskRunner();
+    private final FaceUi.FaceActions faceActions;
     private DeduplicationService.DupeCandidate current;
     private int round;
     private boolean sessionActive;
@@ -68,6 +63,34 @@ public class DedupeView extends BorderPane {
      */
     public DedupeView(DeduplicationService dedupService) {
         this.dedupService = dedupService;
+        this.faceActions = new FaceUi.FaceActions(
+                new FaceUi.FaceActions.Source() {
+                    @Override
+                    public boolean isOriginalAvailable(String hash) throws SQLException {
+                        return dedupService.isOriginalAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
+                        return dedupService.isContainingFolderAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean openOriginal(String hash) throws IOException, SQLException {
+                        return dedupService.openOriginal(hash);
+                    }
+
+                    @Override
+                    public boolean openContainingFolder(String hash) throws IOException, SQLException {
+                        return dedupService.openContainingFolder(hash);
+                    }
+                },
+                statusLabel::setText,
+                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
+                (message, ex) -> {
+                    statusLabel.setText(message);
+                    handleFailure(message, ex);
+                });
         buildUi();
     }
 
@@ -76,9 +99,6 @@ public class DedupeView extends BorderPane {
      * buttons.
      */
     private void buildUi() {
-        configureThumbnail(faceAView);
-        configureThumbnail(faceBView);
-
         startButton.setOnAction(e -> startSession());
 
         HBox topBar = new HBox(10, startButton, statusLabel);
@@ -166,7 +186,7 @@ public class DedupeView extends BorderPane {
             if (sessionActive) {
                 endSession(I18n.get("ui.dedupe.loadFailed"));
             }
-            showError(I18n.get("ui.dedupe.loadFailed"), error);
+            handleFailure(I18n.get("ui.dedupe.loadFailed"), error);
         });
 
         taskRunner.start(task, "dedupe-pair-loader");
@@ -186,10 +206,10 @@ public class DedupeView extends BorderPane {
                 round, candidate.nameA(), candidate.nameB(), candidate.similarity()));
         nameALabel.setText(candidate.nameA());
         nameBLabel.setText(candidate.nameB());
-        faceAView.setImage(toImage(candidate.repFaceA()));
-        faceBView.setImage(toImage(candidate.repFaceB()));
-        installContextMenu(faceAView, candidate.repFaceA());
-        installContextMenu(faceBView, candidate.repFaceB());
+        FaceUi.setImage(faceAView, candidate.repFaceA());
+        FaceUi.setImage(faceBView, candidate.repFaceB());
+        faceActions.installFaceMenu(faceAView, candidate.repFaceA());
+        faceActions.installFaceMenu(faceBView, candidate.repFaceB());
         setDecisionEnabled(true);
     }
 
@@ -251,7 +271,7 @@ public class DedupeView extends BorderPane {
             loadNextPair();
         } catch (SQLException ex) {
             LOG.log(Level.WARNING, "Deduplication decision failed", ex);
-            showError(I18n.get("ui.dedupe.operationFailed"), ex);
+            handleFailure(I18n.get("ui.dedupe.operationFailed"), ex);
             setDecisionEnabled(true);
         }
     }
@@ -280,8 +300,8 @@ public class DedupeView extends BorderPane {
         nameBLabel.setText("");
         faceAView.setImage(null);
         faceBView.setImage(null);
-        installContextMenu(faceAView, null);
-        installContextMenu(faceBView, null);
+        faceActions.installFaceMenu(faceAView, null);
+        faceActions.installFaceMenu(faceBView, null);
         setDecisionEnabled(false);
         stopButton.setDisable(true);
         startButton.setDisable(false);
@@ -299,137 +319,15 @@ public class DedupeView extends BorderPane {
     }
 
     /**
-     * Decodes a face's JPEG sub-image into a JavaFX image, or returns
-     * {@code null} when no sub-image is available.
-     *
-     * @param face the face record to render
-     * @return the decoded image, or {@code null} when unavailable
-     */
-    private static Image toImage(FaceRecord face) {
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg == null || jpg.length == 0) {
-            return null;
-        }
-        return new Image(new ByteArrayInputStream(jpg));
-    }
-
-    /**
-     * Configures a face thumbnail ImageView to a fixed display size.
-     *
-     * @param view the ImageView to configure
-     */
-    private static void configureThumbnail(ImageView view) {
-        view.setFitWidth(THUMBNAIL_SIZE);
-        view.setFitHeight(THUMBNAIL_SIZE);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
-    }
-
-    /**
-     * Installs a right-click context menu on a face thumbnail with "Open
-     * Original" and "Open containing folder" entries, grayed out while the
-     * source image is not available on disk.
-     *
-     * @param node the node to attach the menu to
-     * @param face the face whose source image should be openable
-     */
-    private void installContextMenu(javafx.scene.Node node, FaceRecord face) {
-        if (face == null) {
-            node.setOnContextMenuRequested(null);
-            return;
-        }
-        node.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
-            openOriginalItem.setDisable(!isOriginalAvailable(face));
-            openOriginalItem.setOnAction(ev -> openOriginal(face.imageHash()));
-            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
-            openContainingFolderItem.setDisable(!isContainingFolderAvailable(face));
-            openContainingFolderItem.setOnAction(ev -> openContainingFolder(face.imageHash()));
-            new ContextMenu(openOriginalItem, openContainingFolderItem)
-                    .show(node, e.getScreenX(), e.getScreenY());
-        });
-    }
-
-    /**
-     * Tells whether the original file of a face's source image exists on disk.
-     *
-     * @param face the face whose source image to check
-     * @return {@code true} if the original file is available
-     */
-    private boolean isOriginalAvailable(FaceRecord face) {
-        try {
-            return dedupService.isOriginalAvailable(face.imageHash());
-        } catch (SQLException ex) {
-            LOG.log(Level.WARNING, "Could not check original availability for "
-                    + face.imageHash(), ex);
-            return false;
-        }
-    }
-
-    /**
-     * Tells whether the folder containing the original file of a face's source
-     * image exists on disk.
-     *
-     * @param face the face whose containing folder to check
-     * @return {@code true} if the containing folder is available
-     */
-    private boolean isContainingFolderAvailable(FaceRecord face) {
-        try {
-            return dedupService.isContainingFolderAvailable(face.imageHash());
-        } catch (SQLException ex) {
-            LOG.log(Level.WARNING, "Could not check containing folder for "
-                    + face.imageHash(), ex);
-            return false;
-        }
-    }
-
-    /**
-     * Opens the original file of a face's source image in the default viewer.
-     *
-     * @param hash content hash of the source image
-     */
-    private void openOriginal(String hash) {
-        try {
-            boolean opened = dedupService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
-            showError(I18n.get("common.openOriginalFailed"), ex);
-        }
-    }
-
-    /**
-     * Opens the folder containing the original file of a face's source image in
-     * the file manager.
-     *
-     * @param hash content hash of the source image
-     */
-    private void openContainingFolder(String hash) {
-        try {
-            boolean opened = dedupService.openContainingFolder(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            LOG.log(Level.WARNING, "Could not open containing folder of " + hash, ex);
-            showError(I18n.get("common.openContainingFolderFailed"), ex);
-        }
-    }
-
-    /**
-     * Shows a modal error dialog owned by this view's window.
+     * Raises a modal error dialog and resets the status bar.
      *
      * @param message the header text
      * @param error   the underlying exception
      */
-    private void showError(String message, Throwable error) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(I18n.get("ui.dedupe.alertTitle"));
-        alert.setHeaderText(message);
-        alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
+    private void handleFailure(String message, Throwable error) {
+        statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;
-        if (window != null) {
-            alert.initOwner(window);
-        }
-        alert.showAndWait();
+        FaceUi.showError(window, "ui.dedupe.alertTitle", message, error);
     }
 
     /**

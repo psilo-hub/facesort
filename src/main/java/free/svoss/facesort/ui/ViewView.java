@@ -1,14 +1,11 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
-import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.service.ViewService;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
@@ -26,8 +23,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * "View" tab: shows a grid of name cards (representative face, name, face
@@ -40,7 +35,6 @@ import java.util.logging.Logger;
  */
 public class ViewView extends BorderPane implements Refreshable {
 
-    private static final Logger LOG = Logger.getLogger(ViewView.class.getName());
     private static final double NAME_THUMBNAIL_SIZE = 120.0;
     private static final double IMAGE_THUMBNAIL_SIZE = 150.0;
 
@@ -54,6 +48,7 @@ public class ViewView extends BorderPane implements Refreshable {
     private final FlowPane imagesPane = new FlowPane(12, 12);
 
     private final TaskRunner taskRunner = new TaskRunner();
+    private final FaceUi.FaceActions faceActions;
     private boolean imagesMode;
     private long activeNameId;
     private String activeNameText = "";
@@ -65,6 +60,34 @@ public class ViewView extends BorderPane implements Refreshable {
      */
     public ViewView(ViewService viewService) {
         this.viewService = viewService;
+        this.faceActions = new FaceUi.FaceActions(
+                new FaceUi.FaceActions.Source() {
+                    @Override
+                    public boolean isOriginalAvailable(String hash) throws SQLException {
+                        return viewService.isOriginalAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
+                        return viewService.isContainingFolderAvailable(hash);
+                    }
+
+                    @Override
+                    public boolean openOriginal(String hash) throws IOException, SQLException {
+                        return viewService.openOriginal(hash);
+                    }
+
+                    @Override
+                    public boolean openContainingFolder(String hash) throws IOException, SQLException {
+                        return viewService.openContainingFolder(hash);
+                    }
+                },
+                statusLabel::setText,
+                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
+                (message, ex) -> {
+                    statusLabel.setText(message);
+                    handleFailure(message, ex);
+                });
         buildUi();
         loadNames();
     }
@@ -214,7 +237,7 @@ public class ViewView extends BorderPane implements Refreshable {
         countLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
         card.getChildren().addAll(
-                thumbnail(summary.representative(), NAME_THUMBNAIL_SIZE),
+                FaceUi.thumb(summary.representative(), NAME_THUMBNAIL_SIZE),
                 nameLabel, countLabel);
         card.setOnMouseClicked(e -> openNameImages(summary.name().id(), name));
         return card;
@@ -251,7 +274,7 @@ public class ViewView extends BorderPane implements Refreshable {
         box.getChildren().addAll(view, caption);
         box.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY) {
-                openOriginal(hash);
+                faceActions.openOriginal(hash);
             }
         });
         installContextMenu(box, image);
@@ -266,81 +289,9 @@ public class ViewView extends BorderPane implements Refreshable {
      * @param image the named image the box displays
      */
     private void installContextMenu(VBox box, ViewService.NamedImage image) {
-        String hash = image.hash();
-        box.setOnContextMenuRequested(e -> {
-            MenuItem openOriginalItem = new MenuItem(I18n.get("common.openOriginal"));
-            openOriginalItem.setDisable(!isOriginalAvailable(hash));
-            openOriginalItem.setOnAction(ev -> openOriginal(hash));
-            MenuItem openContainingFolderItem = new MenuItem(I18n.get("common.openContainingFolder"));
-            openContainingFolderItem.setDisable(!isContainingFolderAvailable(hash));
-            openContainingFolderItem.setOnAction(ev -> openContainingFolder(hash));
-            MenuItem untagItem = new MenuItem(I18n.format("ui.view.untagFrom", activeNameText));
-            untagItem.setOnAction(ev -> untagFaces(hash));
-            new ContextMenu(openOriginalItem, openContainingFolderItem, untagItem)
-                    .show(box, e.getScreenX(), e.getScreenY());
-        });
-    }
-
-    /**
-     * Tells whether an original file for the given image exists on disk.
-     *
-     * @param hash content hash of the image
-     * @return {@code true} if the original file is available
-     */
-    private boolean isOriginalAvailable(String hash) {
-        try {
-            return viewService.isOriginalAvailable(hash);
-        } catch (SQLException ex) {
-            LOG.log(Level.WARNING, "Could not check original availability for " + hash, ex);
-            return false;
-        }
-    }
-
-    /**
-     * Tells whether the folder containing the original file for the given image
-     * exists on disk.
-     *
-     * @param hash content hash of the image
-     * @return {@code true} if the containing folder is available
-     */
-    private boolean isContainingFolderAvailable(String hash) {
-        try {
-            return viewService.isContainingFolderAvailable(hash);
-        } catch (SQLException ex) {
-            LOG.log(Level.WARNING, "Could not check containing folder for " + hash, ex);
-            return false;
-        }
-    }
-
-    /**
-     * Opens the original file of an image in the default viewer.
-     *
-     * @param hash content hash of the image
-     */
-    private void openOriginal(String hash) {
-        try {
-            boolean opened = viewService.openOriginal(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            LOG.log(Level.WARNING, "Could not open original image " + hash, ex);
-            handleFailure(I18n.get("common.openOriginalFailed"), ex);
-        }
-    }
-
-    /**
-     * Opens the folder containing the original file of an image in the file
-     * manager.
-     *
-     * @param hash content hash of the image
-     */
-    private void openContainingFolder(String hash) {
-        try {
-            boolean opened = viewService.openContainingFolder(hash);
-            statusLabel.setText(opened ? "" : I18n.get("common.originalNotFound"));
-        } catch (IOException | SQLException ex) {
-            LOG.log(Level.WARNING, "Could not open containing folder of " + hash, ex);
-            handleFailure(I18n.get("common.openContainingFolderFailed"), ex);
-        }
+        MenuItem untagItem = new MenuItem(I18n.format("ui.view.untagFrom", activeNameText));
+        untagItem.setOnAction(ev -> untagFaces(image.hash()));
+        faceActions.installMenu(box, image.hash(), untagItem);
     }
 
     /**
@@ -374,27 +325,6 @@ public class ViewView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Decodes a face's JPEG sub-image, or returns an empty ImageView when the
-     * sub-image is unavailable.
-     *
-     * @param face the face record to render
-     * @param size the display size for the thumbnail
-     * @return the thumbnail node
-     */
-    private static ImageView thumbnail(FaceRecord face, double size) {
-        ImageView view = new ImageView();
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg != null && jpg.length > 0) {
-            view.setImage(new Image(new ByteArrayInputStream(jpg)));
-        }
-        view.setFitWidth(size);
-        view.setFitHeight(size);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
-        return view;
-    }
-
-    /**
      * Enables or disables interaction while a query runs.
      *
      * @param busy {@code true} while a query runs
@@ -412,14 +342,7 @@ public class ViewView extends BorderPane implements Refreshable {
      */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(I18n.get("ui.view.alertTitle"));
-        alert.setHeaderText(message);
-        alert.setContentText(error.getMessage() == null ? error.toString() : error.getMessage());
         Window window = getScene() != null ? getScene().getWindow() : null;
-        if (window != null) {
-            alert.initOwner(window);
-        }
-        alert.showAndWait();
+        FaceUi.showError(window, "ui.view.alertTitle", message, error);
     }
 }
