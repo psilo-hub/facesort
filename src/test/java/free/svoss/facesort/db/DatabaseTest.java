@@ -135,6 +135,60 @@ class DatabaseTest {
         }
     }
 
+    @Test
+    void deleteImageAndVideo_cascadesToDependentRows() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                stmt.execute("INSERT INTO images (hash, detection_ts, criteria_json, face_count) VALUES ('img1', 0, '{}', 1)");
+                stmt.execute("INSERT INTO images (hash, detection_ts, criteria_json, face_count) VALUES ('frameImg', 0, '{}', 1)");
+                stmt.execute("INSERT INTO image_paths (hash, path) VALUES ('img1', '/p/a.jpg')");
+                stmt.execute("INSERT INTO thumbnails (hash, jpg_data) VALUES ('img1', X'FF')");
+                stmt.execute("INSERT INTO names (name) VALUES ('Alice')");
+                stmt.execute("""
+                        INSERT INTO faces (image_hash, bbox_x, bbox_y, bbox_w, bbox_h,
+                            confidence, embedding, sub_image_jpg, name_id)
+                        VALUES ('img1', 10, 10, 80, 80, 0.9, X'00', X'FF',
+                            (SELECT id FROM names WHERE name = 'Alice'))
+                        """);
+                stmt.execute("INSERT INTO videos (hash, detection_ts, criteria_json, duration_secs) VALUES ('vid1', 0, '{}', 2.5)");
+                stmt.execute("INSERT INTO video_paths (hash, path) VALUES ('vid1', '/v/p.mp4')");
+                stmt.execute("INSERT INTO video_frames (frame_hash, video_hash, timestamp_ms) VALUES ('frameImg', 'vid1', 500)");
+
+                stmt.execute("DELETE FROM images WHERE hash = 'img1'");
+
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM image_paths WHERE hash = 'img1'"));
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM thumbnails WHERE hash = 'img1'"));
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM faces WHERE image_hash = 'img1'"));
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM names WHERE name = 'Alice'"),
+                        "names are reached via ON DELETE SET NULL and must survive");
+
+                stmt.execute("DELETE FROM videos WHERE hash = 'vid1'");
+
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM video_paths WHERE hash = 'vid1'"));
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM video_frames WHERE video_hash = 'vid1'"));
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM images WHERE hash = 'frameImg'"),
+                        "the frame image must survive the removal of its frame link");
+            }
+        }
+    }
+
+    @Test
+    void deleteFrameImage_cascadesToVideoFramesOnly() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                stmt.execute("INSERT INTO images (hash) VALUES ('frameImg')");
+                stmt.execute("INSERT INTO videos (hash) VALUES ('vid1')");
+                stmt.execute("INSERT INTO video_frames (frame_hash, video_hash, timestamp_ms) VALUES ('frameImg', 'vid1', 500)");
+
+                stmt.execute("DELETE FROM images WHERE hash = 'frameImg'");
+
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM video_frames WHERE frame_hash = 'frameImg'"));
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM videos WHERE hash = 'vid1'"),
+                        "the video must survive the removal of its frame reference");
+            }
+        }
+    }
+
     private static int userVersion(Database db) throws SQLException {
         try (Statement stmt = db.getConnection().createStatement();
              ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {

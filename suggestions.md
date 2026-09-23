@@ -351,7 +351,41 @@ Original findings, with the resolution of each:
 
 ---
 
-## 9. Test suite (Medium)
+## ~~9. Test suite (Medium)~~ ✅ DONE
+
+**Solved 2026-09-23** — see todo.txt item 14 for details. Resolution of each point:
+
+- **Timing-sensitive assertion** ✅ FIXED: `ImportServiceTest.importFolder_returnsOnlyAfterAllWorkersFinished`
+  no longer measures wall-clock time. Instead each `SleepEngine` bumps shared
+  `active`/`maxActive` counters, and the test asserts the workers really overlapped
+  (`maxActive == 2`) and that `importFolder` joined every worker before returning
+  (`active == 0` after the call) — deterministic on any machine.
+- **Weak assertions** ✅ FIXED: `findSimilarUnnamed_ranksMostSimilarFirst` now uses
+  distinct embeddings (identical vs orthogonal) and asserts the most-similar face is
+  the first result and the least similar is last; `rankSimilar_honorsLimit` asserts
+  that a limit of 1 returns the exact most-similar candidate.
+- **Real-video tests skip silently** ✅ FIXED: a new pure-Java `TinyAviVideo` helper
+  (test service package) writes a real 1 fps Motion-JPEG AVI (RIFF layout with
+  ffmpeg MKTAG-ordered fourccs) on the fly, so `FfmpegEndToEndImportTest` runs the
+  genuine native ffmpeg decode path in every environment and never uses
+  `assumeTrue`. The "unreadable header" failure mode is covered by a garbage file
+  that must surface as a clean `IOException`; the `AV_PIX_FMT_NONE` guard stays as
+  defensive code.
+- **Fakes duplicated** ✅ FIXED: `ImportServiceTest`'s and `VideoImportServiceTest`'s
+  local `CountingEngine`s now extend the shared `FakeFaceAiEngine` (which gained a
+  `detectCalls()` counter). The two *frame-source* fakes (`FakeVideoFrameSource`,
+  `FakeImportFrameSource`) are intentionally kept — they emulate frame delivery, a
+  different contract than the FaceAI engine seam.
+- **No tests for**: ✅ COVERED — `I18n` (`I18nTest`) and `UpdateChecker` runtime/cache
+  (`UpdateCheckerTest`) already existed and were verified present; this round adds
+  `FaceAiServiceTest` (`toFaceAIConfig` mapping incl. blank-cacheDir fallback, null
+  handling, argument contracts), `FaceDetectionUtilsTest` (criteria filtering,
+  max-faces cap, dropped-face counting on embedding failure, detection-scale mapping
+  back to original coordinates, criteria JSON), and DB FK-cascade tests
+  (`NameDaoTest.delete_setsFaceNameIdToNullWithoutDeletingFaces`;
+  `DatabaseTest` image/video cascades covering both FK directions).
+- **No Mockito**: kept as-is — the union of hand-rolled fakes was reduced by the
+  `CountingEngine` consolidation and reflects the existing seam design.
 
 Strengths: broad coverage (28 test classes), good seam design (`FaceAiService.Engine`,
 `VideoFrameSourceOpener`), per-DAO tests, and `InterfaceBetweenServices`-style fakes.

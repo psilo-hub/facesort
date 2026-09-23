@@ -210,12 +210,21 @@ class NamingServiceTest {
     void findSimilarUnnamed_ranksMostSimilarFirst() throws SQLException {
         long alice = nameDao.insert("Alice");
         long refId = addImageAndFace("imgA", alice);
-        addImageAndFace("imgU1", null);
-        addImageAndFace("imgU2", null);
+        // Identical embedding -> similarity 1.0; orthogonal embedding -> 0.0.
+        long closeFaceId = addFaceWithEmbedding("imgClose",
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        long farFaceId = addFaceWithEmbedding("imgFar",
+                new float[]{0, 1, 0, 0, 0, 0, 0, 0});
 
         List<SimilarityResult> results = service.findSimilarUnnamed(refId, 10);
 
         assertEquals(2, results.size());
+        assertEquals(closeFaceId, results.get(0).faceRecord().id(),
+                "the most similar face must come first");
+        assertEquals(farFaceId, results.get(1).faceRecord().id(),
+                "the least similar face must come last");
+        assertTrue(results.get(0).similarity() >= results.get(1).similarity(),
+                "similarities must be sorted descending");
     }
 
     @Test
@@ -262,7 +271,7 @@ class NamingServiceTest {
     @Test
     void rankSimilar_honorsLimit() throws SQLException {
         long refId = addFaceWithEmbedding("imgRef", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
-        addFaceWithEmbedding("imgA", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
+        long imgA = addFaceWithEmbedding("imgA", new float[]{1, 0, 0, 0, 0, 0, 0, 0});
         addFaceWithEmbedding("imgB", new float[]{0, 1, 0, 0, 0, 0, 0, 0});
 
         FaceRecord reference = faceDao.findById(refId).orElseThrow();
@@ -271,6 +280,8 @@ class NamingServiceTest {
                 service.rankSimilar(reference, faceDao.findUnnamed(), 1);
 
         assertEquals(1, results.size());
+        assertEquals(imgA, results.get(0).faceRecord().id(),
+                "with a limit of 1 the most similar candidate is returned");
     }
 
     @Test

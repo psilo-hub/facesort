@@ -188,55 +188,8 @@ class VideoImportServiceTest {
     }
 
     /** Engine that records how many frames it analysed. */
-    private static final class CountingEngine implements FaceAiService.Engine {
-
-        private final AtomicInteger detectCalls = new AtomicInteger();
-        private final DetectedFace[] faces;
-        private final float[] embedding;
-
-        CountingEngine(DetectedFace[] faces, float[] embedding) {
-            this.faces = faces;
-            this.embedding = embedding;
-        }
-
-        int detectCalls() {
-            return detectCalls.get();
-        }
-
-        @Override
-        public DetectedFace[] detectFaces(BufferedImage image) {
-            detectCalls.incrementAndGet();
-            return faces;
-        }
-
-        @Override
-        public float[] getEmbedding(BufferedImage image) {
-            return embedding;
-        }
-
-        @Override
-        public double calcSimilarity(float[] left, float[] right) {
-            return FakeFaceAiEngine.cosineSimilarity(left, right);
-        }
-
-        @Override
-        public float[] calcAverage(List<float[]> embeddings) {
-            float[] average = new float[embeddings.get(0).length];
-            for (float[] vector : embeddings) {
-                for (int i = 0; i < average.length; i++) {
-                    average[i] += vector[i];
-                }
-            }
-            for (int i = 0; i < average.length; i++) {
-                average[i] /= embeddings.size();
-            }
-            return average;
-        }
-
-        @Override
-        public void close() {
-            // nothing to release
-        }
+    private static FakeFaceAiEngine countingEngine() {
+        return new FakeFaceAiEngine().withFaces(ONE_FACE).withEmbedding(TEST_EMBEDDING);
     }
 
     private Path createVideo(Path dir, String name, String content) throws Exception {
@@ -507,8 +460,8 @@ class VideoImportServiceTest {
         createVideo(dir, "b.mp4", "3.0\nB");
         createVideo(dir, "c.mp4", "4.0\nC");
         createVideo(dir, "d.mp4", "5.0\nD");
-        CountingEngine engineA = new CountingEngine(ONE_FACE, TEST_EMBEDDING);
-        CountingEngine engineB = new CountingEngine(ONE_FACE, TEST_EMBEDDING);
+        FakeFaceAiEngine engineA = countingEngine();
+        FakeFaceAiEngine engineB = countingEngine();
 
         try (VideoImportService service = parallelService(2,
                 new FaceAiService(engineA), new FaceAiService(engineB))) {

@@ -4,6 +4,7 @@ import free.svoss.tools.faceai.DetectedFace;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Reusable fake FaceAI engine for service tests.
@@ -13,16 +14,22 @@ import java.util.List;
  * double. Similarity is plain cosine similarity and averaging is a
  * component-wise mean, which keeps the math simple to assert.</p>
  */
-final class FakeFaceAiEngine implements FaceAiService.Engine {
+class FakeFaceAiEngine implements FaceAiService.Engine {
 
     private DetectedFace[] faces = new DetectedFace[0];
     private float[] embedding = new float[]{1, 0, 0, 0, 0, 0, 0, 0};
     private boolean failEmbedding = false;
+    private final AtomicInteger detectCalls = new AtomicInteger();
 
     /** Sets the faces reported for every detected image. */
     FakeFaceAiEngine withFaces(DetectedFace... faces) {
         this.faces = faces;
         return this;
+    }
+
+    /** Returns how many images were offered to face detection. */
+    int detectCalls() {
+        return detectCalls.get();
     }
 
     /** Sets the embedding returned for every face crop. */
@@ -39,6 +46,7 @@ final class FakeFaceAiEngine implements FaceAiService.Engine {
 
     @Override
     public DetectedFace[] detectFaces(BufferedImage image) {
+        detectCalls.incrementAndGet();
         return faces;
     }
 

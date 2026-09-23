@@ -118,71 +118,20 @@ class ImportServiceTest {
         return new DetectedFace[]{new DetectedFace(10, 10, 100, 100, 0.95f)};
     }
 
-    /** Engine that records how many images it analysed. */
-    private static class CountingEngine implements FaceAiService.Engine {
-
-        private final AtomicInteger detectCalls = new AtomicInteger();
-        private final DetectedFace[] faces;
-        private final float[] embedding;
-
-        CountingEngine(DetectedFace[] faces, float[] embedding) {
-            this.faces = faces;
-            this.embedding = embedding;
-        }
-
-        int detectCalls() {
-            return detectCalls.get();
-        }
-
-        @Override
-        public DetectedFace[] detectFaces(BufferedImage image) {
-            detectCalls.incrementAndGet();
-            return faces;
-        }
-
-        @Override
-        public float[] getEmbedding(BufferedImage image) {
-            return embedding;
-        }
-
-        @Override
-        public double calcSimilarity(float[] left, float[] right) {
-            return FakeFaceAiEngine.cosineSimilarity(left, right);
-        }
-
-        @Override
-        public float[] calcAverage(List<float[]> embeddings) {
-            float[] average = new float[embeddings.get(0).length];
-            for (float[] vector : embeddings) {
-                for (int i = 0; i < average.length; i++) {
-                    average[i] += vector[i];
-                }
-            }
-            for (int i = 0; i < average.length; i++) {
-                average[i] /= embeddings.size();
-            }
-            return average;
-        }
-
-        @Override
-        public void close() {
-        }
-    }
-
     /**
      * Engine that records the dimensions of every image offered to face
      * detection and the largest face crop handed to embedding. Used to verify
      * that high-resolution images are downscaled before detection and that
      * embedding never sees oversized face crops.
      */
-    private static final class RecordingEngine extends CountingEngine {
+    private static final class RecordingEngine extends FakeFaceAiEngine {
 
         private int detectionWidth;
         private int detectionHeight;
         private final AtomicInteger maxEmbeddingDim = new AtomicInteger();
 
         RecordingEngine(DetectedFace[] faces, float[] embedding) {
-            super(faces, embedding);
+            withFaces(faces).withEmbedding(embedding);
         }
 
         int detectionWidth() {
@@ -218,7 +167,7 @@ class ImportServiceTest {
      * The {@code active}/{@code overlapSeen} counters are shared by every
      * engine so that concurrency is measured across workers, not per engine.
      */
-    private static final class BarrierEngine extends CountingEngine {
+    private static final class BarrierEngine extends FakeFaceAiEngine {
 
         private final CyclicBarrier barrier;
         private final AtomicInteger active;
@@ -226,7 +175,7 @@ class ImportServiceTest {
 
         BarrierEngine(CyclicBarrier barrier, AtomicInteger active, AtomicInteger overlapSeen,
                       DetectedFace[] faces, float[] embedding) {
-            super(faces, embedding);
+            withFaces(faces).withEmbedding(embedding);
             this.barrier = barrier;
             this.active = active;
             this.overlapSeen = overlapSeen;
@@ -255,20 +204,27 @@ class ImportServiceTest {
     }
 
     /**
-     * Engine whose face detection takes a configurable amount of time. Used to
-     * verify that {@code importFolder} joins every worker before it returns:
-     * when the method returns, no worker may still be inside {@code detectFaces}
-     * and the database must already contain the full import.
+     * Engine whose face detection takes a configurable amount of time and
+     * reports the number of workers currently inside {@code detectFaces}
+     * through shared counters. Used to verify both halves of the
+     * {@code importFolder} contract without a wall clock: the workers really
+     * overlap ({@code maxActive} reaches the worker count) and {@code importFolder}
+     * joins every worker before it returns ({@code active} is back to zero when
+     * the method returns, and the database already contains the full import).
+     * The counters are shared across engines so concurrency is measured across
+     * workers, not per engine.
      */
-    private static final class SleepEngine extends CountingEngine {
+    private static final class SleepEngine extends FakeFaceAiEngine {
 
         private final long delayMs;
-        private final AtomicInteger active = new AtomicInteger();
-        private final AtomicInteger maxActive = new AtomicInteger();
+        private final AtomicInteger active;
+        private final AtomicInteger maxActive;
 
-        SleepEngine(long delayMs) {
-            super(testFaces(), TEST_EMBEDDING);
+        SleepEngine(long delayMs, AtomicInteger active, AtomicInteger maxActive) {
+            withFaces(testFaces()).withEmbedding(TEST_EMBEDDING);
             this.delayMs = delayMs;
+            this.active = active;
+            this.maxActive = maxActive;
         }
 
         @Override
@@ -296,12 +252,12 @@ class ImportServiceTest {
      * cannot pull the next file from the shared counter, so the fixed pool is
      * forced to hand its first files to all engines before any of them finishes.
      */
-    private static final class GatingEngine extends CountingEngine {
+    private static final class GatingEngine extends FakeFaceAiEngine {
 
         private final CountDownLatch gate;
 
         GatingEngine(CountDownLatch gate) {
-            super(testFaces(), TEST_EMBEDDING);
+            withFaces(testFaces()).withEmbedding(TEST_EMBEDDING);
             this.gate = gate;
         }
 
@@ -321,9 +277,9 @@ class ImportServiceTest {
     }
 
     /** Builds a service that spreads work over the given engines. */
-    private ImportService parallelService(int threads, CountingEngine... engines) {
+    private ImportService parallelService(int threads, FakeFaceAiEngine... engines) {
         List<FaceAiService> services = new ArrayList<>();
-        for (CountingEngine engine : engines) {
+        for (FakeFaceAiEngine engine : engines) {
             services.add(new FaceAiService(engine));
         }
         ConfigModel config = config();
@@ -331,8 +287,8 @@ class ImportServiceTest {
         return new ImportService(imageDao, faceDao, services, config, db.getTransactionRunner());
     }
 
-    private static CountingEngine countingEngine() {
-        return new CountingEngine(testFaces(), TEST_EMBEDDING);
+    private static FakeFaceAiEngine countingEngine() {
+        return new FakeFaceAiEngine().withFaces(testFaces()).withEmbedding(TEST_EMBEDDING);
     }
 
     private static BarrierEngine barrierEngine(CyclicBarrier barrier, AtomicInteger active,
@@ -547,9 +503,9 @@ class ImportServiceTest {
     void importFolder_parallelCancellationKeepsStateConsistent() throws Exception {
         Path dir = createPhotos(6);
         AtomicInteger seen = new AtomicInteger();
-        CountingEngine engineA = countingEngine();
-        CountingEngine engineB = countingEngine();
-        CountingEngine engineC = countingEngine();
+        FakeFaceAiEngine engineA = countingEngine();
+        FakeFaceAiEngine engineB = countingEngine();
+        FakeFaceAiEngine engineC = countingEngine();
         try (ImportService service = parallelService(3, engineA, engineB, engineC)) {
             ImportService.ImportResult result = service.importFolder(dir,
                     summary -> seen.set(parseCompleted(summary)),
@@ -576,8 +532,8 @@ class ImportServiceTest {
     @Test
     void importFolder_parallelDuplicateContentRecordsNewPathWithoutErrors() throws Exception {
         Path dir = createPhotos(1);
-        CountingEngine engineA = countingEngine();
-        CountingEngine engineB = countingEngine();
+        FakeFaceAiEngine engineA = countingEngine();
+        FakeFaceAiEngine engineB = countingEngine();
         try (ImportService service = parallelService(2, engineA, engineB)) {
             service.importFolder(dir, null);
 
@@ -605,34 +561,32 @@ class ImportServiceTest {
     @Test
     void importFolder_returnsOnlyAfterAllWorkersFinished() throws Exception {
         Path dir = createPhotos(6);
-        SleepEngine e1 = new SleepEngine(40);
-        SleepEngine e2 = new SleepEngine(40);
+        AtomicInteger sharedActive = new AtomicInteger();
+        AtomicInteger sharedMaxActive = new AtomicInteger();
+        SleepEngine e1 = new SleepEngine(40, sharedActive, sharedMaxActive);
+        SleepEngine e2 = new SleepEngine(40, sharedActive, sharedMaxActive);
         ConfigModel c = config();
         c.setMaxImportThreads(2);
-        long start = System.nanoTime();
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
                 List.of(new FaceAiService(e1), new FaceAiService(e2)), c,
                 db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
-        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
         // Contract: importFolder returns only when every worker finished.
         assertEquals(6, result.totalFiles());
         assertEquals(6, result.processed());
         assertEquals(0, result.errors());
-        assertEquals(0, e1.active.get() + e2.active.get(),
+        assertEquals(0, sharedActive.get(),
                 "no worker may still run after importFolder returns");
+        assertEquals(2, sharedMaxActive.get(),
+                "the two workers must really overlap (parallel, not serialized)");
         assertEquals(6, imageDao.getAllHashes().size());
         assertEquals(6, faceDao.findUnnamed().size());
         for (String hash : imageDao.getAllHashes()) {
             assertTrue(imageDao.hasThumbnail(hash));
         }
-
-        // Parallelism sanity: 6 files x 40ms across 2 workers must not serialize (~240ms ideal).
-        assertTrue(elapsedMs < 1500,
-                "import ran too long; workers likely serialized: " + elapsedMs + "ms");
     }
 
     // ------------------------------------------------------------------

@@ -94,6 +94,12 @@ All notable changes to Face Sort will be documented in this file.
 - Tabs renamed (2026-09-19)
 - Changelog shortened (2026-09-19)
 - The UI refreshes immediately when the language is switched (2026-09-19)
+- Test suite hardened (internal, no visible behavior change): the video-import
+  end-to-end tests now run in every environment — a tiny test video is
+  generated in pure Java instead of the tests being skipped when the
+  git-ignored sample files are missing — and the import-parallelism,
+  face-detection error-path, naming-rank and database FK-cascade behaviors
+  gained deterministic assertions and new coverage (2026-09-23)
 - Database access is now single-lock: all DAO calls from any thread are
   serialized through one synchronized connection, so concurrent import
   workers, video import and the clustering/naming/dedup services can never

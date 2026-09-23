@@ -1,5 +1,6 @@
 package free.svoss.facesort.db;
 
+import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -83,6 +85,23 @@ class NameDaoTest {
         dao.delete(id);
         assertEquals(0, dao.count());
         assertTrue(dao.findById(id).isEmpty());
+    }
+
+    @Test
+    void delete_setsFaceNameIdToNullWithoutDeletingFaces() throws Exception {
+        long alice = dao.insert("Alice");
+        ImageDao imageDao = new ImageDao(db.getConnection());
+        FaceDao faceDao = new FaceDao(db.getConnection());
+        imageDao.insert("imgA", 0, "{}", 1);
+        long faceId = faceDao.insert(new FaceRecord(0, "imgA", 10, 10, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+
+        dao.delete(alice);
+
+        FaceRecord face = faceDao.findById(faceId).orElseThrow();
+        assertNull(face.nameId(),
+                "faces keep their image but must lose the deleted name reference");
+        assertEquals(1, imageDao.getAllHashes().size(), "the image itself must survive");
     }
 
     @Test
