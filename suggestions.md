@@ -74,7 +74,19 @@ A shared `TaskRunner` helper in the ui package would fix all sites at once.
 
 ## 3. Duplication (High effort payoff, mostly mechanical)
 
-### 3a. Import vs. video import orchestration
+### ~~3a. Import vs. video import orchestration~~ ✅ DONE
+
+**Solved 2026-09-23** — new shared `service/` helpers used by both imports:
+`ImportWorkerPool` (fixed pool of daemon worker threads claiming files off a
+shared counter, "Started/Completed i/N" progress, cancellation, exception and
+dropped-face error counting, and the unbounded join so `importFolder` never
+returns while a worker is still running), `ImportFiles` (the recursive
+`walkFileTree` collection + extension predicate, previously duplicated line for
+line), and `Thumbnailer` (downsize + JPEG encode; its `JPEG_QUALITY` is now the
+single 0.85f constant also used by `FaceDetectionUtils` for face sub-images).
+Each service keeps only its per-file `processFile`/`processVideo` logic. Covered
+by the new `ImportWorkerPoolTest` and `ImportFilesTest`; full suite green.
+
 `ImportService` and `VideoImportService` duplicate almost verbatim:
 - Worker thread pool creation, `runWorker`, `awaitWorkerCompletion`, progress reporting
   (`ImportService.java:141-262` vs `VideoImportService.java:163-283`).

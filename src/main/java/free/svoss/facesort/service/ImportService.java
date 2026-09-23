@@ -10,26 +10,13 @@ import free.svoss.facesort.util.ImageUtils;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Orchestrates the import of image files into the Face Sort database.
@@ -45,18 +32,14 @@ import java.util.logging.Logger;
  *   <li>Generates a thumbnail if one is not already stored.</li>
  * </ol>
  *
- * <p>Files are processed concurrently by a pool of worker threads, each with
- * its own {@link FaceAiService} (face models are not thread-safe). All database
- * access is serialized through a single lock because the shared SQLite
- * connection is not thread-safe either. Each file is processed independently;
- * errors are counted but do not abort the overall import.</p>
+ * <p>Files are processed concurrently by an {@link ImportWorkerPool} of worker
+ * threads, each with its own {@link FaceAiService} (face models are not
+ * thread-safe). All database access is serialized through a single lock because
+ * the shared SQLite connection is not thread-safe either. Each file is
+ * processed independently; errors are counted but do not abort the overall
+ * import.</p>
  */
 public class ImportService implements AutoCloseable {
-
-    private static final Logger LOG = Logger.getLogger(ImportService.class.getName());
-
-    /** JPEG quality for thumbnail encoding. */
-    private static final float JPEG_QUALITY = 0.85f;
 
     /** Supported image file extensions (case-insensitive, without the leading dot). */
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
@@ -140,131 +123,46 @@ public class ImportService implements AutoCloseable {
      */
     public ImportResult importFolder(Path folder, ProgressListener progress,
                                      BooleanSupplier cancelled) throws IOException {
-        List<Path> imageFiles = collectImageFiles(folder, cancelled);
+        List<Path> imageFiles = ImportFiles.collect(folder, SUPPORTED_EXTENSIONS, cancelled);
         if (imageFiles.isEmpty()) {
             return new ImportResult(0, 0, 0, 0, 0, 0, 0,
                     cancelled != null && cancelled.getAsBoolean());
         }
         int total = imageFiles.size();
 
-        int threads = Math.min(Math.max(1, config.getMaxImportThreads()), faceAiServices.size());
-
         int minBbox = config.getMinBoundingBoxSize();
         double minConfidence = config.getMinConfidence();
         int maxFacesPerImage = config.getMaxFacesPerImage();
         String criteriaJson = FaceDetectionUtils.buildCriteriaJson(minBbox, minConfidence, maxFacesPerImage);
 
-        AtomicInteger nextFile = new AtomicInteger();
         AtomicInteger newImages = new AtomicInteger();
         AtomicInteger newPaths = new AtomicInteger();
         AtomicInteger newFaces = new AtomicInteger();
         AtomicInteger skipped = new AtomicInteger();
-        AtomicInteger errors = new AtomicInteger();
-        AtomicInteger processed = new AtomicInteger();
-        AtomicBoolean stopped = new AtomicBoolean();
 
-        AtomicInteger workerIds = new AtomicInteger();
-        ExecutorService pool = Executors.newFixedThreadPool(threads, runnable -> {
-            Thread thread = new Thread(runnable,
-                    "import-worker-" + workerIds.getAndIncrement());
-            thread.setDaemon(true);
-            return thread;
-        });
-        List<Future<?>> futures = new ArrayList<>();
-        try {
-            for (int w = 0; w < threads; w++) {
-                final FaceAiService service = faceAiServices.get(w % faceAiServices.size());
-                futures.add(pool.submit(() -> runWorker(service, imageFiles, total, criteriaJson,
-                        minBbox, minConfidence, maxFacesPerImage, progress, cancelled,
-                        nextFile, newImages, newPaths, newFaces, skipped, errors,
-                        processed, stopped)));
-            }
-        } finally {
-            pool.shutdown();
-            awaitWorkerCompletion(futures);
-        }
+        ImportWorkerPool.Result worker = ImportWorkerPool.run(
+                config.getMaxImportThreads(), faceAiServices, "import-worker-",
+                imageFiles, progress, cancelled,
+                (service, file) -> {
+                    FileResult result = processFile(file, criteriaJson, minBbox,
+                            minConfidence, maxFacesPerImage, service);
+                    if (result.newImage) {
+                        newImages.incrementAndGet();
+                    }
+                    if (result.newPath) {
+                        newPaths.incrementAndGet();
+                    }
+                    if (result.skipped) {
+                        skipped.incrementAndGet();
+                    }
+                    newFaces.addAndGet(result.facesAdded);
+                    return result.droppedFaces;
+                });
 
-        boolean wasCancelled = stopped.get()
+        boolean wasCancelled = worker.stopped()
                 || (cancelled != null && cancelled.getAsBoolean());
         return new ImportResult(total, newImages.get(), newPaths.get(), newFaces.get(),
-                skipped.get(), errors.get(), processed.get(), wasCancelled);
-    }
-
-    /**
-     * Single worker loop: pulls file indices from the shared counter until the
-     * import is cancelled or all files are processed.
-     */
-    private void runWorker(FaceAiService service, List<Path> imageFiles, int total,
-                           String criteriaJson, int minBbox, double minConfidence,
-                           int maxFacesPerImage, ProgressListener progress,
-                           BooleanSupplier cancelled, AtomicInteger nextFile,
-                           AtomicInteger newImages, AtomicInteger newPaths,
-                           AtomicInteger newFaces, AtomicInteger skipped,
-                           AtomicInteger errors, AtomicInteger processed,
-                           AtomicBoolean stopped) {
-        for (int i = nextFile.getAndIncrement(); i < total; i = nextFile.getAndIncrement()) {
-            if (cancelled != null && cancelled.getAsBoolean()) {
-                stopped.set(true);
-                return;
-            }
-            Path file = imageFiles.get(i);
-            int index = i + 1;
-            reportProgress(progress, String.format(Locale.ROOT,
-                    "Started %d/%d: %s", index, total, file.getFileName()));
-            try {
-                FileResult result = processFile(file, criteriaJson, minBbox, minConfidence,
-                        maxFacesPerImage, service);
-                if (result.newImage) {
-                    newImages.incrementAndGet();
-                }
-                if (result.newPath) {
-                    newPaths.incrementAndGet();
-                }
-                if (result.skipped) {
-                    skipped.incrementAndGet();
-                }
-                newFaces.addAndGet(result.facesAdded);
-                if (result.droppedFaces > 0) {
-                    // Faces lost to a crop/embedding/encoding failure are
-                    // surfaced as a file error so they are not invisible to
-                    // the user, while the remaining faces are still stored.
-                    errors.incrementAndGet();
-                }
-            } catch (Exception e) {
-                LOG.log(Level.WARNING, "Error processing file: " + file, e);
-                errors.incrementAndGet();
-            }
-            processed.incrementAndGet();
-            reportProgress(progress, String.format(Locale.ROOT,
-                    "Completed %d/%d: %s", index, total, file.getFileName()));
-        }
-    }
-
-    private static void reportProgress(ProgressListener progress, String message) {
-        if (progress != null) {
-            synchronized (progress) {
-                progress.onProgress(message);
-            }
-        }
-    }
-
-    /**
-     * Blocks until every worker future completes. Unbounded: {@code importFolder}
-     * must not report completion while workers are still importing. An interruption
-     * (JVM shutdown) stops the join and returns the current aggregate; a worker
-     * that dies unexpectedly is logged and the remaining workers are still joined.
-     */
-    private static void awaitWorkerCompletion(List<Future<?>> futures) {
-        for (Future<?> future : futures) {
-            try {
-                future.get();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            } catch (ExecutionException e) {
-                LOG.log(Level.SEVERE, "Import worker failed unexpectedly", e.getCause());
-            }
-        }
+                skipped.get(), worker.errors(), worker.processed(), wasCancelled);
     }
 
     /**
@@ -357,7 +255,7 @@ public class ImportService implements AutoCloseable {
         if (thumbnailPresent(hash)) {
             return;
         }
-        byte[] thumbJpg = encodeThumbnail(image);
+        byte[] thumbJpg = Thumbnailer.encode(image, config.getThumbnailSize());
         saveThumbnailIfAbsent(hash, thumbJpg);
     }
 
@@ -375,8 +273,7 @@ public class ImportService implements AutoCloseable {
             return;
         }
         BufferedImage image = ImageUtils.readImage(file);
-        byte[] thumbJpg = encodeThumbnail(image);
-        saveThumbnailIfAbsent(hash, thumbJpg);
+        saveThumbnailIfAbsent(hash, Thumbnailer.encode(image, config.getThumbnailSize()));
     }
 
     private boolean thumbnailPresent(String hash) throws SQLException {
@@ -387,66 +284,6 @@ public class ImportService implements AutoCloseable {
         if (!imageDao.hasThumbnail(hash)) {
             imageDao.saveThumbnail(hash, thumbJpg);
         }
-    }
-
-    private byte[] encodeThumbnail(BufferedImage image) throws IOException {
-        int thumbSize = config.getThumbnailSize();
-        BufferedImage thumbnail = ImageUtils.downsize(image, thumbSize);
-        return ImageUtils.toJpegBytes(thumbnail, JPEG_QUALITY);
-    }
-
-    // ---- File collection ----
-
-    /**
-     * Recursively collects all supported image files under {@code root}.
-     *
-     * <p>The walk terminates as soon as {@code cancelled} reports {@code true},
-     * potentially returning a partial list.</p>
-     *
-     * @param root      the root directory to scan
-     * @param cancelled supplier consulted before each file and directory; when
-     *                  it returns {@code true} the scan stops (may be {@code null})
-     */
-    private List<Path> collectImageFiles(Path root, BooleanSupplier cancelled) throws IOException {
-        List<Path> files = new ArrayList<>();
-        Files.walkFileTree(root, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                if (cancelled != null && cancelled.getAsBoolean()) {
-                    return FileVisitResult.TERMINATE;
-                }
-                if (attrs.isRegularFile() && isSupportedImage(file)) {
-                    files.add(file);
-                }
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                return (cancelled != null && cancelled.getAsBoolean())
-                        ? FileVisitResult.TERMINATE
-                        : FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                LOG.log(Level.WARNING, "Cannot access file: " + file, exc);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-        return files;
-    }
-
-    /**
-     * Returns {@code true} if the file has a supported image extension.
-     */
-    private static boolean isSupportedImage(Path file) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        int dot = name.lastIndexOf('.');
-        if (dot < 0) {
-            return false;
-        }
-        return SUPPORTED_EXTENSIONS.contains(name.substring(dot + 1));
     }
 
     @Override

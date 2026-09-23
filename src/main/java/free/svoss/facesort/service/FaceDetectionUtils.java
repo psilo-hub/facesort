@@ -31,9 +31,6 @@ final class FaceDetectionUtils {
     /** Maximum dimension (width or height) for face sub-image thumbnails. */
     private static final int SUB_IMAGE_MAX_DIM = 160;
 
-    /** JPEG quality for face sub-image encoding. */
-    private static final float SUB_IMAGE_JPEG_QUALITY = 0.85f;
-
     private FaceDetectionUtils() {
         // Utility class - not instantiable
     }
@@ -82,7 +79,7 @@ final class FaceDetectionUtils {
                 BufferedImage faceCrop = face.crop(image);
                 BufferedImage faceThumb = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
                 float[] embedding = service.getEmbedding(faceThumb);
-                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, SUB_IMAGE_JPEG_QUALITY);
+                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, Thumbnailer.JPEG_QUALITY);
 
                 faceRecords.add(new FaceRecord(
                         0, imageHash,

@@ -116,6 +116,12 @@ All notable changes to Face Sort will be documented in this file.
   version and existing databases are brought up to the current schema when they
   are opened, so future schema changes can migrate old data instead of silently
   missing columns (internal, no visible behavior change) (2026-09-23)
+- The photo and video import pipelines share one worker pool, one recursive
+  file walker and one thumbnail encoder (internal, no visible behavior change):
+  the parallel worker-thread pool with cancellation/progress/error counting,
+  the `.extension` file walk and the JPEG thumbnail encoding were extracted from
+  `ImportService`/`VideoImportService` into shared helpers, and a single JPEG
+  quality constant applies to thumbnails and face sub-images (2026-09-23)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and
