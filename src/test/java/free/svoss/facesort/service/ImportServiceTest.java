@@ -5,7 +5,6 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.model.FaceRecord;
-import free.svoss.facesort.util.EmbeddingUtils;
 import free.svoss.tools.faceai.DetectedFace;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -148,7 +147,7 @@ class ImportServiceTest {
 
         @Override
         public double calcSimilarity(float[] left, float[] right) {
-            return EmbeddingUtils.cosineSimilarity(left, right);
+            return FakeFaceAiEngine.cosineSimilarity(left, right);
         }
 
         @Override

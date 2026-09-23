@@ -6,7 +6,6 @@ import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
-import free.svoss.facesort.model.VideoFrameLinkRecord;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
 
@@ -314,7 +313,6 @@ public class VideoImportService implements AutoCloseable {
         // ---- New-video branch: heavy work happens outside the DB ----
         int framesAdded = 0;
         int facesAdded = 0;
-        int linkedFrames = 0;
         int droppedFaces = 0;
         try (VideoFrameSource source = sourceOpener.open(file)) {
             double duration = source.getDuration();
@@ -366,14 +364,12 @@ public class VideoImportService implements AutoCloseable {
                         }
                         stored = true;
                     }
-                    // The link is dropped when another video already imported
-                    // the same frame (a frame belongs to at most one video), so
-                    // only links that actually exist are counted.
-                    int links = videoDao.linkFrame(frameHash, hash, timestampMs);
-                    return new FrameOutcome(stored, links, faceRecords.size());
+                    // A link is dropped when another video already imported
+                    // the same frame (a frame belongs to at most one video).
+                    videoDao.linkFrame(frameHash, hash, timestampMs);
+                    return new FrameOutcome(stored, faceRecords.size());
                 });
 
-                linkedFrames += outcome.linksAdded;
                 droppedFaces += detection.droppedFaces();
                 if (outcome.storedNewFrame) {
                     framesAdded++;
@@ -381,14 +377,6 @@ public class VideoImportService implements AutoCloseable {
                 }
             }
 
-            // Persist the final counts on the video row, derived from the links
-            // and their stored faces so the videos row stays consistent with
-            // the video_frames and images tables.
-            int linkedFaces = 0;
-            for (VideoFrameLinkRecord link : videoDao.findFramesForVideo(hash)) {
-                linkedFaces += faceDao.findByImageHash(link.frameHash()).size();
-            }
-            videoDao.updateVideoCounts(hash, linkedFrames, linkedFaces);
             return VideoFileResult.newVideo(framesAdded, facesAdded, droppedFaces);
         }
     }
@@ -504,10 +492,9 @@ public class VideoImportService implements AutoCloseable {
      * Outcome of storing one sampled frame.
      *
      * @param storedNewFrame whether a new image row (thumbnail + faces) was written
-     * @param linksAdded     how many {@code video_frames} links were inserted
      * @param facesAdded     faces detected on the frame when it was new
      */
-    private record FrameOutcome(boolean storedNewFrame, int linksAdded, int facesAdded) {
+    private record FrameOutcome(boolean storedNewFrame, int facesAdded) {
     }
 
     /**

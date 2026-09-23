@@ -4,8 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Utility class for serializing and deserializing float arrays (face embeddings)
- * and computing similarity metrics.
+ * Utility class for serializing and deserializing float arrays (face embeddings).
  */
 public final class EmbeddingUtils {
 
@@ -52,38 +51,5 @@ public final class EmbeddingUtils {
             result[i] = buffer.getFloat();
         }
         return result;
-    }
-
-    /**
-     * Computes the cosine similarity between two float vectors.
-     * Both vectors must have the same length.
-     *
-     * @param a the first vector
-     * @param b the second vector
-     * @return the cosine similarity in the range [-1.0, 1.0],
-     *         or 0.0 if either vector is zero-length
-     * @throws IllegalArgumentException if the vectors have different lengths
-     */
-    public static float cosineSimilarity(float[] a, float[] b) {
-        if (a.length != b.length) {
-            throw new IllegalArgumentException(
-                    "Vectors must have the same length: " + a.length + " vs " + b.length);
-        }
-
-        float dotProduct = 0.0f;
-        float normA = 0.0f;
-        float normB = 0.0f;
-
-        for (int i = 0; i < a.length; i++) {
-            dotProduct += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
-        }
-
-        if (normA == 0.0f || normB == 0.0f) {
-            return 0.0f;
-        }
-
-        return dotProduct / (float) (Math.sqrt(normA) * Math.sqrt(normB));
     }
 }

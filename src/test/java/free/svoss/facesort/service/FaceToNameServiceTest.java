@@ -8,7 +8,6 @@ import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.SimilarityResult;
-import free.svoss.facesort.util.EmbeddingUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -400,7 +399,7 @@ class FaceToNameServiceTest {
         assertTrue(preview.isPresent());
         assertEquals(representative, preview.get().representative().id(),
                 "the face closest to the name's average embedding must be presented");
-        assertEquals(EmbeddingUtils.cosineSimilarity(
+        assertEquals(FakeFaceAiEngine.cosineSimilarity(
                         new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, xLike()),
                 preview.get().similarity(), 1e-6,
                 "the similarity between the candidate face and the name's average must be reported");

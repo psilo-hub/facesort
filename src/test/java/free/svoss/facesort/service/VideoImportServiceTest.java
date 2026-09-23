@@ -8,7 +8,6 @@ import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.VideoFrameLinkRecord;
 import free.svoss.facesort.model.VideoRecord;
-import free.svoss.facesort.util.EmbeddingUtils;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
 import free.svoss.tools.faceai.DetectedFace;
@@ -217,7 +216,7 @@ class VideoImportServiceTest {
 
         @Override
         public double calcSimilarity(float[] left, float[] right) {
-            return EmbeddingUtils.cosineSimilarity(left, right);
+            return FakeFaceAiEngine.cosineSimilarity(left, right);
         }
 
         @Override

@@ -2,7 +2,6 @@ package free.svoss.facesort.util;
 
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -57,42 +56,6 @@ public final class ImageUtils {
         }
 
         return resized;
-    }
-
-    /**
-     * Crops an image to the specified rectangular region.
-     * The region coordinates are rounded to the nearest integer.
-     *
-     * <p>Regions that partially overlap the image are clamped to the image
-     * bounds, so a slightly out-of-bounds face bounding box still produces a
-     * usable crop. If the region does not overlap the image at all, an
-     * exception is thrown.</p>
-     *
-     * @param img    the source image
-     * @param region the region to crop (in image coordinates)
-     * @return the cropped image
-     * @throws IllegalArgumentException if the region does not overlap the image bounds
-     */
-    public static BufferedImage crop(BufferedImage img, Rectangle2D region) {
-        int x0 = (int) Math.round(region.getX());
-        int y0 = (int) Math.round(region.getY());
-        int x1 = x0 + (int) Math.round(region.getWidth());
-        int y1 = y0 + (int) Math.round(region.getHeight());
-
-        // Clamp to image bounds (partial overlap is tolerated)
-        int cx0 = Math.max(x0, 0);
-        int cy0 = Math.max(y0, 0);
-        int cx1 = Math.min(x1, img.getWidth());
-        int cy1 = Math.min(y1, img.getHeight());
-
-        int w = cx1 - cx0;
-        int h = cy1 - cy0;
-
-        if (w <= 0 || h <= 0) {
-            throw new IllegalArgumentException("Crop region does not overlap the image bounds");
-        }
-
-        return img.getSubimage(cx0, cy0, w, h);
     }
 
     /**

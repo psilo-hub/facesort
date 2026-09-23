@@ -1,10 +1,10 @@
 package free.svoss.facesort.db;
 
+import free.svoss.facesort.model.NamePair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,9 +55,9 @@ class NotDupeDaoTest {
 
         dao.insert(b, a); // reversed
 
-        List<long[]> all = dao.findAll();
+        List<NamePair> all = dao.findAll();
         assertEquals(1, all.size(), "reversed insert must not create a duplicate row");
-        assertTrue(Arrays.equals(new long[]{a, b}, all.get(0)),
+        assertEquals(new NamePair(a, b), all.get(0),
                 "pair must be stored normalized as (min, max)");
     }
 
@@ -69,7 +69,7 @@ class NotDupeDaoTest {
         dao.insert(a, b);
         dao.insert(a, c);
 
-        List<long[]> pairs = dao.findByNameId(a);
+        List<NamePair> pairs = dao.findByNameId(a);
         assertEquals(2, pairs.size(), "both pairs involving Alice are returned");
 
         // a pair not involving Alice must not appear

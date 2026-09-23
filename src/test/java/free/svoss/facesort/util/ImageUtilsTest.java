@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -80,38 +79,6 @@ class ImageUtilsTest {
         assertTrue(decoded != null, "decoded image must not be null");
         assertEquals(20, decoded.getWidth());
         assertEquals(30, decoded.getHeight());
-    }
-
-    @Test
-    void crop_insideImage_returnsCorrectSizeAndContent() {
-        BufferedImage img = solidImage(4, 4, Color.WHITE);
-        Graphics2D g = img.createGraphics();
-        try {
-            g.setColor(Color.BLACK);
-            g.fillRect(1, 1, 2, 2);
-        } finally {
-            g.dispose();
-        }
-
-        BufferedImage cropped = ImageUtils.crop(img, new Rectangle2D.Double(1, 1, 2, 2));
-        assertEquals(2, cropped.getWidth());
-        assertEquals(2, cropped.getHeight());
-        assertEquals(Color.BLACK.getRGB(), cropped.getRGB(0, 0), "crop content must match the painted region");
-    }
-
-    @Test
-    void crop_partialOverlap_clampsToImageBounds() {
-        BufferedImage img = solidImage(4, 4, Color.WHITE);
-        BufferedImage cropped = ImageUtils.crop(img, new Rectangle2D.Double(-2, -2, 4, 4));
-        assertEquals(2, cropped.getWidth(), "left/top overflow is clamped away");
-        assertEquals(2, cropped.getHeight(), "left/top overflow is clamped away");
-    }
-
-    @Test
-    void crop_noOverlap_throws() {
-        BufferedImage img = solidImage(4, 4, Color.WHITE);
-        assertThrows(IllegalArgumentException.class,
-                () -> ImageUtils.crop(img, new Rectangle2D.Double(10, 10, 5, 5)));
     }
 
     @Test

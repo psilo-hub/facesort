@@ -7,22 +7,6 @@
     -fx-font-size: 14px;
 }
 
-/* ---- Face thumbnails ---- */
-
-.face-thumbnail {
-    -fx-border-color: #dddddd;
-    -fx-border-width: 1px;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
-    -fx-background-color: white;
-    -fx-padding: 2px;
-}
-
-.face-thumbnail.selected {
-    -fx-border-color: #4a90d9;
-    -fx-border-width: 3px;
-}
-
 /* ---- Tab panes ---- */
 
 .tab-pane {

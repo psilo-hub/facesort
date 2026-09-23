@@ -1,5 +1,7 @@
 package free.svoss.facesort.db;
 
+import free.svoss.facesort.model.NamePair;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,15 +50,15 @@ public class NotDupeDao {
     /**
      * Returns all not-dupe pairs involving the given name.
      */
-    public List<long[]> findByNameId(long nameId) throws SQLException {
-        List<long[]> pairs = new ArrayList<>();
+    public List<NamePair> findByNameId(long nameId) throws SQLException {
+        List<NamePair> pairs = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT name_id_a, name_id_b FROM not_dupes WHERE name_id_a = ? OR name_id_b = ?")) {
             ps.setLong(1, nameId);
             ps.setLong(2, nameId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                pairs.add(new long[]{rs.getLong("name_id_a"), rs.getLong("name_id_b")});
+                pairs.add(new NamePair(rs.getLong("name_id_a"), rs.getLong("name_id_b")));
             }
         }
         return pairs;
@@ -65,12 +67,12 @@ public class NotDupeDao {
     /**
      * Returns all not-dupe pairs.
      */
-    public List<long[]> findAll() throws SQLException {
-        List<long[]> pairs = new ArrayList<>();
+    public List<NamePair> findAll() throws SQLException {
+        List<NamePair> pairs = new ArrayList<>();
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT name_id_a, name_id_b FROM not_dupes")) {
             while (rs.next()) {
-                pairs.add(new long[]{rs.getLong("name_id_a"), rs.getLong("name_id_b")});
+                pairs.add(new NamePair(rs.getLong("name_id_a"), rs.getLong("name_id_b")));
             }
         }
         return pairs;

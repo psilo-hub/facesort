@@ -59,14 +59,6 @@ public final class NameRecord {
         return faceCount;
     }
 
-    /**
-     * Returns a copy of this record with the given face count, keeping all
-     * other fields (id, name, average embedding) unchanged.
-     */
-    public NameRecord withFaceCount(int newCount) {
-        return new NameRecord(id, name, averageEmbedding, newCount);
-    }
-
     @Override
     public String toString() {
         return "NameRecord{id=" + id + ", name='" + name + "'}";

@@ -42,36 +42,4 @@ class EmbeddingUtilsTest {
     void emptyByteArray_decodesToEmptyFloatArray() {
         assertArrayEquals(new float[0], EmbeddingUtils.bytesToFloatArray(new byte[0]), 0.0f);
     }
-
-    @Test
-    void cosineSimilarity_identicalVectors_isOne() {
-        float[] a = {1.0f, 2.0f, 3.0f};
-        assertEquals(1.0f, EmbeddingUtils.cosineSimilarity(a, a.clone()), 1e-6f);
-    }
-
-    @Test
-    void cosineSimilarity_orthogonalVectors_isZero() {
-        float[] a = {1.0f, 0.0f};
-        float[] b = {0.0f, 1.0f};
-        assertEquals(0.0f, EmbeddingUtils.cosineSimilarity(a, b), 1e-6f);
-    }
-
-    @Test
-    void cosineSimilarity_zeroVector_isZero() {
-        assertEquals(0.0f, EmbeddingUtils.cosineSimilarity(new float[]{0, 0, 0}, new float[]{1, 2, 3}), 0.0f);
-        assertEquals(0.0f, EmbeddingUtils.cosineSimilarity(new float[]{1, 2, 3}, new float[]{0, 0, 0}), 0.0f);
-    }
-
-    @Test
-    void cosineSimilarity_oppositeVectors_isNegativeOne() {
-        float[] a = {1.0f, 0.0f};
-        float[] b = {-1.0f, 0.0f};
-        assertEquals(-1.0f, EmbeddingUtils.cosineSimilarity(a, b), 1e-6f);
-    }
-
-    @Test
-    void cosineSimilarity_mismatchedLengths_throws() {
-        assertThrows(IllegalArgumentException.class,
-                () -> EmbeddingUtils.cosineSimilarity(new float[2], new float[3]));
-    }
 }

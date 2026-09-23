@@ -111,6 +111,18 @@ All notable changes to Face Sort will be documented in this file.
   are opened, so future schema changes can migrate old data instead of silently
   missing columns (internal, no visible behavior change) (2026-09-23)
 
+### Removed
+- Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and
+  `ProgressDialog` UI components, the unused `ImageDao.delete`/`VideoDao.delete`
+  methods, and unused model/utility API (`FaceRecord` bounding-box helpers,
+  `ImageRecord` path/thumbnail fields, `NameRecord.withFaceCount`,
+  `EmbeddingUtils.cosineSimilarity`, `ImageUtils.crop`) are gone. `not_dupes`
+  pairs now use an immutable `NamePair` record (2026-09-23)
+- Database schema version 2: the stored `videos.frame_count`/`face_count` and
+  `video_frames.face_count` columns are dropped when a v1 database is opened —
+  they were written but never read (frame and face counts are computed live);
+  existing databases migrate automatically (2026-09-23)
+
 ### Fixed
 - Feedback submissions and the automatic update check now give up instead of
   hanging: both requests have a bounded network timeout (15 s feedback, 20 s

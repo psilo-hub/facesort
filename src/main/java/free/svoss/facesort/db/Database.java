@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     private final Connection connection;
     private final Connection sharedConnection;
@@ -118,8 +118,33 @@ public class Database implements AutoCloseable {
         if (fromVersion <= 0) {
             createBaselineSchema(stmt);
         }
+        if (fromVersion < 2) {
+            // Version 2 drops the stored count columns on videos /
+            // video_frames; they were written but never read (frame and face
+            // counts are computed live in VideoDao.findByHash). Drop them only
+            // when present so a brand-new baseline (which no longer declares
+            // them) is a no-op.
+            dropColumnIfPresent(stmt, "videos", "frame_count");
+            dropColumnIfPresent(stmt, "videos", "face_count");
+            dropColumnIfPresent(stmt, "video_frames", "face_count");
+        }
         // Future migrations, e.g.:
-        // if (fromVersion < 2) { stmt.execute(...); }
+        // if (fromVersion < 3) { stmt.execute(...); }
+    }
+
+    private static void dropColumnIfPresent(Statement stmt, String table, String column) throws SQLException {
+        try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            boolean present = false;
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    present = true;
+                    break;
+                }
+            }
+            if (present) {
+                stmt.execute("ALTER TABLE " + table + " DROP COLUMN " + column);
+            }
+        }
     }
 
     private static void createBaselineSchema(Statement stmt) throws SQLException {
@@ -189,9 +214,7 @@ public class Database implements AutoCloseable {
                     hash            TEXT PRIMARY KEY,
                     detection_ts    INTEGER,
                     criteria_json   TEXT,
-                    duration_secs   REAL,
-                    frame_count     INTEGER DEFAULT 0,
-                    face_count      INTEGER DEFAULT 0
+                    duration_secs   REAL
                 )
                 """);
 
@@ -209,7 +232,6 @@ public class Database implements AutoCloseable {
                     frame_hash      TEXT PRIMARY KEY,
                     video_hash      TEXT NOT NULL,
                     timestamp_ms    INTEGER NOT NULL,
-                    face_count      INTEGER DEFAULT 0,
                     FOREIGN KEY (frame_hash) REFERENCES images(hash) ON DELETE CASCADE,
                     FOREIGN KEY (video_hash) REFERENCES videos(hash) ON DELETE CASCADE
                 )

@@ -1,24 +1,20 @@
 package free.svoss.facesort.model;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
  * Represents an imported image, uniquely identified by its SHA-256 content hash.
  *
- * <p>An image may be reachable through multiple file paths (duplicates on disk).
- * The thumbnail is normally stored in the database as JPEG bytes;
- * {@code thumbnailPath} carries an on-disk location when one has been
- * materialized, or is {@code null} otherwise.
+ * <p>An image may be reachable through multiple file paths (duplicates on disk);
+ * the paths are held by the {@code image_paths} table and resolved where needed.
+ * The thumbnail is stored in the database as JPEG bytes.
  */
 public final class ImageRecord {
 
     private final String hash;
     private final long detectionTs;
     private final String criteriaJson;
-    private final List<String> paths;
-    private final String thumbnailPath;
-    private final boolean hasFaces;
+    private final int faceCount;
 
     /**
      * Creates a record from database columns (used by {@code ImageDao}).
@@ -29,29 +25,10 @@ public final class ImageRecord {
      * @param faceCount    number of faces that qualified for embedding
      */
     public ImageRecord(String hash, long detectionTs, String criteriaJson, int faceCount) {
-        this(hash, detectionTs, criteriaJson, List.of(), null, faceCount > 0);
-    }
-
-    /**
-     * Creates a fully populated record, typically for UI-facing use.
-     *
-     * @param hash          content hash (SHA-256 hex)
-     * @param paths         all known on-disk paths for this image
-     * @param thumbnailPath on-disk thumbnail location, or null
-     * @param hasFaces      true when at least one face was detected
-     */
-    public ImageRecord(String hash, List<String> paths, String thumbnailPath, boolean hasFaces) {
-        this(hash, 0L, null, paths, thumbnailPath, hasFaces);
-    }
-
-    private ImageRecord(String hash, long detectionTs, String criteriaJson,
-                        List<String> paths, String thumbnailPath, boolean hasFaces) {
         this.hash = Objects.requireNonNull(hash, "hash");
         this.detectionTs = detectionTs;
         this.criteriaJson = criteriaJson;
-        this.paths = List.copyOf(paths);
-        this.thumbnailPath = thumbnailPath;
-        this.hasFaces = hasFaces;
+        this.faceCount = faceCount;
     }
 
     public String hash() {
@@ -68,19 +45,9 @@ public final class ImageRecord {
         return criteriaJson;
     }
 
-    /** All known on-disk paths for this image. */
-    public List<String> paths() {
-        return paths;
-    }
-
-    /** On-disk thumbnail location, or null. */
-    public String thumbnailPath() {
-        return thumbnailPath;
-    }
-
-    /** True when at least one face was detected for this image. */
-    public boolean hasFaces() {
-        return hasFaces;
+    /** Number of faces that qualified for embedding. */
+    public int faceCount() {
+        return faceCount;
     }
 
     @Override
@@ -101,6 +68,6 @@ public final class ImageRecord {
 
     @Override
     public String toString() {
-        return "ImageRecord{hash='" + hash + "', paths=" + paths + ", hasFaces=" + hasFaces + '}';
+        return "ImageRecord{hash='" + hash + "', faceCount=" + faceCount + '}';
     }
 }

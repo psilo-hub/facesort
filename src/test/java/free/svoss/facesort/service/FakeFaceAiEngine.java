@@ -1,6 +1,5 @@
 package free.svoss.facesort.service;
 
-import free.svoss.facesort.util.EmbeddingUtils;
 import free.svoss.tools.faceai.DetectedFace;
 
 import java.awt.image.BufferedImage;
@@ -53,7 +52,27 @@ final class FakeFaceAiEngine implements FaceAiService.Engine {
 
     @Override
     public double calcSimilarity(float[] a, float[] b) {
-        return EmbeddingUtils.cosineSimilarity(a, b);
+        return cosineSimilarity(a, b);
+    }
+
+    /**
+     * Cosine similarity used by the fake engines. Kept here (package-private)
+     * so service tests share a single implementation of the same math the real
+     * engine applies.
+     */
+    static double cosineSimilarity(float[] a, float[] b) {
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dotProduct += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        if (normA == 0.0 || normB == 0.0) {
+            return 0.0;
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
     @Override

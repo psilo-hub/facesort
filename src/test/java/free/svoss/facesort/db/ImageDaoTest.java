@@ -48,7 +48,7 @@ class ImageDaoTest {
         assertEquals("hash1", record.hash());
         assertEquals(123L, record.detectionTs());
         assertEquals("{}", record.criteriaJson());
-        assertTrue(record.hasFaces(), "faceCount>0 must map to hasFaces=true");
+        assertEquals(2, record.faceCount());
     }
 
     @Test
@@ -102,34 +102,6 @@ class ImageDaoTest {
         byte[] jpeg2 = new byte[]{9, 9};
         dao.saveThumbnail("hash1", jpeg2);
         assertTrue(java.util.Arrays.equals(jpeg2, dao.getThumbnail("hash1")));
-    }
-
-    @Test
-    void delete_removesImagePathsAndThumbnail() throws Exception {
-        insertImage("hash1", 0);
-        dao.addPath("hash1", "/photos/x.jpg");
-        dao.saveThumbnail("hash1", new byte[]{1});
-
-        dao.delete("hash1");
-
-        assertFalse(dao.exists("hash1"));
-        assertTrue(dao.getPaths("hash1").isEmpty(), "image_paths must cascade-delete");
-        assertFalse(dao.hasThumbnail("hash1"), "thumbnail must cascade-delete");
-        assertTrue(dao.getAllHashes().isEmpty());
-    }
-
-    @Test
-    void deleteImage_cascadesToFaces() throws Exception {
-        insertImage("hash1", 1);
-        FaceDao faceDao = new FaceDao(db.getConnection());
-        faceDao.insert(new free.svoss.facesort.model.FaceRecord(
-                0, "hash1", 0, 0, 10, 10, 0.9,
-                new float[]{1.0f}, new byte[]{4, 5}, null));
-
-        dao.delete("hash1");
-
-        assertTrue(faceDao.findByImageHash("hash1").isEmpty(),
-                "faces rows must cascade-delete with their image");
     }
 
     @Test

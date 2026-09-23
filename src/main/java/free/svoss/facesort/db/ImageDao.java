@@ -100,17 +100,6 @@ public class ImageDao {
         return hashes;
     }
 
-    /**
-     * Deletes an image and all cascaded data by hash.
-     */
-    public void delete(String hash) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM images WHERE hash = ?")) {
-            ps.setString(1, hash);
-            ps.executeUpdate();
-        }
-    }
-
     // ---- Thumbnail operations ----
 
     /**

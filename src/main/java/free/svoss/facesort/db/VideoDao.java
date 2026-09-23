@@ -191,29 +191,4 @@ public class VideoDao {
         }
     }
 
-    /**
-     * Persists the frame and face counts on the video row after import
-     * completes. The row is expected to exist (use
-     * {@link #insert(String, long, String, double)} first).
-     */
-    public void updateVideoCounts(String hash, int frameCount, int faceCount) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE videos SET frame_count = ?, face_count = ? WHERE hash = ?")) {
-            ps.setInt(1, frameCount);
-            ps.setInt(2, faceCount);
-            ps.setString(3, hash);
-            ps.executeUpdate();
-        }
     }
-
-    /**
-     * Deletes a video; paths and frame links cascade via foreign keys.
-     */
-    public void delete(String hash) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM videos WHERE hash = ?")) {
-            ps.setString(1, hash);
-            ps.executeUpdate();
-        }
-    }
-}

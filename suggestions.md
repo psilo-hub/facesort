@@ -168,7 +168,38 @@ Move encoding outside the lock (encode first, then synchronize only the writes).
 
 ---
 
-## 6. Dead code, dead schema, unused public API (Low risk, easy cleanup)
+## ~~6. Dead code, dead schema, unused public API (Low risk, easy cleanup)~~ ✅ DONE
+
+**Solved 2026-09-23** — see todo.txt item 13 for details.
+
+Chosen direction (User decision, 2026-09-23): **delete** rather than wire in.
+Summary of each row:
+
+- `ui/components/FaceThumbnail.java` and `ui/components/ProgressDialog.java` were
+  **deleted** (component "wire them in" option declined; they can be re-created
+  when item 3b absorbs the view duplication). The `face-thumbnail` /
+  `face-thumbnail.selected` CSS rules went with them.
+- `ImageDao.delete(String)` / `VideoDao.delete(String)` **deleted** (the
+  "add a delete-image/delete-video UI" option declined). The FK cascade they
+  were tested through remains in place; those cascade-only tests were removed
+  with the methods.
+- `NameRecord.withFaceCount`, `FaceRecord.faceIndex`/`faceIndex()`/`boundingBox()`
+  including the 11-arg and `Rectangle2D` convenience ctors, and `ImageRecord`'s
+  UI-facing ctor / `thumbnailPath()` / `hasFaces()` — all **deleted**.
+- `EmbeddingUtils.cosineSimilarity` **deleted** from the shipped code; the math
+  now lives once as a package-private helper on the shared `FakeFaceAiEngine`
+  test seam (rewiring the fakes/tests that used it).
+- `ImageUtils.crop` **deleted** (it was never exercised by production code).
+- DB columns `video_frames.face_count` and `videos.frame_count`/`face_count`:
+  **dropped via a schema migration**. `SCHEMA_VERSION` bumped to 2;
+  `Database.migrate` drops the columns with a `PRAGMA table_info` presence guard
+  so brand-new databases are unaffected, and `VideoDao.updateVideoCounts` plus
+  its `VideoImportService` call were removed (counts were written but never
+  read — `findByHash` computes them live). Covered by
+  `databaseFromVersionOne_dropsDeadCountColumns` in `DatabaseTest`.
+- `not_dupes` now has a model: immutable `NamePair(long a, long b)` record
+  (normalizes so `a <= b`, matching `NotDupeDao` storage), returned by
+  `NotDupeDao.findByNameId`/`findAll` instead of mutable `long[]` pairs.
 
 Confirmed unused (no production call sites):
 

@@ -127,18 +127,4 @@ class VideoDaoTest {
         assertEquals(0, dao.findFramesForVideo("video2").size(),
                 "the second link attempt must be dropped");
     }
-
-    @Test
-    void delete_cascadesToPathsAndFrameLinks() throws Exception {
-        insertVideoWithFrame("video1", 60.0, "frame1", 1000L);
-        dao.addPath("video1", "/videos/a.mp4");
-        dao.addPath("video1", "/videos/b.mp4");
-
-        dao.delete("video1");
-
-        assertFalse(dao.exists("video1"), "video must be deleted");
-        assertTrue(dao.getPaths("video1").isEmpty(), "video_paths must cascade-delete");
-        assertTrue(dao.findFramesForVideo("video1").isEmpty(), "video_frames must cascade-delete");
-        assertNull(dao.findTimestamp("frame1"), "frame link must cascade-delete with the video");
-    }
 }
