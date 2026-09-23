@@ -5,6 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -18,6 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FaceDaoTest {
 
     private static final byte[] JPEG = {1, 2, 3, 4, 5};
+
+    private static final List<String> MAP_ROW_COLUMNS = List.of(
+            "id", "image_hash", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
+            "confidence", "embedding", "sub_image_jpg", "name_id");
 
     private Database db;
     private ImageDao imageDao;
@@ -369,5 +377,24 @@ class FaceDaoTest {
         insertFace("img2", 0, 0, new float[]{3.0f}, null);
 
         assertEquals(3, faceDao.findAll().size());
+    }
+
+    @Test
+    void selectColumns_listTheColumnsMapRowReads() {
+        assertEquals(MAP_ROW_COLUMNS, Arrays.asList(FaceDao.SELECT_COLUMNS.split(",\\s*")),
+                "SELECT_COLUMNS must list, in order, exactly the columns mapRow reads");
+    }
+
+    @Test
+    void selectColumns_matchThePhysicalFacesTableSchema() throws Exception {
+        List<String> schemaColumns = new ArrayList<>();
+        try (Statement stmt = db.getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(faces)")) {
+            while (rs.next()) {
+                schemaColumns.add(rs.getString("name"));
+            }
+        }
+        assertEquals(MAP_ROW_COLUMNS, schemaColumns,
+                "every SELECT_COLUMNS column must be a real physical column of the faces table");
     }
 }

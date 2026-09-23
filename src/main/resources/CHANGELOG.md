@@ -122,6 +122,11 @@ All notable changes to Face Sort will be documented in this file.
   the `.extension` file walk and the JPEG thumbnail encoding were extracted from
   `ImportService`/`VideoImportService` into shared helpers, and a single JPEG
   quality constant applies to thumbnails and face sub-images (2026-09-23)
+- The faces table is always read through a single shared column list (internal,
+  no visible behavior change): the ten columns projected by every `FaceDao`
+  query live in one `SELECT_COLUMNS` constant instead of six duplicates, with a
+  test pinning it to the columns the row mapper reads and to the physical
+  schema (2026-09-23)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

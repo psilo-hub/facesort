@@ -2,13 +2,13 @@
 
 Checklist of the improvement suggestions that are still **open**. The implemented
 ones (suggestions 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9) have been removed — their
-resolutions are recorded in `todo.txt` items 7–16 and `CHANGELOG.md`. HNSW index
+resolutions are recorded in `todo.txt` items 7–17 and `CHANGELOG.md`. HNSW index
 closing was dismissed with evidence (no `close()` on the pure-Java `HnswIndex`; the
 index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-23, full suite green: 306 tests / 35 classes, 0 failures).
+(2026-09-23, full suite green: 308 tests / 35 classes, 0 failures).
 
 ---
 
@@ -23,9 +23,11 @@ All line numbers below refer to the current state of the codebase
   (`DeduplicationService.java:263-291`), `ViewService.findRepresentative`
   (`ViewService.java:337-351`), `FaceToNameService.mostSimilarToAverage`
   (`FaceToNameService.java:246-257`). **High effort payoff, mostly mechanical.**
-- [ ] **`FaceDao` column-list constant** — the same 10-column SELECT is spelled out 6×
+- [x] **`FaceDao` column-list constant** — the same 10-column SELECT is spelled out 6×
   (`FaceDao.java:75,110,157,175,193,207`); a named constant (with a test asserting the
-  column count matches `mapRow`) stops silent drift. **Low effort.**
+  column count matches `mapRow`) stops silent drift. Done — the shared `SELECT_COLUMNS`
+  constant + two tests (constant ↔ `mapRow` columns, constant ↔ physical schema) landed
+  in todo.txt item 17. **Low effort.**
 - [ ] **`NameDao` query dedup** — the correlated `face_count` subquery + name-row mapping
   is duplicated 3× (`NameDao.java:45,61,78-81`). **Low effort.**
 - [ ] **Single source of truth for video extensions** — `VideoImportService.SUPPORTED_EXTENSIONS`

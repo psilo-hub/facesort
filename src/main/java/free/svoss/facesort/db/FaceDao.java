@@ -20,6 +20,15 @@ public class FaceDao {
      */
     private static final int PATH_FILTER_PLACEHOLDERS = 5;
 
+    /**
+     * The column list every {@code SELECT} projects — the ten columns that
+     * {@link #mapRow} reads by name. Kept in one place so the queries cannot
+     * drift apart; {@code FaceDaoTest} pins it to the columns {@link #mapRow}
+     * reads and to the physical {@code faces} schema.
+     */
+    static final String SELECT_COLUMNS =
+            "id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id";
+
     private final Connection conn;
 
     public FaceDao(Connection conn) {
@@ -72,8 +81,7 @@ public class FaceDao {
     public List<FaceRecord> findByImageHash(String imageHash) throws SQLException {
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE image_hash = ?")) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE image_hash = ?")) {
             ps.setString(1, imageHash);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
@@ -107,8 +115,7 @@ public class FaceDao {
     public List<FaceRecord> findUnnamed(String pathPrefix) throws SQLException {
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
             bindPathFilter(ps, pathPrefix);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
@@ -154,8 +161,8 @@ public class FaceDao {
         }
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE name_id IS NULL" + pathFilterClause() + " ORDER BY RANDOM() LIMIT ?")) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL" + pathFilterClause()
+                + " ORDER BY RANDOM() LIMIT ?")) {
             bindPathFilter(ps, pathPrefix);
             ps.setInt(1 + PATH_FILTER_PLACEHOLDERS, limit);
             ResultSet rs = ps.executeQuery();
@@ -172,8 +179,7 @@ public class FaceDao {
     public List<FaceRecord> findByNameId(long nameId) throws SQLException {
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE name_id = ?")) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id = ?")) {
             ps.setLong(1, nameId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
@@ -190,8 +196,7 @@ public class FaceDao {
         List<FaceRecord> faces = new ArrayList<>();
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces")) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces")) {
             while (rs.next()) {
                 faces.add(mapRow(rs));
             }
@@ -204,8 +209,7 @@ public class FaceDao {
      */
     public Optional<FaceRecord> findById(long id) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
-                + "FROM faces WHERE id = ?")) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id = ?")) {
             ps.setLong(1, id);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
