@@ -50,9 +50,11 @@ final class FaceDetectionUtils {
      * @param maxFacesPerImage       maximum faces kept per image
      * @param service                face detection and embedding service
      * @param sourceDescription      human-readable source for error logs
-     * @return the qualifying faces, each with its stored sub-image JPEG
+     * @return the faces that were fully processed (each with its stored
+     *         sub-image JPEG) together with how many detected faces failed
+     *         processing and were dropped as a result
      */
-    static List<FaceRecord> detectFaces(String imageHash, BufferedImage image,
+    static DetectionResult detectFaces(String imageHash, BufferedImage image,
                                         int maxDetectionDimension, int minBbox,
                                         double minConfidence, int maxFacesPerImage,
                                         FaceAiService service, String sourceDescription) {
@@ -74,6 +76,7 @@ final class FaceDetectionUtils {
         // cropped at full resolution but immediately downscaled so that neither
         // embedding inference nor JPEG encoding ever processes a large crop.
         List<FaceRecord> faceRecords = new ArrayList<>();
+        int droppedFaces = 0;
         for (DetectedFace face : qualifying) {
             try {
                 BufferedImage faceCrop = face.crop(image);
@@ -86,11 +89,22 @@ final class FaceDetectionUtils {
                         face.x(), face.y(), face.width(), face.height(),
                         face.confidence(), embedding, subImageJpg, null));
             } catch (Exception e) {
+                droppedFaces++;
                 LOG.log(Level.WARNING,
                         "Error processing detected face in " + sourceDescription, e);
             }
         }
-        return faceRecords;
+        return new DetectionResult(List.copyOf(faceRecords), droppedFaces);
+    }
+
+    /**
+     * Outcome of detecting faces in one image.
+     *
+     * @param faces        faces that were fully processed and are ready for persistence
+     * @param droppedFaces detected faces that failed to process (crop, embedding or
+     *                     JPEG encoding) and were therefore not persisted
+     */
+    record DetectionResult(List<FaceRecord> faces, int droppedFaces) {
     }
 
     /**

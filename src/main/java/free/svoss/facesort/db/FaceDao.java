@@ -13,6 +13,13 @@ import java.util.Optional;
  */
 public class FaceDao {
 
+    /**
+     * Number of {@code ?} placeholders in {@link #pathFilterClause()}, all bound
+     * to the same prefix by {@link #bindPathFilter}. The optional LIMIT clause
+     * of {@link #findRandomUnnamed} starts directly after them.
+     */
+    private static final int PATH_FILTER_PLACEHOLDERS = 5;
+
     private final Connection conn;
 
     public FaceDao(Connection conn) {
@@ -150,7 +157,7 @@ public class FaceDao {
                 "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id "
                 + "FROM faces WHERE name_id IS NULL" + pathFilterClause() + " ORDER BY RANDOM() LIMIT ?")) {
             bindPathFilter(ps, pathPrefix);
-            ps.setInt(6, limit);
+            ps.setInt(1 + PATH_FILTER_PLACEHOLDERS, limit);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
@@ -277,8 +284,9 @@ public class FaceDao {
      * Builds the SQL fragment that restricts results to images having at least
      * one stored photo path starting with a given prefix, or (for video
      * frames) at least one stored path of the linked video starting with the
-     * prefix. The fragment contains five {@code ?} placeholders, all bound to
-     * the same prefix value by {@link #bindPathFilter(PreparedStatement, String)}.
+     * prefix. The fragment contains {@link #PATH_FILTER_PLACEHOLDERS} {@code ?}
+     * placeholders, all bound to the same prefix value by
+     * {@link #bindPathFilter(PreparedStatement, String)}.
      *
      * @return the WHERE fragment, always starting with {@code " AND "}
      */

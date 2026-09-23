@@ -31,7 +31,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -353,8 +352,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             thumb.setSmooth(true);
             installPathTooltip(thumb, face);
 
-            Label sim = new Label(String.format(Locale.ROOT, "%.0f%%",
-                    candidate.similarity() * 100));
+            Label sim = new Label(I18n.percent(candidate.similarity()));
             sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
             Button tag = new Button(I18n.get("ui.nameFace.tag"));

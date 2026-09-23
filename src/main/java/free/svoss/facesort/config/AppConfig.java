@@ -16,8 +16,11 @@ import java.nio.file.Path;
  */
 public final class AppConfig {
 
+    /** Default config directory relative to the app directory. */
+    public static final String DEFAULT_CONFIG_DIR = "config";
+
     /** Default config file location relative to the app directory. */
-    public static final String DEFAULT_CONFIG_FILE = "config/facesort-config.json";
+    public static final String DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR + "/facesort-config.json";
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);

@@ -36,8 +36,9 @@ public final class FrameSampler {
         if (durationSecs <= 0) {
             throw new IllegalArgumentException("durationSecs must be positive: " + durationSecs);
         }
+        long durationMs = (long) (durationSecs * 1000);
         return (int) Math.min(MAX_FRAMES_PER_VIDEO,
-                Math.max(1, Math.floor(durationSecs)));
+                Math.max(1, durationMs / MIN_FRAME_MS_SPACING));
     }
 
     /**

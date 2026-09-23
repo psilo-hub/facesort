@@ -10,6 +10,8 @@ import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A simple, non-modal dialog announcing that a new release is available.
@@ -19,6 +21,8 @@ import java.net.URI;
  * closable either via its close button or the window's close control.</p>
  */
 public class UpdateNoticeDialog extends Dialog<Void> {
+
+    private static final Logger LOG = Logger.getLogger(UpdateNoticeDialog.class.getName());
 
     /** URL of the latest release page on GitHub. */
     public static final String RELEASES_URL = "https://github.com/psilo-hub/facesort/releases/latest";
@@ -47,10 +51,10 @@ public class UpdateNoticeDialog extends Dialog<Void> {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(new URI(url));
             } else {
-                System.err.println("Update check: no desktop browser support for " + url);
+                LOG.log(Level.WARNING, "Update check: no desktop browser support for {0}", url);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.log(Level.WARNING, "Failed to open the release page in the browser", e);
         }
     }
 }

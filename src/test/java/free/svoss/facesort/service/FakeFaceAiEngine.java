@@ -18,6 +18,7 @@ final class FakeFaceAiEngine implements FaceAiService.Engine {
 
     private DetectedFace[] faces = new DetectedFace[0];
     private float[] embedding = new float[]{1, 0, 0, 0, 0, 0, 0, 0};
+    private boolean failEmbedding = false;
 
     /** Sets the faces reported for every detected image. */
     FakeFaceAiEngine withFaces(DetectedFace... faces) {
@@ -31,6 +32,12 @@ final class FakeFaceAiEngine implements FaceAiService.Engine {
         return this;
     }
 
+    /** Makes every {@link #getEmbedding(BufferedImage)} call throw. */
+    FakeFaceAiEngine withFailingEmbedding() {
+        this.failEmbedding = true;
+        return this;
+    }
+
     @Override
     public DetectedFace[] detectFaces(BufferedImage image) {
         return faces;
@@ -38,6 +45,9 @@ final class FakeFaceAiEngine implements FaceAiService.Engine {
 
     @Override
     public float[] getEmbedding(BufferedImage faceCrop) {
+        if (failEmbedding) {
+            throw new IllegalStateException("embedding unavailable");
+        }
         return embedding;
     }
 

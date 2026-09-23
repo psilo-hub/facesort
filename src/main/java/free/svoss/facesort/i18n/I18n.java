@@ -64,6 +64,17 @@ public final class I18n {
     }
 
     /**
+     * Formats a fraction as a percentage rounded to a whole percent using the
+     * active locale, for example {@code percent(0.426)} returns {@code "43%"}.
+     *
+     * @param fraction the fraction to format ({@code 0.0} to {@code 1.0})
+     * @return the localized percentage string
+     */
+    public static synchronized String percent(double fraction) {
+        return String.format(currentLocale, "%.0f%%", fraction * 100);
+    }
+
+    /**
      * Switches the active language. Affects all subsequent {@link #get(String)}
      * and {@link #format(String, Object...)} calls.
      *

@@ -195,7 +195,37 @@ record would match the rest of the model package.
 
 ---
 
-## 7. Bugs & small UX issues (Low effort, high polish)
+## ~~7. Bugs & small UX issues (Low effort, high polish)~~ ✅ DONE
+
+**Solved 2026-09-23** — all bugs below except two explicitly deferred items:
+
+- Lost "Saved" confirm fixed: the language-switch callback now returns the freshly
+  built `SettingsView` (`Supplier<SettingsView>`), and the status text ("Saved" or the
+  save-failure message) is shown on that rebuilt view's label instead of the detached
+  one (`SettingsView.java`, `FaceSortApp.java`).
+- Import progress uses the named `ProgressBar.INDETERMINATE_PROGRESS` constant instead
+  of a literal `-1` (`ImportView.java:178`).
+- Similarity percentages standardized on `I18n.percent(double)` (active locale, rounded
+  to a whole percent) in `FaceNameView` and `NameFaceView`; covered by a new `I18nTest`.
+- `FaceDao`'s implicit 5-placeholder path-filter contract is now the named constant
+  `FaceDao.PATH_FILTER_PLACEHOLDERS`, and the `LIMIT ?` in `findRandomUnnamed` binds at
+  `1 + PATH_FILTER_PLACEHOLDERS` instead of magic index 6.
+- `FrameSampler.MIN_FRAME_MS_SPACING` is now actually used by `countFrames` (the
+  per-second budget is derived from it) instead of being a dead constant.
+- `FaceDetectionUtils` no longer swallows per-face errors: `detectFaces` returns a
+  `DetectionResult(faces, droppedFaces)`, and photo/video import count a file with any
+  dropped face as an error while still persisting the remaining faces (and the file).
+  Covered by new tests in `ImportServiceTest` and `VideoImportServiceTest`.
+- `UpdateChecker` and `UpdateNoticeDialog` use `java.util.logging` instead of
+  `System.err`/`printStackTrace`.
+- `FaceRecord.java:65` javadoc corrected (`IllegalArgumentException`, not `SQLException`),
+  and `AppConfig.DEFAULT_CONFIG_DIR` is the single source for the `config` directory
+  (`FaceSortApp.java:109,182`).
+
+Deferred intentionally (not part of this pass): the `ORDER BY RANDOM()` scan
+(`FaceDao.java:151` — the path filter restricts via EXISTS subqueries, so offset-based
+sampling would make the query far more complex for little gain) and the inline-hex → CSS
+migration (24+ `setStyle` sites; a pure-presentation change with no functional benefit).
 
 - **Lost "Saved" confirm on language change**: `onLanguageChanged.run()` (rebuilds the
   whole window) runs **before** `statusLabel.setText(I18n.get("settings.saved"))`

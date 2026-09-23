@@ -21,6 +21,7 @@ import javafx.scene.layout.Region;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.function.Supplier;
 
 /**
  * The Settings tab: edit detection, clustering, and HNSW parameters.
@@ -36,7 +37,7 @@ public class SettingsView extends BorderPane {
 
     private final ConfigModel config;
     private final Path configPath;
-    private final Runnable onLanguageChanged;
+    private final Supplier<SettingsView> onLanguageChanged;
 
     private final ComboBox<String> languageBox = new ComboBox<>();
     private final Spinner<Integer> minBoundingBoxSize = intSpinner(20, 500, 10);
@@ -62,10 +63,11 @@ public class SettingsView extends BorderPane {
      *
      * @param config           the configuration object to edit and persist; must not be null
      * @param configPath       path of the JSON config file to write on save; must not be null
-     * @param onLanguageChanged callback fired after the user picked a new UI language; the
-     *                          language selection has been applied and saved by then
+     * @param onLanguageChanged supplies the newly rebuilt settings view after the user
+     *                          picked a new UI language; the language selection has been
+     *                          applied and saved by then (may be {@code null})
      */
-    public SettingsView(ConfigModel config, Path configPath, Runnable onLanguageChanged) {
+    public SettingsView(ConfigModel config, Path configPath, Supplier<SettingsView> onLanguageChanged) {
         this.config = config;
         this.configPath = configPath;
         this.onLanguageChanged = onLanguageChanged;
@@ -259,15 +261,30 @@ public class SettingsView extends BorderPane {
         }
         config.setLanguage(code);
         I18n.setLocale(I18n.localeFor(code));
+        String message;
         try {
             AppConfig.save(configPath, config);
+            message = I18n.get("settings.saved");
         } catch (IOException e) {
-            statusLabel.setText(I18n.format("settings.saveFailed", e.getMessage()));
+            message = I18n.format("settings.saveFailed", e.getMessage());
         }
-        if (onLanguageChanged != null) {
-            onLanguageChanged.run();
+        // Rebuilding the window detaches this view from the scene graph, so the
+        // status message must be shown on the freshly built view instead.
+        SettingsView rebuilt = onLanguageChanged == null ? null : onLanguageChanged.get();
+        if (rebuilt != null) {
+            rebuilt.showStatusText(message);
         }
-        statusLabel.setText(I18n.get("settings.saved"));
+    }
+
+    /**
+     * Shows a status text in the status bar. Used by the language switcher to
+     * surface the save confirmation on the freshly rebuilt view, because the
+     * old view's label is already detached from the scene graph at that point.
+     *
+     * @param text the status text to display
+     */
+    private void showStatusText(String text) {
+        statusLabel.setText(text);
     }
 
     /**

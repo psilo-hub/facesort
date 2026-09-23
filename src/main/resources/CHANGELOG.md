@@ -108,6 +108,19 @@ All notable changes to Face Sort will be documented in this file.
   or half-updated rows behind (2026-09-23)
 
 ### Fixed
+- The "Saved" confirmation after changing the UI language is now actually visible:
+  it is shown on the freshly rebuilt window instead of being attached to the view
+  that the rebuild replaces (2026-09-23)
+- Detected faces that fail to process are no longer silently lost: an image or video
+  whose faces could not be cropped/embedded/encoded now counts as an error in the
+  import summary, while the remaining faces (and the file itself) are still stored
+  (2026-09-23)
+- Similarity percentages are formatted consistently in the "Add faces to a name" and
+  "Put a name to a face" tabs, rounded to a whole percent with the active locale
+  (2026-09-23)
+- Update-check and browser-open failures are logged via `java.util.logging` instead of
+  being printed to the console; the import progress bar uses the standard indeterminate
+  progress constant (internal polish, no visible behavior change) (2026-09-23)
 - No more cross-wired results in the tagging views: when actions overlap (switching
   names, re-loading samples, typing a name, running a dedupe session), a finished
   background task can no longer apply a newer task's value. Every background

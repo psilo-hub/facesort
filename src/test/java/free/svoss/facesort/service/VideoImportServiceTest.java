@@ -528,4 +528,24 @@ class VideoImportServiceTest {
         assertTrue(engineA.detectCalls() > 0, "every configured engine must be used");
         assertTrue(engineB.detectCalls() > 0, "every configured engine must be used");
     }
+
+    @Test
+    void importFolder_surfacesLostFacesAsFileErrorsWithoutLosingFrames() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("brokenface"));
+        createVideo(dir, "clip.mp4", "3.0\nsample");
+
+        FaceAiService failingService = new FaceAiService(new FakeFaceAiEngine()
+                .withFaces(ONE_FACE)
+                .withFailingEmbedding());
+        VideoImportService.VideoImportResult result;
+        try (VideoImportService service = newService(failingService)) {
+            result = service.importFolder(dir, null);
+        }
+
+        assertEquals(1, result.newVideos(), "the video is stored even though its faces were lost");
+        assertEquals(3, result.newFrames(), "frames are still stored without faces");
+        assertEquals(0, result.newFaces());
+        assertEquals(1, result.errors(), "lost faces are surfaced as a file error");
+        assertEquals(0, result.skipped());
+    }
 }

@@ -224,6 +224,12 @@ public class ImportService implements AutoCloseable {
                     skipped.incrementAndGet();
                 }
                 newFaces.addAndGet(result.facesAdded);
+                if (result.droppedFaces > 0) {
+                    // Faces lost to a crop/embedding/encoding failure are
+                    // surfaced as a file error so they are not invisible to
+                    // the user, while the remaining faces are still stored.
+                    errors.incrementAndGet();
+                }
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Error processing file: " + file, e);
                 errors.incrementAndGet();
@@ -300,9 +306,10 @@ public class ImportService implements AutoCloseable {
         // scaled down before detection, bounding boxes are mapped back to the
         // original coordinates, and each qualifying face is cropped, downscaled,
         // embedded and encoded exactly like video frames are.
-        List<FaceRecord> faceRecords = FaceDetectionUtils.detectFaces(hash, image,
+        FaceDetectionUtils.DetectionResult detection = FaceDetectionUtils.detectFaces(hash, image,
                 config.getMaxDetectionDimension(), minBbox, minConfidence,
                 maxFacesPerImage, service, file.toString());
+        List<FaceRecord> faceRecords = detection.faces();
         int facesAdded = faceRecords.size();
 
         // ---- One atomic commit unit (insert + path + faces) ----
@@ -335,7 +342,7 @@ public class ImportService implements AutoCloseable {
         // Generate thumbnail for the full image (reusing the loaded image)
         generateThumbnailIfAbsent(hash, image);
 
-        return FileResult.newImage(facesAdded);
+        return FileResult.newImage(facesAdded, detection.droppedFaces());
     }
 
     /**
@@ -471,7 +478,7 @@ public class ImportService implements AutoCloseable {
      * @param newPaths     additional paths recorded for already-known images
      * @param newFaces     face records created
      * @param skipped      files already fully known (image + path)
-     * @param errors       files that failed processing
+     * @param errors       files that failed processing or lost faces during detection
      * @param processed    files actually processed before the import stopped
      * @param wasCancelled true if the import was stopped via the cancellation supplier
      */
@@ -505,24 +512,27 @@ public class ImportService implements AutoCloseable {
         final boolean newPath;
         final boolean skipped;
         final int facesAdded;
+        final int droppedFaces;
 
-        private FileResult(boolean newImage, boolean newPath, boolean skipped, int facesAdded) {
+        private FileResult(boolean newImage, boolean newPath, boolean skipped,
+                           int facesAdded, int droppedFaces) {
             this.newImage = newImage;
             this.newPath = newPath;
             this.skipped = skipped;
             this.facesAdded = facesAdded;
+            this.droppedFaces = droppedFaces;
         }
 
-        static FileResult newImage(int faces) {
-            return new FileResult(true, false, false, faces);
+        static FileResult newImage(int faces, int droppedFaces) {
+            return new FileResult(true, false, false, faces, droppedFaces);
         }
 
         static FileResult newPath() {
-            return new FileResult(false, true, false, 0);
+            return new FileResult(false, true, false, 0, 0);
         }
 
         static FileResult skipped() {
-            return new FileResult(false, false, true, 0);
+            return new FileResult(false, false, true, 0, 0);
         }
     }
 }

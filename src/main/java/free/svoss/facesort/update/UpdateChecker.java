@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +32,8 @@ import java.util.regex.Pattern;
  * to the console only.</p>
  */
 public final class UpdateChecker {
+
+    private static final Logger LOG = Logger.getLogger(UpdateChecker.class.getName());
 
     /** Hardcoded interval between update checks. */
     public static final Duration CHECK_INTERVAL = Duration.ofDays(2);
@@ -78,7 +82,7 @@ public final class UpdateChecker {
 
             byte[] downloaded = Fetcher.get(CHANGELOG_URL);
             if (downloaded == null || downloaded.length == 0) {
-                System.err.println("Update check: no data returned for " + CHANGELOG_URL);
+                LOG.log(Level.WARNING, "Update check: no data returned for {0}", CHANGELOG_URL);
                 return;
             }
 
@@ -91,7 +95,7 @@ public final class UpdateChecker {
                 showUpdateNotice();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.log(Level.WARNING, "Update check failed", e);
         }
     }
 
@@ -188,7 +192,7 @@ public final class UpdateChecker {
             try {
                 new UpdateNoticeDialog().show();
             } catch (Exception e) {
-                e.printStackTrace();
+                LOG.log(Level.WARNING, "Failed to show the update notice", e);
             }
         });
     }

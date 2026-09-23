@@ -106,7 +106,7 @@ public class FaceSortApp extends Application {
             // 1. Background update check on a daemon thread; never blocks startup.
             //    Skipped when the user disabled it in the settings.
             if (config.isUpdateCheckEnabled()) {
-                new UpdateChecker(Path.of("config")).startInBackground();
+                new UpdateChecker(Path.of(AppConfig.DEFAULT_CONFIG_DIR)).startInBackground();
             }
 
             // 2. On the very first start the FaceAI models are not cached yet.
@@ -179,7 +179,7 @@ public class FaceSortApp extends Application {
      */
     private void showMainWindow(Stage primaryStage) throws Exception {
         // 2. Open the database under config/, creating the directory if needed.
-        Path configDir = Path.of("config");
+        Path configDir = Path.of(AppConfig.DEFAULT_CONFIG_DIR);
         Files.createDirectories(configDir);
         Path dbPath = configDir.resolve(Path.of(config.getDbName()));
         database = new Database(dbPath);
@@ -230,7 +230,7 @@ public class FaceSortApp extends Application {
      * and whenever the UI language changes, so every tab picks up the new
      * language. Must be called on the JavaFX application thread.
      */
-    private void buildMainWindowUi() {
+    private SettingsView buildMainWindowUi() {
         // 6. Views.
         ImportView importView = new ImportView(importService, videoImportService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
@@ -268,6 +268,7 @@ public class FaceSortApp extends Application {
             mainWindow.getSelectionModel().select(selected);
         }
         primaryStage.show();
+        return settingsView;
     }
 
     /**
@@ -332,9 +333,12 @@ public class FaceSortApp extends Application {
      * Rebuilds the main window after the user changed the UI language. The
      * language is already saved and applied to {@link I18n} by the settings
      * view before this callback fires.
+     *
+     * @return the freshly built settings view, so the caller can show the save
+     *         confirmation on a label that is still attached to the scene graph
      */
-    private void changeLanguage() {
-        buildMainWindowUi();
+    private SettingsView changeLanguage() {
+        return buildMainWindowUi();
     }
 
     @Override

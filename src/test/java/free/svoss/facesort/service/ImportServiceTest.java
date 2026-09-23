@@ -707,4 +707,25 @@ class ImportServiceTest {
         // And the crop (80,80 at 10,10 -> 100px) is capped at 160 for embedding.
         assertTrue(engine.maxEmbeddingDim() <= 160);
     }
+
+    @Test
+    void importFolder_surfacesLostFacesAsFileErrorsWithoutLosingTheImage() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("brokenface"));
+        writePng(dir.resolve("photo.png"), 200, 200, Color.BLUE);
+
+        FaceAiService failingService = new FaceAiService(new FakeFaceAiEngine()
+                .withFaces(new DetectedFace(10, 10, 100, 100, 0.95f))
+                .withFailingEmbedding());
+        ImportService.ImportResult result;
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                failingService, config(), db.getTransactionRunner())) {
+            result = service.importFolder(dir, null);
+        }
+
+        assertEquals(1, result.newImages(), "the image is stored even though its faces were lost");
+        assertEquals(0, result.newFaces(), "no face survived the failing embedding step");
+        assertEquals(1, result.errors(), "lost faces are surfaced as a file error");
+        assertEquals(0, result.skipped());
+        assertEquals(1, result.processed());
+    }
 }

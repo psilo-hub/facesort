@@ -62,7 +62,8 @@ public final class FaceRecord {
      * {@code sub_image_jpg BLOB NOT NULL}. Records built with this constructor
      * carry no sub-image bytes and therefore must only be used for display.
      * They must never be passed to {@code FaceDao.insert(FaceRecord)}, which
-     * requires real JPEG bytes (rejecting null with a clear SQLException).
+     * requires real JPEG bytes (rejecting null with a clear
+     * {@code IllegalArgumentException}).
      */
     public FaceRecord(long id, String imageHash, int faceIndex, Rectangle2D bounds,
                       float[] embedding, Long nameId) {

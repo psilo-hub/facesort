@@ -175,7 +175,7 @@ public class ImportView extends BorderPane {
 
         setBusy(true);
         statusLabel.setText(I18n.get("ui.import.scanning"));
-        progressBar.setProgress(-1);
+        progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
         appendLog(I18n.format("ui.import.importingFrom", folder.toAbsolutePath()));
 
         Task<ImportCoordinator.CombinedImportResult> task = new Task<>() {

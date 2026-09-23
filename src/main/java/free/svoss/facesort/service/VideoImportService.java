@@ -248,6 +248,12 @@ public class VideoImportService implements AutoCloseable {
                 }
                 newFrames.addAndGet(result.framesAdded);
                 newFaces.addAndGet(result.facesAdded);
+                if (result.droppedFaces > 0) {
+                    // Faces lost to a crop/embedding/encoding failure are
+                    // surfaced as a file error so they are not invisible to
+                    // the user, while the remaining faces are still stored.
+                    errors.incrementAndGet();
+                }
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Error processing video: " + file, e);
                 errors.incrementAndGet();
@@ -309,6 +315,7 @@ public class VideoImportService implements AutoCloseable {
         int framesAdded = 0;
         int facesAdded = 0;
         int linkedFrames = 0;
+        int droppedFaces = 0;
         try (VideoFrameSource source = sourceOpener.open(file)) {
             double duration = source.getDuration();
             List<Double> targets = FrameSampler.sampleTargets(duration);
@@ -333,11 +340,13 @@ public class VideoImportService implements AutoCloseable {
                 // identical content): keep the existing image row and only link
                 // it, so costly detection runs only for genuinely new frames.
                 boolean knownFrame = imageDao.exists(frameHash);
-                List<FaceRecord> faceRecords = knownFrame ? List.of()
+                FaceDetectionUtils.DetectionResult detection = knownFrame
+                        ? new FaceDetectionUtils.DetectionResult(List.of(), 0)
                         : FaceDetectionUtils.detectFaces(frameHash, frame,
                                 maxDetectionDimension, minBbox, minConfidence,
                                 maxFacesPerImage, service,
                                 file + " @ " + timestampMs + " ms");
+                List<FaceRecord> faceRecords = detection.faces();
 
                 // The thumbnail is encoded before the transaction starts: JPEG
                 // encoding must never run while holding the connection monitor.
@@ -365,6 +374,7 @@ public class VideoImportService implements AutoCloseable {
                 });
 
                 linkedFrames += outcome.linksAdded;
+                droppedFaces += detection.droppedFaces();
                 if (outcome.storedNewFrame) {
                     framesAdded++;
                     facesAdded += outcome.facesAdded;
@@ -379,7 +389,7 @@ public class VideoImportService implements AutoCloseable {
                 linkedFaces += faceDao.findByImageHash(link.frameHash()).size();
             }
             videoDao.updateVideoCounts(hash, linkedFrames, linkedFaces);
-            return VideoFileResult.newVideo(framesAdded, facesAdded);
+            return VideoFileResult.newVideo(framesAdded, facesAdded, droppedFaces);
         }
     }
 
@@ -472,7 +482,7 @@ public class VideoImportService implements AutoCloseable {
      * @param newFrames   frame images newly added to the database
      * @param newFaces    face records created
      * @param skipped     files already fully known (video + path)
-     * @param errors      files that failed processing
+     * @param errors      files that failed processing or lost faces during detection
      * @param processed   files actually processed before the import stopped
      * @param wasCancelled true if the import was stopped via the cancellation supplier
      */
@@ -508,25 +518,27 @@ public class VideoImportService implements AutoCloseable {
         final boolean skipped;
         final int framesAdded;
         final int facesAdded;
+        final int droppedFaces;
 
         private VideoFileResult(boolean newVideo, boolean skipped,
-                                int framesAdded, int facesAdded) {
+                                int framesAdded, int facesAdded, int droppedFaces) {
             this.newVideo = newVideo;
             this.skipped = skipped;
             this.framesAdded = framesAdded;
             this.facesAdded = facesAdded;
+            this.droppedFaces = droppedFaces;
         }
 
-        static VideoFileResult newVideo(int frames, int faces) {
-            return new VideoFileResult(true, false, frames, faces);
+        static VideoFileResult newVideo(int frames, int faces, int droppedFaces) {
+            return new VideoFileResult(true, false, frames, faces, droppedFaces);
         }
 
         static VideoFileResult newPath() {
-            return new VideoFileResult(false, false, 0, 0);
+            return new VideoFileResult(false, false, 0, 0, 0);
         }
 
         static VideoFileResult skipped() {
-            return new VideoFileResult(false, true, 0, 0);
+            return new VideoFileResult(false, true, 0, 0, 0);
         }
     }
 }

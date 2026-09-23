@@ -41,7 +41,6 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -337,8 +336,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
             thumb.setPreserveRatio(true);
             thumb.setSmooth(true);
 
-            Label sim = new Label(String.format(Locale.ROOT, "%.0f%%",
-                    candidate.similarity() * 100));
+            Label sim = new Label(I18n.percent(candidate.similarity()));
             sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
 
             card.getChildren().addAll(thumb, sim);
