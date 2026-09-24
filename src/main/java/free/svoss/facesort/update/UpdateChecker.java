@@ -53,7 +53,7 @@ public final class UpdateChecker {
     private static final Logger LOG = Logger.getLogger(UpdateChecker.class.getName());
 
     /** Hardcoded interval between update checks. */
-    public static final Duration CHECK_INTERVAL = Duration.ofDays(2);
+    public static final Duration CHECK_INTERVAL = Duration.ofDays(7);
 
     /** Upper bound for a single remote fetch, so a stalled network cannot hang the check. */
     public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(20);
