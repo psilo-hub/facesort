@@ -163,6 +163,12 @@ Bedienelement hat einen Erklärungstooltip); sie werden in
 `config/facesort-config.json` gespeichert. Die **Sprache** der Benutzeroberfläche
 lässt sich dort ebenfalls umschalten.
 
+Neben den Erkennungs- und Clustering-Parametern sind auch die Import-Budgets
+einstellbar: die JPEG-Qualität gespeicherter Vorschaubilder und
+Gesichtsausschnitte, die maximale Anzahl Frames pro Video und die Größe des
+Gesichtsausschnitts – so lässt sich der Import zwischen Qualität und
+Geschwindigkeit abwägen.
+
 ## Lizenz
 
 Veröffentlicht unter der [MIT License](LICENSE).

@@ -16,6 +16,12 @@ public class ConfigModel {
     public static final int DEFAULT_MAX_IMPORT_THREADS = 4;
     /** Hard upper bound for parallel import worker threads. */
     public static final int MAX_IMPORT_THREADS = 16;
+    /** JPEG quality for every stored thumbnail and face sub-image. */
+    public static final float DEFAULT_THUMBNAIL_QUALITY = 0.85f;
+    /** Hard upper bound on the number of frames extracted per video. */
+    public static final int DEFAULT_MAX_FRAMES_PER_VIDEO = 120;
+    /** Maximum width/height of the square crop stored per detected face. */
+    public static final int DEFAULT_FACE_CROP_SIZE = 160;
     public static final String DEFAULT_DB_NAME = "facesort.db";
     /** Minimum similarity for adding a face to an existing name. */
     public static final double DEFAULT_MIN_NAME_SIMILARITY = 0.75;
@@ -32,6 +38,9 @@ public class ConfigModel {
     private static final int MIN_MAX_FACES_PER_IMAGE = 1;
     private static final int MIN_MAX_DETECTION_DIMENSION = 16;
     private static final int MIN_THUMBNAIL_SIZE = 1;
+    private static final double MIN_THUMBNAIL_QUALITY = 0.1;
+    private static final int MIN_MAX_FRAMES_PER_VIDEO = 1;
+    private static final int MIN_FACE_CROP_SIZE = 1;
     private static final int MIN_HNSW_M = 2;
     private static final int MIN_HNSW_EF = 1;
     private static final int MIN_KNN_K = 1;
@@ -50,6 +59,12 @@ public class ConfigModel {
     // Import performance
     @JsonProperty("maxDetectionDimension")
     private int maxDetectionDimension = DEFAULT_MAX_DETECTION_DIMENSION;
+    @JsonProperty("thumbnailQuality")
+    private float thumbnailQuality = DEFAULT_THUMBNAIL_QUALITY;
+    @JsonProperty("maxFramesPerVideo")
+    private int maxFramesPerVideo = DEFAULT_MAX_FRAMES_PER_VIDEO;
+    @JsonProperty("faceCropSize")
+    private int faceCropSize = DEFAULT_FACE_CROP_SIZE;
 
     // Clustering
     @JsonProperty("clusteringThreshold")
@@ -109,6 +124,9 @@ public class ConfigModel {
         minConfidence = clamp(minConfidence, 0.0, 1.0);
         maxFacesPerImage = clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE);
         maxDetectionDimension = clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE);
+        thumbnailQuality = (float) clamp(thumbnailQuality, MIN_THUMBNAIL_QUALITY, 1.0);
+        maxFramesPerVideo = clamp(maxFramesPerVideo, MIN_MAX_FRAMES_PER_VIDEO, Integer.MAX_VALUE);
+        faceCropSize = clamp(faceCropSize, MIN_FACE_CROP_SIZE, Integer.MAX_VALUE);
         clusteringThreshold = clamp(clusteringThreshold, 0.0, 1.0);
         hnswM = clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE);
         hnswEfConstruction = clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE);
@@ -166,6 +184,30 @@ public class ConfigModel {
 
     public void setMaxDetectionDimension(int maxDetectionDimension) {
         this.maxDetectionDimension = maxDetectionDimension;
+    }
+
+    public float getThumbnailQuality() {
+        return thumbnailQuality;
+    }
+
+    public void setThumbnailQuality(float thumbnailQuality) {
+        this.thumbnailQuality = thumbnailQuality;
+    }
+
+    public int getMaxFramesPerVideo() {
+        return maxFramesPerVideo;
+    }
+
+    public void setMaxFramesPerVideo(int maxFramesPerVideo) {
+        this.maxFramesPerVideo = maxFramesPerVideo;
+    }
+
+    public int getFaceCropSize() {
+        return faceCropSize;
+    }
+
+    public void setFaceCropSize(int faceCropSize) {
+        this.faceCropSize = faceCropSize;
     }
 
     public double getClusteringThreshold() {

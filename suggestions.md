@@ -8,7 +8,7 @@ index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-24, full suite green: 322 tests / 38 classes, 0 failures).
+(2026-09-24, full suite green: 327 tests / 38 classes, 0 failures).
 
 ---
 
@@ -108,11 +108,17 @@ All line numbers below refer to the current state of the codebase
 - [ ] **GPU inference option** — expose `FaceAiService.DEVICE` in Settings (see §8; blocked
   on `faceai` supporting `device()`). Would speed up clustering/import on CUDA machines.
   **Medium effort once unblocked.**
-- [ ] **Configurable import budgets** — thumbnail JPEG quality (`Thumbnailer.JPEG_QUALITY = 0.85f`,
+- [x] **Configurable import budgets** — thumbnail JPEG quality (`Thumbnailer.JPEG_QUALITY = 0.85f`,
   `Thumbnailer.java:16`), max frames per video (`FrameSampler.MAX_FRAMES_PER_VIDEO = 120`,
   `FrameSampler.java:17`), face-crop size (`FaceDetectionUtils.SUB_IMAGE_MAX_DIM = 160`,
-  `FaceDetectionUtils.java:32`) — move to `ConfigModel` (only `thumbnailSize` is configurable today).
-  **Medium effort.**
+  `FaceDetectionUtils.java:32`) — move to `ConfigModel` (only `thumbnailSize` is configurable today). Done —
+  the three hard-coded constants are gone, replaced by `ConfigModel.thumbnailQuality` (0.85f) /
+  `maxFramesPerVideo` (120) / `faceCropSize` (160) with clamps in `normalize()` (quality → [0.1, 1.0],
+  counts → [1, MAX]); `Thumbnailer.encode`, `FrameSampler.countFrames`/`sampleTargets` (frame cap now a
+  validated parameter) and `FaceDetectionUtils.detectFaces` (crop size + quality) all take the budget from
+  the config, threaded through `ImportService`/`VideoImportService`. The Settings tab gained three controls
+  (quality double spinner, frames-per-video and face-crop integer spinners) with labels + tooltips in all six
+  languages, wired into load/save/reset (todo.txt item 24). **Medium effort — done, with Settings UI.**
 - [ ] **Delete image/video feature** — the unused `ImageDao.delete`/`VideoDao.delete` were
   removed in the dead-code cleanup (suggestion 6), so a delete UI now also means re-adding
   those DAO methods; the FK cascade on faces remains in place as the foundation. **Medium effort.**

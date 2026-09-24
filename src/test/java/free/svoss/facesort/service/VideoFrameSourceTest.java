@@ -1,5 +1,6 @@
 package free.svoss.facesort.service;
 
+import free.svoss.facesort.config.ConfigModel;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
@@ -34,7 +35,8 @@ class VideoFrameSourceTest {
     void samplerTargets_extractOneFramePerTargetAscending() {
         double[] positions = {0.5, 1.5, 2.5, 3.5, 4.5};
         try (FakeVideoFrameSource source = new FakeVideoFrameSource(5.0, positions)) {
-            List<Double> targets = FrameSampler.sampleTargets(source.getDuration());
+            List<Double> targets = FrameSampler.sampleTargets(source.getDuration(),
+                    ConfigModel.DEFAULT_MAX_FRAMES_PER_VIDEO);
             assertEquals(5, targets.size());
 
             List<Double> delivered = new ArrayList<>();

@@ -149,6 +149,12 @@ All notable changes to Face Sort will be documented in this file.
   face closest to it is now one `FaceSelector` helper, used by the clustering,
   deduplication, View-tab and "Add faces to a name" services instead of four
   near-identical reimplementations (2026-09-24)
+- The import budgets are configurable: the JPEG quality of stored thumbnails and
+  face sub-images (default 0.85), the maximum number of frames extracted per
+  video (default 120) and the face crop size (default 160 px) are no longer
+  hard-coded — they are settings in the Settings tab (new controls + tooltips in
+  all six languages) and keys in `config/facesort-config.json`, with
+  hand-edited values clamped to safe ranges on load (2026-09-24)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -131,7 +131,8 @@ class VideoImportServiceTest {
 
         FakeImportFrameSource(double duration) {
             this.duration = duration;
-            this.positions = FrameSampler.sampleTargets(duration);
+            this.positions = FrameSampler.sampleTargets(duration,
+                    ConfigModel.DEFAULT_MAX_FRAMES_PER_VIDEO);
         }
 
         @Override

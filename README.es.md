@@ -164,6 +164,12 @@ Todos los ajustes pueden cambiarse en la pestaña **Ajustes** (cada control tien
 una información explicativa); se guardan en `config/facesort-config.json`.
 También puedes cambiar el **idioma** de la interfaz allí.
 
+Además de los parámetros de detección y agrupación, también se pueden ajustar
+los presupuestos de importación: la calidad JPEG de las miniaturas y recortes de
+rostro guardados, el número máximo de fotogramas muestreados por vídeo y el
+tamaño del recorte de rostro, para equilibrar la importación entre calidad y
+velocidad.
+
 ## Licencia
 
 Distribuida bajo la [Licencia MIT](LICENSE).

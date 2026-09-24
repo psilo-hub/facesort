@@ -214,7 +214,7 @@ public class VideoImportService implements AutoCloseable {
         int droppedFaces = 0;
         try (VideoFrameSource source = sourceOpener.open(file)) {
             double duration = source.getDuration();
-            List<Double> targets = FrameSampler.sampleTargets(duration);
+            List<Double> targets = FrameSampler.sampleTargets(duration, config.getMaxFramesPerVideo());
             long detectionTs = System.currentTimeMillis();
 
             // Register the video row before extracting any frames so the frame
@@ -229,7 +229,7 @@ public class VideoImportService implements AutoCloseable {
                 }
                 BufferedImage frame = sampled.image();
                 long timestampMs = Math.round(sampled.positionSeconds() * 1000);
-                byte[] frameJpg = ImageUtils.toJpegBytes(frame, Thumbnailer.JPEG_QUALITY);
+                byte[] frameJpg = ImageUtils.toJpegBytes(frame, config.getThumbnailQuality());
                 String frameHash = HashUtils.hashBytes(frameJpg);
 
                 // Frame content already known (identical frame, or a photo with
@@ -240,14 +240,16 @@ public class VideoImportService implements AutoCloseable {
                         ? new FaceDetectionUtils.DetectionResult(List.of(), 0)
                         : FaceDetectionUtils.detectFaces(frameHash, frame,
                                 maxDetectionDimension, minBbox, minConfidence,
-                                maxFacesPerImage, service,
+                                maxFacesPerImage, config.getFaceCropSize(),
+                                config.getThumbnailQuality(), service,
                                 file + " @ " + timestampMs + " ms");
                 List<FaceRecord> faceRecords = detection.faces();
 
                 // The thumbnail is encoded before the transaction starts: JPEG
                 // encoding must never run while holding the connection monitor.
                 byte[] thumbJpg = knownFrame ? null
-                    : Thumbnailer.encode(frame, config.getThumbnailSize());
+                    : Thumbnailer.encode(frame, config.getThumbnailSize(),
+                            config.getThumbnailQuality());
 
                 // ---- One atomic unit per frame (insert + thumbnail + faces
                 //      + link) ----

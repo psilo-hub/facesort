@@ -1,12 +1,15 @@
 package free.svoss.facesort.service;
 
+import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.tools.faceai.DetectedFace;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -33,7 +36,8 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", image, 1600,
-                            80, 0.8, 10, service, SOURCE);
+                            80, 0.8, 10, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(1, result.faces().size());
             assertEquals(0, result.droppedFaces());
@@ -61,7 +65,8 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", solidImage(200, 200), 1600,
-                            80, 0.8, 2, service, SOURCE);
+                            80, 0.8, 2, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(2, result.faces().size());
             assertEquals(0, result.droppedFaces());
@@ -78,7 +83,8 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", solidImage(200, 200), 1600,
-                            80, 0.8, 10, service, SOURCE);
+                            80, 0.8, 10, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(1, result.faces().size(),
                     "the face whose embedding failed must be dropped");
@@ -96,7 +102,8 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", solidImage(200, 200), 1600,
-                            80, 0.8, 10, service, SOURCE);
+                            80, 0.8, 10, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(0, result.faces().size());
             assertEquals(1, result.droppedFaces());
@@ -113,7 +120,8 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", solidImage(1000, 800), 500,
-                            80, 0.8, 10, service, SOURCE);
+                            80, 0.8, 10, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(1, result.faces().size());
             FaceRecord scaled = result.faces().get(0);
@@ -132,11 +140,32 @@ class FaceDetectionUtilsTest {
 
             FaceDetectionUtils.DetectionResult result =
                     FaceDetectionUtils.detectFaces("img1", solidImage(1000, 800), 500,
-                            100, 0.8, 10, service, SOURCE);
+                            100, 0.8, 10, ConfigModel.DEFAULT_FACE_CROP_SIZE,
+                             ConfigModel.DEFAULT_THUMBNAIL_QUALITY, service, SOURCE);
 
             assertEquals(1, result.faces().size(),
                     "minBbox is evaluated in original coordinates after mapping");
             assertEquals(400, result.faces().get(0).bboxW());
+        }
+    }
+
+    @Test
+    void detectFaces_downscalesStoredFaceCropsToConfiguredSize() throws Exception {
+        FakeFaceAiEngine engine = new FakeFaceAiEngine()
+                .withFaces(new DetectedFace(0, 0, 200, 200, 0.95f));
+        try (FaceAiService service = new FaceAiService(engine)) {
+
+            FaceDetectionUtils.DetectionResult result =
+                    FaceDetectionUtils.detectFaces("img1", solidImage(200, 200), 1600,
+                            80, 0.8, 10, 50, 0.85f, service, SOURCE);
+
+            assertEquals(1, result.faces().size());
+            BufferedImage stored = ImageIO.read(new ByteArrayInputStream(
+                    result.faces().get(0).subImageJpg()));
+            assertEquals(50, stored.getWidth(),
+                    "the stored face crop must be downscaled to the configured size");
+            assertEquals(50, stored.getHeight(),
+                    "the stored face crop must be downscaled to the configured size");
         }
     }
 

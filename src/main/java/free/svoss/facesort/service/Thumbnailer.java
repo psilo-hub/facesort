@@ -6,14 +6,11 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 /**
- * JPEG thumbnail encoding shared by the photo and video import services.
- * Offers the single quality constant used for every cached JPEG in the app
- * (full-image thumbnails, video frame thumbnails and face sub-images).
+ * JPEG thumbnail encoding shared by the photo and video import services. The
+ * quality used for every cached JPEG in the app (full-image thumbnails, video
+ * frame thumbnails and face sub-images) comes from the configuration.
  */
 final class Thumbnailer {
-
-    /** JPEG quality for all stored thumbnails and face sub-images. */
-    static final float JPEG_QUALITY = 0.85f;
 
     private Thumbnailer() {
         // Utility class - not instantiable
@@ -27,11 +24,12 @@ final class Thumbnailer {
      *
      * @param image        the image to encode
      * @param maxDimension longest allowed side of the thumbnail
+     * @param quality      JPEG quality in the range [0.1, 1.0]
      * @return the JPEG bytes
      * @throws IOException if the image cannot be encoded
      */
-    static byte[] encode(BufferedImage image, int maxDimension) throws IOException {
+    static byte[] encode(BufferedImage image, int maxDimension, float quality) throws IOException {
         BufferedImage thumbnail = ImageUtils.downsize(image, maxDimension);
-        return ImageUtils.toJpegBytes(thumbnail, JPEG_QUALITY);
+        return ImageUtils.toJpegBytes(thumbnail, quality);
     }
 }

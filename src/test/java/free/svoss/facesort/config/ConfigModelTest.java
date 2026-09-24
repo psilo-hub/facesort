@@ -39,6 +39,38 @@ class ConfigModelTest {
         assertEquals(1, config.getHnswEfSearch());
         assertEquals(1, config.getKnnK());
         assertEquals(1, config.getFaceNameMaxImages());
+        assertEquals(1, config.getMaxFramesPerVideo());
+        assertEquals(1, config.getFaceCropSize());
+    }
+
+    @Test
+    void normalize_clampsThumbnailQualityIntoAWorkingRange() {
+        ConfigModel config = new ConfigModel();
+        config.setThumbnailQuality(0.0f);
+        ConfigModel overshoot = new ConfigModel();
+        overshoot.setThumbnailQuality(2.0f);
+
+        config.normalize();
+        overshoot.normalize();
+
+        assertEquals(0.1f, config.getThumbnailQuality(),
+                "a quality at or below zero must be clamped to the floor");
+        assertEquals(1.0f, overshoot.getThumbnailQuality(),
+                "a quality above the maximum must be clamped to 1.0");
+    }
+
+    @Test
+    void normalize_leavesImportBudgetDefaultsUntouched() {
+        ConfigModel config = new ConfigModel();
+        config.setThumbnailQuality(0.7f);
+        config.setMaxFramesPerVideo(30);
+        config.setFaceCropSize(128);
+
+        config.normalize();
+
+        assertEquals(0.7f, config.getThumbnailQuality());
+        assertEquals(30, config.getMaxFramesPerVideo());
+        assertEquals(128, config.getFaceCropSize());
     }
 
     @Test
@@ -88,6 +120,8 @@ class ConfigModelTest {
         config.setHnswEfSearch(0);
         config.setKnnK(-5);
         config.setFaceNameMaxImages(-2);
+        config.setMaxFramesPerVideo(-3);
+        config.setFaceCropSize(0);
         return config;
     }
 }

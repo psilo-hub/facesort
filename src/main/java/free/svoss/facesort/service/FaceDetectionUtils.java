@@ -28,9 +28,6 @@ final class FaceDetectionUtils {
 
     private static final Logger LOG = Logger.getLogger(FaceDetectionUtils.class.getName());
 
-    /** Maximum dimension (width or height) for face sub-image thumbnails. */
-    private static final int SUB_IMAGE_MAX_DIM = 160;
-
     private FaceDetectionUtils() {
         // Utility class - not instantiable
     }
@@ -45,6 +42,9 @@ final class FaceDetectionUtils {
      * @param minBbox                minimum qualifying bounding box size (px)
      * @param minConfidence          minimum qualifying confidence
      * @param maxFacesPerImage       maximum faces kept per image
+     * @param faceCropSize           maximum width/height of the stored face
+     *                               sub-image, in pixels
+     * @param thumbnailQuality       JPEG quality for the stored sub-image
      * @param service                face detection and embedding service
      * @param sourceDescription      human-readable source for error logs
      * @return the faces that were fully processed (each with its stored
@@ -54,6 +54,7 @@ final class FaceDetectionUtils {
     static DetectionResult detectFaces(String imageHash, BufferedImage image,
                                         int maxDetectionDimension, int minBbox,
                                         double minConfidence, int maxFacesPerImage,
+                                        int faceCropSize, float thumbnailQuality,
                                         FaceAiService service, String sourceDescription) {
         double detectionScale = computeDetectionScale(image, maxDetectionDimension);
         BufferedImage detectionImage = detectionScale < 1.0
@@ -77,9 +78,9 @@ final class FaceDetectionUtils {
         for (DetectedFace face : qualifying) {
             try {
                 BufferedImage faceCrop = face.crop(image);
-                BufferedImage faceThumb = ImageUtils.downsize(faceCrop, SUB_IMAGE_MAX_DIM);
+                BufferedImage faceThumb = ImageUtils.downsize(faceCrop, faceCropSize);
                 float[] embedding = service.getEmbedding(faceThumb);
-                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, Thumbnailer.JPEG_QUALITY);
+                byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, thumbnailQuality);
 
                 faceRecords.add(new FaceRecord(
                         0, imageHash,

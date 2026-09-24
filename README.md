@@ -171,6 +171,11 @@ All settings can be changed in the **Settings** tab (each control has an
 explanation tooltip); they are stored in `config/facesort-config.json`. The UI
 **language** is stored there too.
 
+Beyond the detection and clustering parameters, the import budgets are tunable
+as well: the JPEG quality of stored thumbnails and face crops, the maximum
+frames sampled per video, and the face crop size — so imports can be balanced
+between quality and speed.
+
 ## License
 
 Distributed under the [MIT License](LICENSE).

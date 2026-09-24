@@ -172,6 +172,12 @@ contrôle possède une info-bulle explicative) ; ils sont stockés dans
 `config/facesort-config.json`. Vous pouvez aussi y changer la **langue** de
 l'interface.
 
+Outre les paramètres de détection et de regroupement, les budgets d'importation
+sont également réglables : la qualité JPEG des vignettes et des recadrages de
+visage enregistrés, le nombre maximal d'images échantillonnées par vidéo et la
+taille du recadrage du visage — pour équilibrer l'importation entre qualité et
+rapidité.
+
 ## Licence
 
 Distribuée sous la [Licence MIT](LICENSE).

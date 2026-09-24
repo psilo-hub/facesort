@@ -206,7 +206,8 @@ public class ImportService implements AutoCloseable {
         // embedded and encoded exactly like video frames are.
         FaceDetectionUtils.DetectionResult detection = FaceDetectionUtils.detectFaces(hash, image,
                 config.getMaxDetectionDimension(), minBbox, minConfidence,
-                maxFacesPerImage, service, file.toString());
+                maxFacesPerImage, config.getFaceCropSize(), config.getThumbnailQuality(),
+                service, file.toString());
         List<FaceRecord> faceRecords = detection.faces();
         int facesAdded = faceRecords.size();
 
@@ -255,7 +256,8 @@ public class ImportService implements AutoCloseable {
         if (thumbnailPresent(hash)) {
             return;
         }
-        byte[] thumbJpg = Thumbnailer.encode(image, config.getThumbnailSize());
+        byte[] thumbJpg = Thumbnailer.encode(image, config.getThumbnailSize(),
+                config.getThumbnailQuality());
         saveThumbnailIfAbsent(hash, thumbJpg);
     }
 
@@ -273,7 +275,8 @@ public class ImportService implements AutoCloseable {
             return;
         }
         BufferedImage image = ImageUtils.readImage(file);
-        saveThumbnailIfAbsent(hash, Thumbnailer.encode(image, config.getThumbnailSize()));
+        saveThumbnailIfAbsent(hash, Thumbnailer.encode(image, config.getThumbnailSize(),
+                config.getThumbnailQuality()));
     }
 
     private boolean thumbnailPresent(String hash) throws SQLException {

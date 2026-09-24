@@ -51,6 +51,9 @@ public class SettingsView extends BorderPane {
     private final Spinner<Integer> knnK = intSpinner(1, 100, 1);
     private final TextField faceaiCacheDir = new TextField();
     private final Spinner<Integer> thumbnailSize = intSpinner(64, 1024, 32);
+    private final Spinner<Double> thumbnailQuality = doubleSpinner(0.1, 1.0, 0.05);
+    private final Spinner<Integer> maxFramesPerVideo = intSpinner(10, 600, 10);
+    private final Spinner<Integer> faceCropSize = intSpinner(96, 512, 16);
     private final Spinner<Integer> maxImportThreads = intSpinner(1, ConfigModel.MAX_IMPORT_THREADS, 1);
     private final TextField minNameSimilarity = new TextField();
     private final TextField faceNameMaxImages = new TextField();
@@ -136,6 +139,18 @@ public class SettingsView extends BorderPane {
 
         addRow(grid, row++, I18n.get("settings.thumbnailSize"), thumbnailSize,
                 I18n.format("settings.tooltip.thumbnailSize", defaults.getThumbnailSize()));
+
+        addRow(grid, row++, I18n.get("settings.thumbnailQuality"), thumbnailQuality,
+                I18n.format("settings.tooltip.thumbnailQuality",
+                        format(defaults.getThumbnailQuality())));
+
+        addRow(grid, row++, I18n.get("settings.maxFramesPerVideo"), maxFramesPerVideo,
+                I18n.format("settings.tooltip.maxFramesPerVideo",
+                        defaults.getMaxFramesPerVideo()));
+
+        addRow(grid, row++, I18n.get("settings.faceCropSize"), faceCropSize,
+                I18n.format("settings.tooltip.faceCropSize",
+                        defaults.getFaceCropSize()));
 
         addRow(grid, row++, I18n.get("settings.maxImportThreads"), maxImportThreads,
                 I18n.format("settings.tooltip.maxImportThreads",
@@ -237,6 +252,9 @@ public class SettingsView extends BorderPane {
         knnK.getValueFactory().setValue(config.getKnnK());
         faceaiCacheDir.setText(config.getFaceaiCacheDir() == null ? "" : config.getFaceaiCacheDir());
         thumbnailSize.getValueFactory().setValue(config.getThumbnailSize());
+        thumbnailQuality.getValueFactory().setValue((double) config.getThumbnailQuality());
+        maxFramesPerVideo.getValueFactory().setValue(config.getMaxFramesPerVideo());
+        faceCropSize.getValueFactory().setValue(config.getFaceCropSize());
         maxImportThreads.getValueFactory().setValue(config.getMaxImportThreads());
         minNameSimilarity.setText(String.valueOf(config.getMinNameSimilarity()));
         faceNameMaxImages.setText(String.valueOf(config.getFaceNameMaxImages()));
@@ -316,6 +334,9 @@ public class SettingsView extends BorderPane {
         String cacheDir = faceaiCacheDir.getText().trim();
         config.setFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir);
         config.setThumbnailSize(thumbnailSize.getValue());
+        config.setThumbnailQuality(thumbnailQuality.getValue().floatValue());
+        config.setMaxFramesPerVideo(maxFramesPerVideo.getValue());
+        config.setFaceCropSize(faceCropSize.getValue());
         config.setMaxImportThreads(maxImportThreads.getValue());
         config.setMinNameSimilarity(minSimilarity);
         config.setFaceNameMaxImages(maxImages);
@@ -345,6 +366,9 @@ public class SettingsView extends BorderPane {
         config.setKnnK(defaults.getKnnK());
         config.setFaceaiCacheDir(defaults.getFaceaiCacheDir());
         config.setThumbnailSize(defaults.getThumbnailSize());
+        config.setThumbnailQuality(defaults.getThumbnailQuality());
+        config.setMaxFramesPerVideo(defaults.getMaxFramesPerVideo());
+        config.setFaceCropSize(defaults.getFaceCropSize());
         config.setMaxImportThreads(defaults.getMaxImportThreads());
         config.setMinNameSimilarity(defaults.getMinNameSimilarity());
         config.setFaceNameMaxImages(defaults.getFaceNameMaxImages());

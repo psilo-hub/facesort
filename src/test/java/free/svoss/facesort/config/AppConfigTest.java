@@ -53,6 +53,12 @@ class AppConfigTest {
                 "a missing updateCheckEnabled key must fall back to enabled");
         assertEquals(ConfigModel.DEFAULT_FACE_NAME_MAX_IMAGES, config.getFaceNameMaxImages(),
                 "a missing faceNameMaxImages key must fall back to the default");
+        assertEquals(ConfigModel.DEFAULT_THUMBNAIL_QUALITY, config.getThumbnailQuality(),
+                "a missing thumbnailQuality key must fall back to the default");
+        assertEquals(ConfigModel.DEFAULT_MAX_FRAMES_PER_VIDEO, config.getMaxFramesPerVideo(),
+                "a missing maxFramesPerVideo key must fall back to the default");
+        assertEquals(ConfigModel.DEFAULT_FACE_CROP_SIZE, config.getFaceCropSize(),
+                "a missing faceCropSize key must fall back to the default");
         assertEquals("custom.db", config.getDbName(), "the pre-existing keys must still load");
     }
 
@@ -62,12 +68,18 @@ class AppConfigTest {
         ConfigModel written = AppConfig.getDefault();
         written.setUpdateCheckEnabled(false);
         written.setFaceNameMaxImages(42);
+        written.setThumbnailQuality(0.6f);
+        written.setMaxFramesPerVideo(30);
+        written.setFaceCropSize(128);
         AppConfig.save(file, written);
 
         ConfigModel read = AppConfig.load(file);
 
         assertFalse(read.isUpdateCheckEnabled());
         assertEquals(42, read.getFaceNameMaxImages());
+        assertEquals(0.6f, read.getThumbnailQuality());
+        assertEquals(30, read.getMaxFramesPerVideo());
+        assertEquals(128, read.getFaceCropSize());
         assertTrue(Files.exists(file));
     }
 }
