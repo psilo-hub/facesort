@@ -34,6 +34,7 @@ import java.util.Set;
 public class FaceToNameService {
 
     private final FaceAiService faceAiService;
+    private final FaceSelector faceSelector;
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final ImageDao imageDao;
@@ -54,6 +55,7 @@ public class FaceToNameService {
     public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
                              ImageDao imageDao, VideoDao videoDao, ConfigModel config) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
+        this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
@@ -155,7 +157,7 @@ public class FaceToNameService {
             return List.of();
         }
 
-        float[] average = averageOf(namedFaces);
+        float[] average = faceSelector.averageOf(namedFaces);
         double cutoff = config.getMinNameSimilarity();
 
         Map<Long, float[]> otherAverages = excludeCloserToOtherNames
@@ -198,7 +200,7 @@ public class FaceToNameService {
             if (faces.isEmpty()) {
                 continue;
             }
-            averages.put(other.id(), averageOf(faces));
+            averages.put(other.id(), faceSelector.averageOf(faces));
         }
         return averages;
     }
@@ -221,41 +223,6 @@ public class FaceToNameService {
             }
         }
         return false;
-    }
-
-    /**
-     * Computes the component-wise average embedding of the given faces.
-     *
-     * @param faces the faces to average; must not be empty
-     * @return the average embedding
-     */
-    private float[] averageOf(List<FaceRecord> faces) {
-        List<float[]> embeddings = new ArrayList<>(faces.size());
-        for (FaceRecord face : faces) {
-            embeddings.add(face.embedding());
-        }
-        return faceAiService.calcAverage(embeddings);
-    }
-
-    /**
-     * Picks the face whose embedding is most similar to the given average
-     * embedding. The caller guarantees at least one face.
-     *
-     * @param faces   the faces to choose from; must not be empty
-     * @param average the average embedding to compare against
-     * @return the closest face
-     */
-    private FaceRecord mostSimilarToAverage(List<FaceRecord> faces, float[] average) {
-        FaceRecord best = faces.get(0);
-        double bestScore = -1.0;
-        for (FaceRecord face : faces) {
-            double score = faceAiService.calcSimilarity(average, face.embedding());
-            if (score > bestScore) {
-                bestScore = score;
-                best = face;
-            }
-        }
-        return best;
     }
 
     /**
@@ -282,7 +249,7 @@ public class FaceToNameService {
             return List.of();
         }
 
-        float[] average = averageOf(namedFaces);
+        float[] average = faceSelector.averageOf(namedFaces);
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord face : namedFaces) {
@@ -411,8 +378,8 @@ public class FaceToNameService {
         if (namedFaces.isEmpty()) {
             return Optional.empty();
         }
-        float[] average = averageOf(namedFaces);
-        FaceRecord representative = mostSimilarToAverage(namedFaces, average);
+        float[] average = faceSelector.averageOf(namedFaces);
+        FaceRecord representative = faceSelector.mostSimilarTo(average, namedFaces);
         FaceRecord candidate = faceDao.findById(candidateFaceId)
                 .orElseThrow(() -> new IllegalArgumentException("Face not found: " + candidateFaceId));
         return Optional.of(new NamePreview(representative,

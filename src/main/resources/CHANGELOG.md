@@ -144,6 +144,11 @@ All notable changes to Face Sort will be documented in this file.
   the trim → find → insert helper behind "create or find name" and "find name"
   now lives once in a shared `NameService`, used by both tagging workflows
   (2026-09-23)
+- The "representative face" selection is shared (internal, no visible behavior
+  change): computing the average embedding of a set of faces and picking the
+  face closest to it is now one `FaceSelector` helper, used by the clustering,
+  deduplication, View-tab and "Add faces to a name" services instead of four
+  near-identical reimplementations (2026-09-24)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

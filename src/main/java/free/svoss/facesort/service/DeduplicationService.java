@@ -32,6 +32,7 @@ import java.util.Set;
 public class DeduplicationService {
 
     private final FaceAiService faceAiService;
+    private final FaceSelector faceSelector;
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final NotDupeDao notDupeDao;
@@ -63,6 +64,7 @@ public class DeduplicationService {
                                 NameDao nameDao, NotDupeDao notDupeDao, ImageDao imageDao,
                                 VideoDao videoDao, TransactionRunner transactionRunner) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
+        this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notDupeDao = Objects.requireNonNull(notDupeDao, "notDupeDao");
@@ -269,22 +271,10 @@ public class DeduplicationService {
             if (faces.isEmpty()) {
                 continue;
             }
-            List<float[]> embeddings = new ArrayList<>(faces.size());
-            for (FaceRecord face : faces) {
-                embeddings.add(face.embedding());
-            }
-            float[] average = faceAiService.calcAverage(embeddings);
+            float[] average = faceSelector.averageOf(faces);
 
             // Pick the face closest to the name's average embedding (argmax).
-            FaceRecord bestFace = faces.get(0);
-            double bestSim = -1.0;
-            for (FaceRecord face : faces) {
-                double sim = faceAiService.calcSimilarity(average, face.embedding());
-                if (sim > bestSim) {
-                    bestSim = sim;
-                    bestFace = face;
-                }
-            }
+            FaceRecord bestFace = faceSelector.mostSimilarTo(average, faces);
             result.add(new NameWithAverage(record, average, bestFace));
         }
         return result;

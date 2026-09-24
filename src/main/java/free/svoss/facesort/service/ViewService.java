@@ -29,7 +29,7 @@ import java.util.Set;
  */
 public class ViewService {
 
-    private final FaceAiService faceAiService;
+    private final FaceSelector faceSelector;
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final ImageDao imageDao;
@@ -46,7 +46,7 @@ public class ViewService {
      */
     public ViewService(FaceAiService faceAiService, FaceDao faceDao,
                        NameDao nameDao, ImageDao imageDao, VideoDao videoDao) {
-        this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
+        this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
@@ -67,17 +67,10 @@ public class ViewService {
         List<NameSummary> summaries = new ArrayList<>();
         for (NameRecord name : nameDao.findAll()) {
             List<FaceRecord> faces = faceDao.findByNameId(name.id());
-            List<float[]> embeddings = new ArrayList<>();
-            for (FaceRecord face : faces) {
-                if (face.embedding() != null) {
-                    embeddings.add(face.embedding());
-                }
-            }
-            if (embeddings.isEmpty()) {
+            if (faces.isEmpty()) {
                 continue;
             }
-            float[] average = faceAiService.calcAverage(embeddings);
-            FaceRecord representative = findRepresentative(faces, average);
+            FaceRecord representative = faceSelector.representativeOf(faces);
             summaries.add(new NameSummary(name, faces.size(), representative));
         }
         return summaries;
@@ -326,28 +319,6 @@ public class ViewService {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Selects the face whose embedding is most similar to the given average.
-     *
-     * <p>Faces without an embedding are skipped. The caller guarantees at least
-     * one face has an embedding, so the result is never null in practice.</p>
-     */
-    private FaceRecord findRepresentative(List<FaceRecord> faces, float[] average) {
-        FaceRecord best = null;
-        double bestScore = -1.0;
-        for (FaceRecord face : faces) {
-            if (face.embedding() == null) {
-                continue;
-            }
-            double score = faceAiService.calcSimilarity(average, face.embedding());
-            if (best == null || score > bestScore) {
-                best = face;
-                bestScore = score;
-            }
-        }
-        return best;
     }
 
     /**

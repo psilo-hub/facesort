@@ -47,7 +47,7 @@ public class ClusteringService {
     /** Tolerance when comparing float distances against the threshold. */
     private static final double EPSILON = 1e-6;
 
-    private final FaceAiService faceAiService;
+    private final FaceSelector faceSelector;
     private final FaceDao faceDao;
     private final ConfigModel config;
 
@@ -60,7 +60,7 @@ public class ClusteringService {
      *                      parameters; see {@link ConfigModel})
      */
     public ClusteringService(FaceAiService faceAiService, FaceDao faceDao, ConfigModel config) {
-        this.faceAiService = faceAiService;
+        this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = faceDao;
         this.config = config;
     }
@@ -93,7 +93,7 @@ public class ClusteringService {
                     .map(faces::get)
                     .sorted(Comparator.comparingLong(FaceRecord::id))
                     .toList();
-            clusters.add(new Cluster(members, pickRepresentative(members)));
+            clusters.add(new Cluster(members, faceSelector.representativeOf(members)));
         }
         clusters.sort(Comparator.comparingInt((Cluster c) -> c.faces().size()).reversed());
         return clusters;
@@ -217,26 +217,6 @@ public class ClusteringService {
             }
         }
         return components;
-    }
-
-    /**
-     * Picks the cluster representative: the member whose embedding is most
-     * similar to the centroid of all member embeddings.
-     */
-    private FaceRecord pickRepresentative(List<FaceRecord> members) {
-        List<float[]> embeddings = members.stream().map(FaceRecord::embedding).toList();
-        float[] centroid = faceAiService.calcAverage(embeddings);
-
-        FaceRecord best = members.get(0);
-        double bestSimilarity = -1.0;
-        for (FaceRecord member : members) {
-            double similarity = faceAiService.calcSimilarity(centroid, member.embedding());
-            if (similarity > bestSimilarity) {
-                bestSimilarity = similarity;
-                best = member;
-            }
-        }
-        return best;
     }
 
     /** HNSW item wrapping a face's embedding, keyed by the face's database id. */

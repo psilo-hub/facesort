@@ -2,13 +2,13 @@
 
 Checklist of the improvement suggestions that are still **open**. The implemented
 ones (suggestions 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9) have been removed — their
-resolutions are recorded in `todo.txt` items 7–22 and `CHANGELOG.md`. HNSW index
+resolutions are recorded in `todo.txt` items 7–23 and `CHANGELOG.md`. HNSW index
 closing was dismissed with evidence (no `close()` on the pure-Java `HnswIndex`; the
 index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-23, full suite green: 318 tests / 37 classes, 0 failures).
+(2026-09-24, full suite green: 322 tests / 38 classes, 0 failures).
 
 ---
 
@@ -20,12 +20,18 @@ All line numbers below refer to the current state of the codebase
   `NameService` (built over `NameDao`), both services delegate their public methods to it, and
   `NameServiceTest` (5 cases) pins reuse/trim/blank/unknown behavior (todo.txt item 22).
   **High effort payoff, mostly mechanical.**
-- [ ] **Extract an `EmbeddingMath`/`FaceSelector` utility** — "representative = face
+- [x] **Extract an `EmbeddingMath`/`FaceSelector` utility** — "representative = face
   closest to the average embedding" is reimplemented 4×: `ClusteringService.pickRepresentative`
   (`ClusteringService.java:226-240`), `DeduplicationService.loadNamesWithAverages` argmax
   (`DeduplicationService.java:263-291`), `ViewService.findRepresentative`
   (`ViewService.java:337-351`), `FaceToNameService.mostSimilarToAverage`
-  (`FaceToNameService.java:246-257`). **High effort payoff, mostly mechanical.**
+  (`FaceToNameService.java:246-257`). Done — a new `FaceSelector` owns it once
+  (`averageOf` component-wise mean, `mostSimilarTo` strict-argmax keeping the first face on
+  ties, `representativeOf` combination); all four services (plus `FaceToNameService`'s
+  `mostSimilarToAverage`/`averageOf` callers and `ViewService.getNameSummaries`) delegate to
+  it, the per-service copies are deleted, and `FaceSelectorTest` (4 cases) pins the mean,
+  the closest-to-average pick, tie-breaking and representative-of-own-average (todo.txt
+  item 23). **High effort payoff, mostly mechanical.**
 - [x] **`FaceDao` column-list constant** — the same 10-column SELECT is spelled out 6×
   (`FaceDao.java:75,110,157,175,193,207`); a named constant (with a test asserting the
   column count matches `mapRow`) stops silent drift. Done — the shared `SELECT_COLUMNS`
