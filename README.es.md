@@ -49,7 +49,7 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
   reconocimiento facial se descargan una vez (con ventana de progreso) y se
   guardan en caché localmente.
 - **Comprobación automática de actualizaciones**: te avisa cuando hay una nueva
-  versión disponible.
+  versión disponible y muestra las notas de la versión.
 - **Pestaña de comentarios**: envía informes de errores y peticiones de funciones
   directamente desde la aplicación.
 - **Después, totalmente offline**: la detección y la comparación se ejecutan
@@ -159,7 +159,7 @@ arranque): cópiala para hacer una copia de seguridad de tu biblioteca.
 |------|-----------|
 | `config/facesort.db` | Tu biblioteca: fotos, caras, nombres, etiquetas |
 | `config/facesort-config.json` | Tus ajustes |
-| `config/CHANGELOG.md` | Caché usada por la comprobación de actualizaciones |
+| `config/latest-release.json` | Caché usada por la comprobación de actualizaciones |
 | Caché de modelos FaceAI | Modelos descargados: por defecto `~/.djl.ai/cache` (Linux/macOS) o `%USERPROFILE%\.djl.ai\cache` (Windows); configurable mediante el ajuste *FaceAI cache dir* |
 
 Todos los ajustes pueden cambiarse en la pestaña **Ajustes** (cada control tiene

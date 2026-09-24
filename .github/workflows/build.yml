@@ -27,11 +27,6 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
-      - name: Install rawGitHubFetcher dependency
-        shell: bash
-        run: |
-          git clone --depth 1 https://github.com/psilo-hub/rawGitHubFetcher.git rawgithubfetcher-deps
-          mvn -B install -DskipTests -f rawgithubfetcher-deps/pom.xml
       - name: Install ffmpeg4j dependency
         shell: bash
         run: |
@@ -39,7 +34,7 @@ jobs:
           git -C ffmpeg4j-deps fetch --depth 1 origin 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           git -C ffmpeg4j-deps checkout 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
-      - run: mvn -B package -DskipTests
+      - run: mvn -B package -DskipTests -Dbuild.number=build-${{ github.run_number }}
       - uses: actions/upload-artifact@v5
         with:
           name: facesort-fat
@@ -85,11 +80,6 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
           mvn -B install -DskipTests -f faceai-deps/pom.xml
-      - name: Install rawGitHubFetcher dependency
-        shell: bash
-        run: |
-          git clone --depth 1 https://github.com/psilo-hub/rawGitHubFetcher.git rawgithubfetcher-deps
-          mvn -B install -DskipTests -f rawgithubfetcher-deps/pom.xml
       - name: Install ffmpeg4j dependency
         shell: bash
         run: |
@@ -98,7 +88,7 @@ jobs:
           git -C ffmpeg4j-deps checkout 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
       - name: Build platform jar
-        run: mvn -B package -P${{ matrix.platform }} "-Djavafx.platform=${{ matrix.javafx-platform }}" -DskipTests
+        run: mvn -B package -P${{ matrix.platform }} "-Djavafx.platform=${{ matrix.javafx-platform }}" -DskipTests -Dbuild.number=build-${{ github.run_number }}
       - uses: actions/upload-artifact@v5
         with:
           name: facesort-${{ matrix.platform }}

@@ -49,7 +49,8 @@ runs locally on your own computer: **your photos never leave your machine.**
   file is gone — including video frames — are exported as thumbnails instead).
 - **First-run model download** — the built-in face-recognition models are
   downloaded once (with a progress window) and cached locally.
-- **Automatic update check** — lets you know when a new release is available.
+- **Automatic update check** — lets you know when a new build is released and
+  shows the release notes.
 - **Feedback tab** — send bug reports and feature requests straight from the app.
 - **Fully offline afterwards** — all detection and matching runs locally on your CPU.
 
@@ -165,7 +166,7 @@ copy it to back up your library:
 |------|---------|
 | `config/facesort.db` | Your library: photos, faces, names, tags; also holds the `videos`, `video_paths` and `video_frames` tables backing the video import feature |
 | `config/facesort-config.json` | Your settings |
-| `config/CHANGELOG.md` | Cache used by the automatic update check |
+| `config/latest-release.json` | Cache used by the automatic update check |
 | FaceAI model cache | Downloaded models — default `~/.djl.ai/cache` (Linux/macOS) or `%USERPROFILE%\.djl.ai\cache` (Windows); configurable via the *FaceAI cache dir* setting |
 
 All settings can be changed in the **Settings** tab (each control has an

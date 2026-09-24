@@ -50,7 +50,7 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
 - **Modelldownload beim ersten Start** – die eingebauten Gesichtserkennungsmodelle
   werden einmalig heruntergeladen (mit Fortschrittsfenster) und lokal gecacht.
 - **Automatische Update-Prüfung** – informiert dich, wenn eine neue Version
-  verfügbar ist.
+  verfügbar ist, und zeigt die Versionshinweise.
 - **Feedback-Tab** – sende Fehlerberichte und Feature-Wünsche direkt aus der App.
 - **Danach komplett offline** – Erkennung und Vergleich laufen vollständig auf
   deiner CPU.
@@ -157,7 +157,7 @@ angelegt) – kopiere ihn, um deine Bibliothek zu sichern:
 |------|-------|
 | `config/facesort.db` | Deine Bibliothek: Fotos, Gesichter, Namen, Benennungen |
 | `config/facesort-config.json` | Deine Einstellungen |
-| `config/CHANGELOG.md` | Cache der automatischen Update-Prüfung |
+| `config/latest-release.json` | Cache der automatischen Update-Prüfung |
 | FaceAI-Modellcache | Heruntergeladene Modelle – standardmäßig `~/.djl.ai/cache` (Linux/macOS) oder `%USERPROFILE%\.djl.ai\cache` (Windows); über die Einstellung *FaceAI-Cacheordner* änderbar |
 
 Alle Einstellungen können im Tab **Einstellungen** geändert werden (jede

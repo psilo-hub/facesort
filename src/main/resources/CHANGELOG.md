@@ -158,6 +158,13 @@ All notable changes to Face Sort will be documented in this file.
   hard-coded — they are settings in the Settings tab (new controls + tooltips in
   all six languages) and keys in `config/facesort-config.json`, with
   hand-edited values clamped to safe ranges on load (2026-09-24)
+- The automatic update check now reads the latest release from the GitHub
+  Releases API instead of parsing the CHANGELOG.md: each CI build embeds its run
+  number into the jar, so the check compares build tags (local builds without an
+  embedded build number skip the check), and the notice dialog shows the release
+  version, the auto-generated release notes and a link to the release page. The
+  update-check cache in the config folder is now `config/latest-release.json`
+  (2026-09-24)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

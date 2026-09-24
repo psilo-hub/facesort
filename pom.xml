@@ -16,6 +16,9 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.12</javafx.version>
+        <!-- Build tag embedded into the jar; CI overrides it with -Dbuild.number=build-${{ github.run_number }}.
+             "0" marks a local/dev build without a release to compare against. -->
+        <build.number>0</build.number>
     </properties>
 
     <dependencies>
@@ -24,13 +27,6 @@
             <groupId>free.svoss.tools</groupId>
             <artifactId>faceai</artifactId>
             <version>0.1.0</version>
-        </dependency>
-
-        <!-- rawGitHubFetcher (locally installed) -->
-        <dependency>
-            <groupId>free.svoss.tools.rawGitHubFetcher</groupId>
-            <artifactId>rawGitHubFetcher</artifactId>
-            <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <!-- ffmpeg4j (locally installed; commit pinned, see ffmpeg4j-pin.txt) -->
@@ -90,6 +86,25 @@
     </dependencies>
 
     <build>
+        <!-- Only facesort-build.properties is filtered (so the CI build can embed
+             its run number); the rest of the resources, including the binary
+             fonts, are copied verbatim. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>facesort-build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>facesort-build.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

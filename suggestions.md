@@ -96,10 +96,12 @@ All line numbers below refer to the current state of the codebase
 - [ ] **Stray paste in `CHANGELOG.md`** — line 177 is a verbatim paste of todo.txt item 16
   appended after the last "Fixed" bullet with no heading; fold it into the proper section
   or delete it. **Low effort.**
-- [ ] **Undocumented changelog-format coupling** — `README.md:167` describes the update
+- [x] **Undocumented changelog-format coupling** — `README.md:167` describes the update
   cache, but the coupling to the exact `## [version]` heading regex in `UpdateChecker.VERSION_PATTERN`
   (`UpdateChecker.java:58`) is undocumented; worth a note if a future release changes the
-  changelog format. **Low effort.**
+  changelog format. Done — made obsolete by the release-attached auto-update (todo.txt item 26):
+  the update check no longer parses the changelog at all, so the format coupling no longer exists.
+  **Low effort.**
 
 ---
 
@@ -130,10 +132,16 @@ All line numbers below refer to the current state of the codebase
   bar reports a non-matching filter. The pure filter logic is the package-private
   `ViewView.filterNames` helper, pinned by `ViewViewTest` (6 cases); i18n keys and
   README (all six languages) updated (todo.txt item 25). **Medium effort.**
-- [ ] **Release-attached auto-update** — switch `UpdateChecker` from parsing `CHANGELOG.md`
+- [x] **Release-attached auto-update** — switch `UpdateChecker` from parsing `CHANGELOG.md`
   (`VERSION_PATTERN`, `UpdateChecker.java:58`) to the GitHub Releases API, which already
   generates release notes in CI (`softprops/action-gh-release` with `generate_release_notes: true`,
-  `.github/workflows/build.yml:108-114`). **Medium effort.**
+  `.github/workflows/build.yml:108-114`). Done — `UpdateChecker` now queries
+  `api.github.com/…/releases/latest` and parses the JSON (tag/url/notes) with Jackson; each CI
+  build embeds its run number as `build.number=build-<n>` via Maven resource filtering
+  (`-Dbuild.number` in both build.yml package commands), so the check compares build tags and local
+  builds without an embedded number skip it; the notice dialog shows the version + auto-generated
+  release notes; the config cache is now `latest-release.json`; the rawGitHubFetcher dependency and
+  its CI install steps are gone (todo.txt item 26). **Medium effort.**
 - [x] **Build caching in CI** — every job re-clones and rebuilds FaceAI, rawGitHubFetcher and
   ffmpeg4j from scratch (`.github/workflows/build.yml:19-35,71-87`); an `actions/cache` on
   `~/.m2` would cut minutes per job. Done — both build jobs now cache `~/.m2` per runner OS,

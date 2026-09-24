@@ -1,10 +1,13 @@
 package free.svoss.facesort.update;
 
-import free.svoss.tools.rawGitHubFetcher.Fetcher;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -13,34 +16,37 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Background update check.
  *
- * <p>On start, a dedicated daemon thread fetches the current {@code CHANGELOG.md}
- * from the project's GitHub repository and extracts the newest release version
- * from it. If that version is strictly newer than the one packaged inside the
- * running jar, a non-blocking notice dialog with a link to the latest release is
- * shown on the JavaFX application thread.</p>
+ * <p>On start, a dedicated daemon thread queries the GitHub Releases API for the
+ * latest release of this repository and compares its tag (for example
+ * {@code build-42}) with the build tag embedded into the running jar. If the
+ * latest release is strictly newer, a non-blocking notice dialog with the
+ * release version, the auto-generated release notes and a link to the release
+ * page is shown on the JavaFX application thread.</p>
  *
- * <p>Only the version number is compared, so packaging differences such as
- * line endings (CRLF vs LF) or whitespace never trigger a false notice.</p>
+ * <p>The local build tag is read from {@code /facesort-build.properties}; CI
+ * builds embed their GitHub run number there ({@code build.number=build-&lt;n&gt;}).
+ * Jars without a usable build tag (for example local builds) skip the check,
+ * because there is nothing to compare the remote tag against.</p>
  *
  * <p>The check never blocks application startup: the fetch runs on a daemon
- * thread and is bounded by {@link #FETCH_TIMEOUT}, the downloaded changelog is
- * written to the cache atomically (a temp file plus an atomic move, so a
- * crash can never leave a truncated cache), and every failure is written to
- * the console only.</p>
+ * thread and is bounded by {@link #FETCH_TIMEOUT}, the fetched release
+ * information is written to the cache atomically (a temp file plus an atomic
+ * move, so a crash can never leave a truncated cache), and every failure is
+ * written to the console only.</p>
  */
 public final class UpdateChecker {
 
@@ -52,37 +58,43 @@ public final class UpdateChecker {
     /** Upper bound for a single remote fetch, so a stalled network cannot hang the check. */
     public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(20);
 
-    private static final String CHANGELOG_RESOURCE = "/CHANGELOG.md";
-    private static final String CHANGELOG_URL =
-            "https://raw.githubusercontent.com/psilo-hub/facesort/refs/heads/main/src/main/resources/CHANGELOG.md";
-    private static final Pattern VERSION_PATTERN = Pattern.compile("(?m)^##[ \\t]*\\[([^\\]]+)\\]");
+    private static final String BUILD_INFO_RESOURCE = "/facesort-build.properties";
+    private static final String BUILD_NUMBER_KEY = "build.number";
+    private static final String RELEASES_URL =
+            "https://api.github.com/repos/psilo-hub/facesort/releases/latest";
+    private static final String CACHE_FILE_NAME = "latest-release.json";
 
     private final Path configDir;
+    private final String localVersion;
     private final RemoteFetcher fetcher;
     private final Duration fetchTimeout;
-    private final Runnable updateAvailable;
+    private final Consumer<ReleaseInfo> updateAvailable;
 
     /**
      * Creates an update checker for the given config folder.
      *
-     * @param configDir the folder the local changelog is stored in
+     * @param configDir the folder the release cache is stored in
      */
     public UpdateChecker(Path configDir) {
-        this(configDir, () -> Fetcher.get(CHANGELOG_URL), FETCH_TIMEOUT, UpdateChecker::showUpdateNotice);
+        this(configDir, localBuildNumber(), UpdateChecker::fetchLatestRelease,
+                FETCH_TIMEOUT, UpdateChecker::showUpdateNotice);
     }
 
     /**
      * Creates an update checker with configurable fetch and notice behaviour;
      * package-private for tests.
      *
-     * @param configDir      the folder the local changelog is stored in
+     * @param configDir      the folder the release cache is stored in
+     * @param localVersion   the build tag of the running jar; must not be null
      * @param fetcher        the remote fetch to use; must not be null
      * @param fetchTimeout   upper bound for the fetch; must not be null
      * @param updateAvailable invoked instead of the notice dialog when a newer
-     *                        version is found; must not be null
+     *                        release is found; must not be null
      */
-    UpdateChecker(Path configDir, RemoteFetcher fetcher, Duration fetchTimeout, Runnable updateAvailable) {
+    UpdateChecker(Path configDir, String localVersion, RemoteFetcher fetcher, Duration fetchTimeout,
+                  Consumer<ReleaseInfo> updateAvailable) {
         this.configDir = Objects.requireNonNull(configDir, "configDir");
+        this.localVersion = Objects.requireNonNull(localVersion, "localVersion");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
         this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
         this.updateAvailable = Objects.requireNonNull(updateAvailable, "updateAvailable");
@@ -98,53 +110,56 @@ public final class UpdateChecker {
     }
 
     /**
-     * Runs the update check once. The cache short-circuits the check when it
-     * was refreshed within {@link #CHECK_INTERVAL}; otherwise the remote
-     * changelog is fetched within {@link #fetchTimeout}, written atomically to
-     * the cache, and compared against the packaged changelog.
+     * Runs the update check once. If the running jar has no known build tag the
+     * check is skipped. Otherwise the cache short-circuits the check when it was
+     * refreshed within {@link #CHECK_INTERVAL}; else the latest release is
+     * fetched within {@link #fetchTimeout}, written atomically to the cache, and
+     * compared against the local build tag.
      *
      * <p>Package-private so tests can drive it directly.</p>
      */
     void checkForUpdate() {
         try {
-            String jarChangelog = readJarChangelog();
-            String localVersion = latestVersion(jarChangelog);
-            Path configChangelog = configDir.resolve("CHANGELOG.md");
+            if (!isKnownBuild(localVersion)) {
+                LOG.log(Level.FINE, "Update check: no embedded build number ({0}), skipping", localVersion);
+                return;
+            }
+            Path cache = configDir.resolve(CACHE_FILE_NAME);
 
-            if (Files.exists(configChangelog)) {
-                Instant lastModified = Files.getLastModifiedTime(configChangelog).toInstant();
+            if (Files.exists(cache)) {
+                Instant lastModified = Files.getLastModifiedTime(cache).toInstant();
                 if (!lastModified.isBefore(Instant.now().minus(CHECK_INTERVAL))) {
-                    String cachedVersion = latestVersion(Files.readString(configChangelog));
-                    if (compareVersions(cachedVersion, localVersion) > 0) {
-                        updateAvailable.run();
-                    }
+                    notifyIfNewer(parseReleaseInfo(Files.readString(cache)));
                     return;
                 }
             }
 
             byte[] downloaded = fetchRemote();
             if (downloaded == null || downloaded.length == 0) {
-                LOG.log(Level.WARNING, "Update check: no data returned for {0}", CHANGELOG_URL);
+                LOG.log(Level.WARNING, "Update check: no data returned for {0}", RELEASES_URL);
                 return;
             }
 
             Files.createDirectories(configDir);
-            writeCacheAtomically(configChangelog, downloaded);
+            writeCacheAtomically(cache, downloaded);
 
-            String remoteVersion = latestVersion(new String(downloaded, StandardCharsets.UTF_8));
-            if (compareVersions(remoteVersion, localVersion) > 0) {
-                updateAvailable.run();
-            }
+            notifyIfNewer(parseReleaseInfo(new String(downloaded, StandardCharsets.UTF_8)));
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Update check failed", e);
         }
     }
 
+    private void notifyIfNewer(ReleaseInfo release) {
+        if (release != null && compareVersions(release.tagName(), localVersion) > 0) {
+            updateAvailable.accept(release);
+        }
+    }
+
     /**
-     * Fetches the remote changelog, bounded by {@link #fetchTimeout}. The
-     * fetch itself runs on a daemon executor thread so that a network that
-     * never answers cannot block the application or the JVM exit; if it times
-     * out, the check is abandoned (the cache is simply not refreshed).
+     * Fetches the latest release, bounded by {@link #fetchTimeout}. The fetch
+     * itself runs on a daemon executor thread so that a network that never
+     * answers cannot block the application or the JVM exit; if it times out, the
+     * check is abandoned (the cache is simply not refreshed).
      */
     private byte[] fetchRemote() throws IOException {
         ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
@@ -157,12 +172,12 @@ public final class UpdateChecker {
             try {
                 return future.get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
-                throw new IOException("Timed out fetching " + CHANGELOG_URL + " after " + fetchTimeout, e);
+                throw new IOException("Timed out fetching " + RELEASES_URL + " after " + fetchTimeout, e);
             } catch (ExecutionException e) {
-                throw new IOException("Fetching " + CHANGELOG_URL + " failed", e.getCause());
+                throw new IOException("Fetching " + RELEASES_URL + " failed", e.getCause());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while fetching " + CHANGELOG_URL, e);
+                throw new IOException("Interrupted while fetching " + RELEASES_URL, e);
             }
         } finally {
             executor.shutdownNow();
@@ -170,13 +185,38 @@ public final class UpdateChecker {
     }
 
     /**
-     * Writes the downloaded changelog to the cache file through a temp file
+     * Fetches the GitHub Releases API's latest-release endpoint. The GitHub API
+     * requires a {@code User-Agent} header, so the fetch goes out over a plain
+     * HTTPS connection instead of the (removed) raw-file fetcher.
+     */
+    private static byte[] fetchLatestRelease() throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(RELEASES_URL).openConnection();
+        try {
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout((int) FETCH_TIMEOUT.toMillis());
+            connection.setReadTimeout((int) FETCH_TIMEOUT.toMillis());
+            connection.setRequestProperty("Accept", "application/vnd.github+json");
+            connection.setRequestProperty("User-Agent", "FaceSort");
+            int status = connection.getResponseCode();
+            if (status != HttpURLConnection.HTTP_OK) {
+                throw new IOException("HTTP " + status + " fetching " + RELEASES_URL);
+            }
+            try (InputStream in = connection.getInputStream()) {
+                return in.readAllBytes();
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    /**
+     * Writes the downloaded release JSON to the cache file through a temp file
      * and an atomic move, so an interrupted write can never leave a truncated
      * cache behind. Falls back to a non-atomic move where the filesystem does
      * not support atomic moves.
      */
     private static void writeCacheAtomically(Path target, byte[] content) throws IOException {
-        Path tmp = Files.createTempFile(target.getParent(), "changelog", ".tmp");
+        Path tmp = Files.createTempFile(target.getParent(), "release", ".tmp");
         try {
             Files.write(tmp, content);
             try {
@@ -190,18 +230,61 @@ public final class UpdateChecker {
     }
 
     /**
-     * Extracts the newest release version from a changelog.
+     * Extracts the release data from the GitHub API's latest-release response.
      *
-     * @param changelog the changelog text, may be {@code null}
-     * @return the version of the first {@code ## [version]} heading, or an empty
-     *         string if the changelog contains no release heading
+     * @param response the JSON response body, may be {@code null}
+     * @return the parsed release, or {@code null} when the response is missing,
+     *         not valid JSON, or carries no {@code tag_name}
      */
-    static String latestVersion(String changelog) {
-        if (changelog == null) {
+    static ReleaseInfo parseReleaseInfo(String response) {
+        if (response == null) {
+            return null;
+        }
+        try {
+            JsonNode root = new ObjectMapper().readTree(response);
+            String tag = root.path("tag_name").asText("").trim();
+            if (tag.isEmpty()) {
+                return null;
+            }
+            return new ReleaseInfo(tag,
+                    root.path("html_url").asText("").trim(),
+                    root.path("body").asText("").trim());
+        } catch (IOException e) {
+            LOG.log(Level.FINE, "Update check: could not parse the release response", e);
+            return null;
+        }
+    }
+
+    /**
+     * Reads the build tag embedded into the jar by the CI build.
+     *
+     * @return the {@code build.number} from {@code /facesort-build.properties},
+     *         or an empty string when the resource is absent or unreadable
+     */
+    static String localBuildNumber() {
+        try (InputStream in = UpdateChecker.class.getResourceAsStream(BUILD_INFO_RESOURCE)) {
+            if (in == null) {
+                return "";
+            }
+            Properties properties = new Properties();
+            properties.load(in);
+            return properties.getProperty(BUILD_NUMBER_KEY, "").trim();
+        } catch (Exception e) {
+            LOG.log(Level.FINE, "Update check: could not read the embedded build number", e);
             return "";
         }
-        Matcher matcher = VERSION_PATTERN.matcher(changelog);
-        return matcher.find() ? matcher.group(1).trim() : "";
+    }
+
+    /**
+     * Whether a build tag is usable for the comparison. {@code "0"} is the
+     * placeholder embedded by default (local/dev builds); such jars skip the
+     * update check because they have no release to be newer than.
+     *
+     * @param buildNumber the build tag to check
+     * @return {@code true} when the tag can be compared against a release tag
+     */
+    static boolean isKnownBuild(String buildNumber) {
+        return buildNumber != null && !buildNumber.isBlank() && !"0".equals(buildNumber);
     }
 
     /**
@@ -268,19 +351,10 @@ public final class UpdateChecker {
         return value.substring(index);
     }
 
-    private static String readJarChangelog() throws IOException {
-        try (InputStream in = UpdateChecker.class.getResourceAsStream(CHANGELOG_RESOURCE)) {
-            if (in == null) {
-                return "";
-            }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
-    }
-
-    private static void showUpdateNotice() {
+    private static void showUpdateNotice(ReleaseInfo release) {
         Platform.runLater(() -> {
             try {
-                new UpdateNoticeDialog().show();
+                new UpdateNoticeDialog(release).show();
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Failed to show the update notice", e);
             }
@@ -288,7 +362,17 @@ public final class UpdateChecker {
     }
 
     /**
-     * Fetches the remote changelog as raw bytes. Package-private seam so tests
+     * The data of the latest release that the update check shows.
+     *
+     * @param tagName the release tag, e.g. {@code build-42}; never blank
+     * @param htmlUrl the release page URL; may be empty when the response omitted it
+     * @param notes   the auto-generated release notes; may be empty
+     */
+    record ReleaseInfo(String tagName, String htmlUrl, String notes) {
+    }
+
+    /**
+     * Fetches the latest release JSON as raw bytes. Package-private seam so tests
      * can drive {@link #checkForUpdate()} without network access.
      */
     @FunctionalInterface

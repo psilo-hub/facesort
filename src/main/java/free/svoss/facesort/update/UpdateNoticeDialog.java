@@ -6,6 +6,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
@@ -16,32 +17,47 @@ import java.util.logging.Logger;
 /**
  * A simple, non-modal dialog announcing that a new release is available.
  *
- * <p>It is independent of the main window and contains a clickable link to the
- * latest release that opens in the system's default browser. The dialog is
+ * <p>It is independent of the main window, shows the version and the
+ * auto-generated release notes of the new release and contains a clickable link
+ * to the release that opens in the system's default browser. The dialog is
  * closable either via its close button or the window's close control.</p>
  */
 public class UpdateNoticeDialog extends Dialog<Void> {
 
     private static final Logger LOG = Logger.getLogger(UpdateNoticeDialog.class.getName());
 
-    /** URL of the latest release page on GitHub. */
+    /** URL of the latest release page on GitHub; fallback for releases without one. */
     public static final String RELEASES_URL = "https://github.com/psilo-hub/facesort/releases/latest";
 
     /**
-     * Creates the update notice dialog.
+     * Creates the update notice dialog for the given release.
+     *
+     * @param release the latest release to announce; must not be null
      */
-    public UpdateNoticeDialog() {
+    public UpdateNoticeDialog(UpdateChecker.ReleaseInfo release) {
         setTitle(I18n.get("update.title"));
         setResizable(false);
 
-        Label message = new Label(I18n.get("update.message"));
+        Label message = new Label(I18n.format("update.messageVersion", release.tagName()));
         message.setWrapText(true);
 
-        Hyperlink releasesLink = new Hyperlink(RELEASES_URL);
-        releasesLink.setOnAction(event -> openInBrowser(RELEASES_URL));
+        VBox content = new VBox(8, message);
+        if (release.notes() != null && !release.notes().isBlank()) {
+            Label notesHeader = new Label(I18n.get("update.releaseNotes"));
+            TextArea notes = new TextArea(release.notes());
+            notes.setEditable(false);
+            notes.setWrapText(true);
+            notes.setPrefHeight(220);
+            content.getChildren().addAll(notesHeader, notes);
+        }
 
-        VBox content = new VBox(8, message, releasesLink);
-        content.setPrefWidth(380);
+        String releaseUrl = release.htmlUrl() != null && !release.htmlUrl().isBlank()
+                ? release.htmlUrl() : RELEASES_URL;
+        Hyperlink releasesLink = new Hyperlink(releaseUrl);
+        releasesLink.setOnAction(event -> openInBrowser(releaseUrl));
+
+        content.getChildren().add(releasesLink);
+        content.setPrefWidth(420);
         getDialogPane().setContent(content);
         getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
     }

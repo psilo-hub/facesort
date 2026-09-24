@@ -52,7 +52,7 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
   reconnaissance faciale sont téléchargés une seule fois (avec une fenêtre de
   progression) et mis en cache localement.
 - **Vérification automatique des mises à jour** — vous prévient quand une nouvelle
-  version est disponible.
+  version est disponible et affiche les notes de version.
 - **Onglet Feedback** — envoyez des rapports de bug et des demandes de
   fonctionnalités directement depuis l'application.
 - **Ensuite entièrement hors ligne** — détection et correspondance s'exécutent
@@ -166,7 +166,7 @@ lancement) — copiez-le pour sauvegarder votre bibliothèque :
 |--------|------|
 | `config/facesort.db` | Votre bibliothèque : photos, visages, noms, tags |
 | `config/facesort-config.json` | Vos paramètres |
-| `config/CHANGELOG.md` | Cache utilisé par la vérification des mises à jour |
+| `config/latest-release.json` | Cache utilisé par la vérification des mises à jour |
 | Cache des modèles FaceAI | Modèles téléchargés — par défaut `~/.djl.ai/cache` (Linux/macOS) ou `%USERPROFILE%\.djl.ai\cache` (Windows) ; configurable via le paramètre *FaceAI cache dir* |
 
 Tous les paramètres peuvent être modifiés dans l'onglet **Paramètres** (chaque
