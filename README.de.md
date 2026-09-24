@@ -41,6 +41,12 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
   wird nie doppelt gespeichert.
 - **Pfadfilter** – beschränke das Benennen auf einen bestimmten Ordner oder
   Dateinamen.
+- **Nach Pfad-Präfix entfernen** – lösche im Tab *Import* alle importierten Fotos
+  und Videos, deren gespeicherter Pfad mit einem eingegebenen Präfix beginnt. Ein
+  Dialog zeigt zuerst, wie viele Bilder, Videos, Vorschaubilder und
+  Gesichtsausschnitte entfernt würden – gelöscht wird erst nach deiner
+  Bestätigung. Videos werden zusammen mit den aus ihnen extrahierten Einzelbildern
+  entfernt.
 - **Umbenennen & Benennung entfernen** – behebe einen Tippfehler überall auf
   einmal oder entferne ein Gesicht von einem Namen.
 - **Fotos einer Person exportieren** – wähle unter *„Gesichter einem Namen
@@ -92,6 +98,11 @@ Reihenfolge ab:
    zusammen mit seinem Embedding und einem Vorschaubild gespeichert. Du kannst
    einen Import jederzeit stoppen; bereits importierte Dateien bleiben erhalten.
    Ein späterer erneuter Import desselben Ordners protokolliert nur neue Dateien.
+   Um importierte Einträge zu löschen, deren gespeicherter Pfad mit einem
+   bestimmten Präfix beginnt (z. B. nachdem die Originaldateien eines Ordners
+   gelöscht wurden), drücke auf **Nach Pfad-Präfix entfernen…** – ein Dialog
+   zeigt zuerst, wie viele Bilder, Videos, Vorschaubilder und Gesichtsausschnitte
+   entfernt würden, und fragt dann nach Bestätigung.
 
 2. **Gesicht benennen** – Die App gruppiert alle unbenannten Gesichter und zeigt
    den Vertreter der größten Gruppe. Gib einen Namen ein (vorhandene Namen

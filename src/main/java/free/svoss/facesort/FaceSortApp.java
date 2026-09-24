@@ -8,8 +8,10 @@ import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
 import free.svoss.facesort.db.VideoDao;
+import free.svoss.facesort.db.DataRemovalDao;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.ClusteringService;
+import free.svoss.facesort.service.DataRemovalService;
 import free.svoss.facesort.service.DeduplicationService;
 import free.svoss.facesort.service.FaceAiService;
 import free.svoss.facesort.service.FaceToNameService;
@@ -89,6 +91,7 @@ public class FaceSortApp extends Application {
     private FaceToNameService faceToNameService;
     private DeduplicationService dedupService;
     private ViewService viewService;
+    private DataRemovalService dataRemovalService;
 
     @Override
     public void start(Stage primaryStage) {
@@ -221,6 +224,8 @@ public class FaceSortApp extends Application {
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
+        dataRemovalService = new DataRemovalService(
+                new DataRemovalDao(connection), database.getTransactionRunner());
 
         buildMainWindowUi();
     }
@@ -232,7 +237,8 @@ public class FaceSortApp extends Application {
      */
     private SettingsView buildMainWindowUi() {
         // 6. Views.
-        ImportView importView = new ImportView(importService, videoImportService, config);
+        ImportView importView = new ImportView(importService, videoImportService,
+                dataRemovalService, config);
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
         FaceNameView faceNameView = new FaceNameView(faceToNameService, config);

@@ -42,6 +42,12 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
   fois.
 - **Filtre de chemin** — limitez le nommage à un dossier ou un nom de fichier
   précis.
+- **Suppression par préfixe de chemin** — dans l'onglet *Importer*, supprimez
+  toutes les images et vidéos importées dont le chemin stocké commence par un
+  préfixe que vous saisissez. Une fenêtre affiche d'abord combien d'images, de
+  vidéos, de vignettes et de sous-images de visage seraient supprimées ; rien
+  n'est supprimé tant que vous n'avez pas confirmé. Les vidéos sont supprimées
+  avec les frames qui en sont extraites.
 - **Renommer et retirer un nom** — corrigez une faute de frappe partout d'un
   coup, ou retirez un visage d'un nom.
 - **Exporter les photos d'une personne** — dans *Ajouter des visages à un nom*,
@@ -95,6 +101,11 @@ ordre :
    stocké avec son embedding et une vignette. Vous pouvez arrêter un import à
    tout moment ; les fichiers déjà importés sont conservés. Réimporter ensuite le
    même dossier n'enregistre que les nouveaux fichiers.
+   Pour supprimer les entrées importées dont le chemin stocké commence par un
+   préfixe donné (par exemple après avoir effacé les fichiers d'origine d'un
+   dossier), appuyez sur **Supprimer par préfixe de chemin…** — une fenêtre
+   affiche d'abord combien d'images, de vidéos, de vignettes et de sous-images de
+   visage seraient supprimées, puis demande votre confirmation.
 
 2. **Associer un visage à un nom** — L'application regroupe tous les visages non
    nommés et affiche le représentant du plus grand cluster. Saisissez un nom (les

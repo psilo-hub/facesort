@@ -4,6 +4,11 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Remove imported media by path prefix: the Import tab has a "Remove by path
+  prefix..." button that lets you delete every image and video whose stored
+  file path starts with a prefix you enter. Before removing anything, a dialog
+  shows how many images, videos, thumbnails and face sub-images would be
+  deleted, and deletion only happens after you confirm (2026-09-24)
 - Export a person's photos from the "Add faces to a name" tab: pick any name,
   choose an output folder, and every image containing that person is copied
   there; images whose original file is gone are exported as thumbnails instead

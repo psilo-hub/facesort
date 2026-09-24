@@ -3,6 +3,7 @@ package free.svoss.facesort.ui;
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.i18n.I18n;
+import free.svoss.facesort.service.DataRemovalService;
 import free.svoss.facesort.service.ImportCoordinator;
 import free.svoss.facesort.service.ImportService;
 import free.svoss.facesort.service.VideoImportService;
@@ -45,12 +46,14 @@ public class ImportView extends BorderPane {
 
     private final ImportService importService;
     private final VideoImportService videoImportService;
+    private final DataRemovalService dataRemovalService;
     private final ConfigModel config;
 
     private final TextField folderField = new TextField();
     private final Button browseButton = new Button(I18n.get("ui.import.browse"));
     private final Button importButton = new Button(I18n.get("ui.import.import"));
     private final Button stopButton = new Button(I18n.get("ui.import.stop"));
+    private final Button removeButton = new Button(I18n.get("ui.import.remove"));
     private final ProgressBar progressBar = new ProgressBar(0);
     private final TextArea logArea = new TextArea();
     private final Label statusLabel = new Label(I18n.get("ui.import.ready"));
@@ -62,13 +65,15 @@ public class ImportView extends BorderPane {
      *
      * @param importService      the photo import pipeline; must not be null
      * @param videoImportService the video import pipeline; must not be null
+     * @param dataRemovalService service for removing imported rows by path prefix; must not be null
      * @param config             application configuration used to remember the last
      *                           import folder; must not be null
      */
     public ImportView(ImportService importService, VideoImportService videoImportService,
-                      ConfigModel config) {
+                      DataRemovalService dataRemovalService, ConfigModel config) {
         this.importService = importService;
         this.videoImportService = videoImportService;
+        this.dataRemovalService = dataRemovalService;
         this.config = config;
         buildUi();
         restoreLastFolder();
@@ -102,13 +107,18 @@ public class ImportView extends BorderPane {
         VBox center = new VBox(6, progressBar, logArea);
         center.setPadding(new Insets(0, 10, 10, 10));
 
-        // Bottom: status summary
+        // Bottom: status summary with the path-prefix removal button
         statusLabel.setWrapText(true);
+        removeButton.setOnAction(e -> onRemoveByPrefix());
         BorderPane.setMargin(statusLabel, new Insets(0, 10, 10, 10));
+        HBox bottomBar = new HBox(8, removeButton, statusLabel);
+        bottomBar.setPadding(new Insets(0, 10, 10, 10));
+        HBox.setHgrow(statusLabel, Priority.ALWAYS);
+        bottomBar.setAlignment(Pos.CENTER_LEFT);
 
         setTop(topBar);
         setCenter(center);
-        setBottom(statusLabel);
+        setBottom(bottomBar);
     }
 
     /**
@@ -160,6 +170,24 @@ public class ImportView extends BorderPane {
         cancelRequested = true;
         stopButton.setDisable(true);
         appendLog(I18n.get("ui.import.stopRequested"));
+    }
+
+    /**
+     * Opens the "remove by path prefix" dialog; when the user confirmed a
+     * removal, the affected counts are reported in the status line and log.
+     */
+    private void onRemoveByPrefix() {
+        RemoveByPrefixDialog dialog = new RemoveByPrefixDialog(
+                getScene() != null ? getScene().getWindow() : null, dataRemovalService);
+        DataRemovalService.Removal removal = dialog.showAndWait().orElse(null);
+        if (removal == null) {
+            return;
+        }
+        String summary = I18n.format("ui.import.removeCompleted",
+                removal.images(), removal.videos(),
+                removal.thumbnails(), removal.faceSubImages());
+        statusLabel.setText(summary);
+        appendLog(summary);
     }
 
     /**
@@ -234,6 +262,7 @@ public class ImportView extends BorderPane {
         importButton.setDisable(busy);
         folderField.setDisable(busy);
         stopButton.setDisable(!busy);
+        removeButton.setDisable(busy);
     }
 
     /**

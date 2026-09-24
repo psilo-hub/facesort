@@ -40,6 +40,11 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
   misma carpeta es un no-op y la misma foto nunca se almacena dos veces.
 - **Filtro de ruta**: limita el etiquetado a una carpeta o nombre de archivo
   específico.
+- **Eliminar por prefijo de ruta**: en la pestaña *Importar*, elimina todos los
+  fotos y vídeos importados cuya ruta almacenada comience por el prefijo que
+  introduzcas. Un diálogo muestra primero cuántas imágenes, vídeos, miniaturas y
+  subimágenes de caras se eliminarían; no se borra nada hasta que lo confirmes.
+  Los vídeos se eliminan junto con los fotogramas extraídos de ellos.
 - **Renombrar y desetiquetar**: corrige un error tipográfico en todas partes a la
   vez, o quita una cara de un nombre.
 - **Exportar las fotos de una persona**: en *Añadir caras a un nombre*, elige a
@@ -90,6 +95,11 @@ este orden:
    su embedding y una miniatura. Puedes detener una importación en cualquier
    momento; los archivos ya importados se conservan. Reimportar la misma carpeta
    más tarde solo registra los archivos nuevos.
+   Para eliminar registros importados cuya ruta almacenada comienza por un
+   prefijo determinado (por ejemplo, tras borrar los archivos originales de una
+   carpeta), pulsa **Eliminar por prefijo de ruta…** – un diálogo muestra primero
+   cuántas imágenes, vídeos, miniaturas y subimágenes de caras se eliminarían y
+   luego pide tu confirmación.
 
 2. **Poner un nombre a una cara**: la aplicación agrupa todas las caras sin nombre
    y muestra el representante del cluster más grande. Escribe un nombre (los

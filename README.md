@@ -43,6 +43,11 @@ runs locally on your own computer: **your photos never leave your machine.**
   faces are matched through their video file's path. In *Tag random face* and
   *Add faces to a name*, right-click any face and choose **Paste Path to Path
   Filter** to fill the field with that face's folder.
+- **Remove by path prefix** — in the *Import* tab, delete every imported photo
+  and video whose stored path starts with a prefix you enter. A dialog first
+  shows how many images, videos, thumbnails and face sub-images would be
+  removed, and nothing is deleted until you confirm. Videos are removed
+  together with the frames sampled from them.
 - **Rename & untag** — fix a typo everywhere at once, or remove a face from a name.
 - **Export a person's photos** — in *Add faces to a name*, pick anyone and copy
   every photo containing them to a folder of your choice (photos whose original
@@ -90,7 +95,10 @@ The main window is a set of tabs. Work through them roughly in this order:
    first, then videos, in the same run. Every detected face is stored together
    with its embedding and a thumbnail. You can stop an import at any time;
    already-imported files are kept. Re-importing the same folder later only
-   records new files.
+   records new files. To drop imported rows whose stored path starts with a
+   given prefix (for example after deleting the original files of a folder), press
+   **Remove by path prefix…** — a dialog first shows how many images, videos,
+   thumbnails and face sub-images would be removed, then asks you to confirm.
 
 2. **Put a name to a face** — The app clusters all unnamed faces
    and shows the largest cluster's representative. Type a name (existing names

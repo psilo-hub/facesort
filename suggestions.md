@@ -5,10 +5,12 @@ ones (suggestions 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9) have been removed — their
 resolutions are recorded in `todo.txt` items 7–23 and `CHANGELOG.md`. HNSW index
 closing was dismissed with evidence (no `close()` on the pure-Java `HnswIndex`; the
 index is a GC-eligible method-local) and the schema-migration and fail-surfacing
-feature ideas were absorbed by the implemented work, so they are gone too.
+feature ideas were absorbed by the implemented work, so they are gone too. §11's
+"delete image/video feature" was dismissed in favor of the prefix-based removal
+that shipped instead (todo.txt item 27).
 
 All line numbers below refer to the current state of the codebase
-(2026-09-24, full suite green: 333 tests / 39 classes, 0 failures).
+(2026-09-24, full suite green: 353 tests / 41 classes, 0 failures).
 
 ---
 
@@ -121,9 +123,16 @@ All line numbers below refer to the current state of the codebase
   the config, threaded through `ImportService`/`VideoImportService`. The Settings tab gained three controls
   (quality double spinner, frames-per-video and face-crop integer spinners) with labels + tooltips in all six
   languages, wired into load/save/reset (todo.txt item 24). **Medium effort — done, with Settings UI.**
-- [ ] **Delete image/video feature** — the unused `ImageDao.delete`/`VideoDao.delete` were
+- [x] <del>**Delete image/video feature** — the unused `ImageDao.delete`/`VideoDao.delete` were
   removed in the dead-code cleanup (suggestion 6), so a delete UI now also means re-adding
-  those DAO methods; the FK cascade on faces remains in place as the foundation. **Medium effort.**
+  those DAO methods; the FK cascade on faces remains in place as the foundation.</del>
+  Dismissed in favor of a scoped, prefix-based removal: the Import tab's "Remove by path
+  prefix…" deletes every imported photo/video whose stored path starts with a user-entered
+  prefix (and, via the FK cascade, its thumbnails, face sub-images and video-frame links),
+  with a preview dialog showing the affected counts before anything is deleted — so the
+  old broad delete-UI idea is obsolete. New `db/DataRemovalDao` + `service/DataRemovalService`
+  + `ui/RemoveByPrefixDialog`, pinned by `DataRemovalDaoTest` (9 cases) and
+  `DataRemovalServiceTest` (5 cases) (todo.txt item 27).
 - [x] **Per-name search/filter** in the browse tab — `ViewView` lists all names; a text filter
   + count badge would scale past hundreds of names. Done — the View tab's top bar
   now has a search box that filters the already-loaded name cards by name as you type
