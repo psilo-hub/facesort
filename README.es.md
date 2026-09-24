@@ -124,7 +124,9 @@ este orden:
    recuerda permanentemente) o *Omitir*.
 
 6. **Ver**: explora tu colección etiquetada. Cada persona es una tarjeta con una
-   cara representativa y el número de caras etiquetadas. Haz clic en una tarjeta
+   cara representativa y el número de caras etiquetadas. Un cuadro de búsqueda
+   filtra las tarjetas por nombre mientras escribes, para que la lista siga siendo
+   manejable incluso con cientos de personas. Haz clic en una tarjeta
    para ver las imágenes que contienen a esa persona; haz clic en una imagen para
    abrir el original, o usa el menú contextual para *Desetiquetar* esa persona.
 

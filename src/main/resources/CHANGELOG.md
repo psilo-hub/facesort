@@ -89,6 +89,9 @@ All notable changes to Face Sort will be documented in this file.
   containing folder", opening the folder of the original source file (the
   source video's folder for video frames) in the system file manager
   (2026-09-22)
+- The View tab now has a search box that filters the name cards by name as you
+  type, keeping the grid manageable with hundreds of people; the title shows
+  the matching count when a filter is active (2026-09-24)
 
 ### Changed
 - Tabs renamed (2026-09-19)

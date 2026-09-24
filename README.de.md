@@ -123,7 +123,9 @@ Reihenfolge ab:
    Duplikate* (bleibt dauerhaft gespeichert) oder *Überspringen*.
 
 6. **Anzeigen** – durchstöbere deine benannte Sammlung. Jede Person ist eine Karte
-   mit einem Vertretergesicht und der Anzahl benannter Gesichter. Klicke eine Karte,
+   mit einem Vertretergesicht und der Anzahl benannter Gesichter. Ein Suchfeld
+   filtert die Karten beim Tippen nach Namen, sodass die Liste auch bei hunderten
+   von Personen übersichtlich bleibt. Klicke eine Karte,
    um die Fotos mit dieser Person zu sehen; klicke ein Foto, um das Original zu
    öffnen, oder nutze das Kontextmenü, um es von der Person zu *entfernen*.
 

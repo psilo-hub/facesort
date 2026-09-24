@@ -8,7 +8,7 @@ index is a GC-eligible method-local) and the schema-migration and fail-surfacing
 feature ideas were absorbed by the implemented work, so they are gone too.
 
 All line numbers below refer to the current state of the codebase
-(2026-09-24, full suite green: 327 tests / 38 classes, 0 failures).
+(2026-09-24, full suite green: 333 tests / 39 classes, 0 failures).
 
 ---
 
@@ -122,8 +122,14 @@ All line numbers below refer to the current state of the codebase
 - [ ] **Delete image/video feature** — the unused `ImageDao.delete`/`VideoDao.delete` were
   removed in the dead-code cleanup (suggestion 6), so a delete UI now also means re-adding
   those DAO methods; the FK cascade on faces remains in place as the foundation. **Medium effort.**
-- [ ] **Per-name search/filter** in the browse tab — `ViewView` lists all names; a text filter
-  + count badge would scale past hundreds of names. **Medium effort.**
+- [x] **Per-name search/filter** in the browse tab — `ViewView` lists all names; a text filter
+  + count badge would scale past hundreds of names. Done — the View tab's top bar
+  now has a search box that filters the already-loaded name cards by name as you type
+  (case-insensitive substring, input order preserved, no extra DB round-trip per
+  keystroke); the title counts "Names (M of N)" while a filter is active and the status
+  bar reports a non-matching filter. The pure filter logic is the package-private
+  `ViewView.filterNames` helper, pinned by `ViewViewTest` (6 cases); i18n keys and
+  README (all six languages) updated (todo.txt item 25). **Medium effort.**
 - [ ] **Release-attached auto-update** — switch `UpdateChecker` from parsing `CHANGELOG.md`
   (`VERSION_PATTERN`, `UpdateChecker.java:58`) to the GitHub Releases API, which already
   generates release notes in CI (`softprops/action-gh-release` with `generate_release_notes: true`,

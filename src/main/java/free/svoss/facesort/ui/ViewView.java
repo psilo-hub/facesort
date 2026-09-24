@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
@@ -22,7 +23,9 @@ import javafx.stage.Window;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * "View" tab: shows a grid of name cards (representative face, name, face
@@ -42,10 +45,13 @@ public class ViewView extends BorderPane implements Refreshable {
 
     private final Button backButton = new Button(I18n.get("ui.view.backToNames"));
     private final Label titleLabel = new Label(I18n.get("ui.view.names"));
+    private final TextField filterField = new TextField();
     private final Label statusLabel = new Label("");
     private final ScrollPane scrollPane = new ScrollPane();
     private final FlowPane namesPane = new FlowPane(12, 12);
     private final FlowPane imagesPane = new FlowPane(12, 12);
+
+    private List<ViewService.NameSummary> summaries = List.of();
 
     private final TaskRunner taskRunner = new TaskRunner();
     private final FaceUi.FaceActions faceActions;
@@ -99,7 +105,13 @@ public class ViewView extends BorderPane implements Refreshable {
         backButton.setOnAction(e -> loadNames());
         backButton.setVisible(false);
 
-        HBox topBar = new HBox(10, backButton, titleLabel);
+        filterField.setPromptText(I18n.get("ui.view.filterNames"));
+        filterField.setPrefWidth(200);
+        filterField.setMaxWidth(200);
+        filterField.textProperty().addListener((obs, oldValue, newValue) -> applyFilter());
+        HBox.setHgrow(filterField, Priority.NEVER);
+
+        HBox topBar = new HBox(10, backButton, titleLabel, filterField);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(10));
         titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
@@ -125,6 +137,7 @@ public class ViewView extends BorderPane implements Refreshable {
         imagesMode = false;
         activeNameId = 0;
         activeNameText = "";
+        filterField.setVisible(true);
         setBusy(true);
         statusLabel.setText(I18n.get("ui.view.loadingNames"));
 
@@ -136,17 +149,11 @@ public class ViewView extends BorderPane implements Refreshable {
         };
 
         task.setOnSucceeded(e -> {
-            List<ViewService.NameSummary> summaries = task.getValue();
-            namesPane.getChildren().clear();
-            for (ViewService.NameSummary summary : summaries) {
-                namesPane.getChildren().add(buildNameCard(summary));
-            }
+            summaries = task.getValue();
+            applyFilter();
             scrollPane.setContent(namesPane);
-            titleLabel.setText(I18n.format("ui.view.namesCount", summaries.size()));
             backButton.setVisible(false);
             setBusy(false);
-            statusLabel.setText(
-                    summaries.isEmpty() ? I18n.get("ui.view.noNames") : "");
         });
 
         task.setOnFailed(e -> {
@@ -155,6 +162,56 @@ public class ViewView extends BorderPane implements Refreshable {
         });
 
         taskRunner.start(task, "view-names-loader");
+    }
+
+    /**
+     * Re-renders the name grid according to the current filter text: cards are
+     * kept only for names whose (case-insensitive) name contains the trimmed
+     * filter, and the title shows the matching count when a filter is active.
+     * Does nothing while the images grid of a name is shown.
+     */
+    private void applyFilter() {
+        if (imagesMode) {
+            return;
+        }
+        List<ViewService.NameSummary> filtered = filterNames(summaries, filterField.getText());
+        namesPane.getChildren().clear();
+        for (ViewService.NameSummary summary : filtered) {
+            namesPane.getChildren().add(buildNameCard(summary));
+        }
+        if (filterField.getText().isBlank()) {
+            titleLabel.setText(I18n.format("ui.view.namesCount", filtered.size()));
+            statusLabel.setText(summaries.isEmpty() ? I18n.get("ui.view.noNames") : "");
+        } else {
+            titleLabel.setText(I18n.format("ui.view.namesCountOf", filtered.size(), summaries.size()));
+            statusLabel.setText(filtered.isEmpty()
+                    ? I18n.format("ui.view.noMatchingNames", filterField.getText().trim())
+                    : "");
+        }
+    }
+
+    /**
+     * Returns the summaries whose name contains the given filter. Matching is
+     * case-insensitive, the filter is trimmed before comparison, and an empty
+     * (or null) filter returns the input list unchanged.
+     *
+     * @param summaries summaries to filter; must not be null
+     * @param filter    filter text, possibly null or blank
+     * @return the matching summaries in input order
+     */
+    static List<ViewService.NameSummary> filterNames(
+            List<ViewService.NameSummary> summaries, String filter) {
+        String needle = filter == null ? "" : filter.trim().toLowerCase(Locale.ROOT);
+        if (needle.isEmpty()) {
+            return summaries;
+        }
+        List<ViewService.NameSummary> result = new ArrayList<>();
+        for (ViewService.NameSummary summary : summaries) {
+            if (summary.name().name().toLowerCase(Locale.ROOT).contains(needle)) {
+                result.add(summary);
+            }
+        }
+        return result;
     }
 
     /**
@@ -181,6 +238,7 @@ public class ViewView extends BorderPane implements Refreshable {
         imagesMode = true;
         activeNameId = nameId;
         activeNameText = displayName;
+        filterField.setVisible(false);
         setBusy(true);
         statusLabel.setText(I18n.format("ui.view.loadingImages", displayName));
 

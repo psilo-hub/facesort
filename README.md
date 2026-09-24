@@ -126,11 +126,12 @@ The main window is a set of tabs. Work through them roughly in this order:
    *Skip*.
 
 6. **View** — browse your tagged collection. Each person is a card showing a
-   representative face and the number of tagged faces. Click a card to see the
-   images containing that person; click an image to open the original, or use
-   the right-click menu to *Untag* it from that person. Video frames appear
-   with their frame thumbnail; *Open Original* opens the source video the frame
-   came from.
+   representative face and the number of tagged faces. A search box filters the
+   cards by name as you type, so the list stays manageable even with hundreds
+   of people. Click a card to see the images containing that person; click an
+   image to open the original, or use the right-click menu to *Untag* it from
+   that person. Video frames appear with their frame thumbnail; *Open Original*
+   opens the source video the frame came from.
 
 7. **Settings** — tune face detection, clustering, import and model parameters;
    see each control's tooltip for details. Changes are applied via **Save** or

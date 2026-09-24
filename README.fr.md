@@ -130,7 +130,9 @@ ordre :
    *Ce ne sont pas des doublons* (mémorisé définitivement), ou *Ignorer*.
 
 6. **Voir** — parcourez votre collection nommée. Chaque personne est une carte
-   avec un visage représentatif et le nombre de visages nommés. Cliquez sur une
+   avec un visage représentatif et le nombre de visages nommés. Une zone de
+   recherche filtre les cartes par nom pendant la saisie, pour que la liste reste
+   gérable même avec des centaines de personnes. Cliquez sur une
    carte pour voir les images contenant cette personne ; cliquez sur une image
    pour ouvrir l'original, ou utilisez le menu contextuel pour *Retirer le nom* de
    cette personne.
