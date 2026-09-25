@@ -157,6 +157,10 @@ All notable changes to Face Sort will be documented in this file.
   face closest to it is now one `FaceSelector` helper, used by the clustering,
   deduplication, View-tab and "Add faces to a name" services instead of four
   near-identical reimplementations (2026-09-24)
+- The face-card UI is built by one shared helper (internal, no visible behavior
+  change): the context-menu, open-original / open-containing-folder,
+  path-tooltip, name-existence-check and error-alert plumbing that each of the
+  five face views duplicated now lives once in a `FaceUi` helper (2026-09-23)
 - The import budgets are configurable: the JPEG quality of stored thumbnails and
   face sub-images (default 0.85), the maximum number of frames extracted per
   video (default 120) and the face crop size (default 160 px) are no longer
@@ -221,5 +225,3 @@ All notable changes to Face Sort will be documented in this file.
   Noto Emoji font and the tab text the bundled Noto Sans font, so the tabs look
   the same on every system; the View and Settings tabs no longer show a stray
   variation-selector character (their emoji changed to 🔎 and 🔧) (2026-09-21)
-
-16. ✅ Face-grid UI dedup (suggestion 3b of suggestions.md): the five face-related views (`View`, `Dedupe`, `FaceName`, `NameFace`, `RandomName`) no longer each carry their own copy of the duplicated cluster — `installContextMenu`, the `isOriginalAvailable`/`isContainingFolderAvailable`/`openOriginal`/`openContainingFolder` quartet, `checkNameExists`, `installPathTooltip`/`tooltip`, `setImage`/`setImage(ImageView, FaceRecord)`/`faceCard` and the `handleFailure` Alert. A new shared `ui/FaceUi` helper owns it once: `faceCard(FaceRecord, double)` (shared `.candidate-card` CSS + wrapped tooltip), `setImage`/`thumb`/`toImage` (ImageView<-FaceRecord conversion), `installPathTooltip(Node, FaceRecord, String threadName, Lookup<List<String>>)` + `wrappedTooltip`, `checkNameExistence(...)` (same green/red hex + name-equality staleness guard), the nested `FaceActions` with a `Source` seam (`isOriginalAvailable`/`isContainingFolderAvailable`/`openOriginal`/`openContainingFolder`) + `installFaceMenu(Node, FaceRecord, MenuItem...)`/`installMenu`, and `showError(Window, String, String, Throwable)`. Each view keeps only its small private wiring (per-view i18n key prefixes, thread names, staleness guards). Full suite green (306 tests).

@@ -92,12 +92,17 @@ All line numbers below refer to the current state of the codebase
   deliverable and can drift out of sync. Done — the "Before committing" rule now covers
   `README.de.md`, `README.es.md`, `README.fr.md`, `README.ru.md` and `README.zh.md` as item 4
   (todo.txt item 20). **Low effort.**
-- [ ] **Stale claims in `todo.txt` item 3** — the video-import progress note still claims
+- [x] **Stale claims in `todo.txt` item 3** — the video-import progress note still claims
   "Final full suite green 235/235" and "pushed the full matrix (run 44…)" (suite is now
-  306), and the progress docs contain the "tagging facces" typo at `todo.txt:5`. **Low effort.**
-- [ ] **Stray paste in `CHANGELOG.md`** — line 177 is a verbatim paste of todo.txt item 16
+  306), and the progress docs contain the "tagging facces" typo at `todo.txt:5`. Done — item 3
+  is now checked off as the completed video-import task (the phased record lives in
+  `VIDEO_SUPPORT.md`): the `facces` typo is fixed and the multi-phase progress note with its
+  stale `235/235` / `run 44` claims is replaced by a concise completion note pointing at the
+  authoritative docs. **Low effort.**
+- [x] **Stray paste in `CHANGELOG.md`** — line 177 is a verbatim paste of todo.txt item 16
   appended after the last "Fixed" bullet with no heading; fold it into the proper section
-  or delete it. **Low effort.**
+  or delete it. Done — the duplication is removed and the `FaceUi` extraction it described is
+  recorded as a proper `### Changed` bullet alongside the other internal refactors. **Low effort.**
 - [x] **Undocumented changelog-format coupling** — `README.md:167` describes the update
   cache, but the coupling to the exact `## [version]` heading regex in `UpdateChecker.VERSION_PATTERN`
   (`UpdateChecker.java:58`) is undocumented; worth a note if a future release changes the
