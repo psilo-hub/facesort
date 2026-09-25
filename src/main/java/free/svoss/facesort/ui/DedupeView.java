@@ -106,7 +106,7 @@ public class DedupeView extends BorderPane {
         topBar.setPadding(new Insets(10));
         statusLabel.setWrapText(true);
 
-        pairLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+        pairLabel.getStyleClass().add("subtitle-label");
         pairLabel.setPadding(new Insets(0, 0, 10, 0));
         pairLabel.setText(I18n.get("ui.dedupe.idleHint2"));
 

@@ -114,7 +114,7 @@ public class ViewView extends BorderPane implements Refreshable {
         HBox topBar = new HBox(10, backButton, titleLabel, filterField);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(10));
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+        titleLabel.getStyleClass().add("subtitle-label");
 
         namesPane.setPadding(new Insets(10));
         imagesPane.setPadding(new Insets(10));
@@ -284,15 +284,13 @@ public class ViewView extends BorderPane implements Refreshable {
         card.setAlignment(Pos.TOP_CENTER);
         card.setPadding(new Insets(8));
         card.setPrefWidth(NAME_THUMBNAIL_SIZE + 16);
-        card.setStyle("-fx-background-color: #f4f4f8; -fx-background-radius: 6;"
-                + " -fx-border-color: #ccccdd; -fx-border-radius: 6; -fx-cursor: hand;");
 
         Label nameLabel = new Label(name);
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13;");
+        nameLabel.getStyleClass().add("name-label");
 
         int count = summary.faceCount();
         Label countLabel = new Label(I18n.format(count == 1 ? "ui.view.face" : "ui.view.faces", count));
-        countLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
+        countLabel.getStyleClass().add("count-label");
 
         card.getChildren().addAll(
                 FaceUi.thumb(summary.representative(), NAME_THUMBNAIL_SIZE),
@@ -312,8 +310,7 @@ public class ViewView extends BorderPane implements Refreshable {
         box.setAlignment(Pos.TOP_CENTER);
         box.setPadding(new Insets(6));
         box.setPrefWidth(IMAGE_THUMBNAIL_SIZE + 16);
-        box.setStyle("-fx-background-color: #f4f4f8; -fx-background-radius: 6;"
-                + " -fx-border-color: #ccccdd; -fx-border-radius: 6; -fx-cursor: hand;");
+        box.getStyleClass().add("image-thumbnail");
 
         ImageView view = new ImageView();
         byte[] jpg = image.thumbnailJpg();
@@ -327,7 +324,7 @@ public class ViewView extends BorderPane implements Refreshable {
 
         String hash = image.hash();
         Label caption = new Label(jpg != null ? hash.substring(0, Math.min(8, hash.length())) : I18n.get("ui.view.noPreview"));
-        caption.setStyle("-fx-font-size: 10; -fx-text-fill: #666666;");
+        caption.getStyleClass().add("caption-label");
 
         box.getChildren().addAll(view, caption);
         box.setOnMouseClicked(e -> {

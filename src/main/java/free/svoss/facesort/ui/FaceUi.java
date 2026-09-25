@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
@@ -34,8 +35,39 @@ import java.util.function.Consumer;
  */
 final class FaceUi {
 
+    /** Status styles for the name-existence check (see {@code css/styles.css}). */
+    static final String NAME_STATUS_EXISTS = "name-status-exists";
+    static final String NAME_STATUS_NEW = "name-status-new";
+
     private FaceUi() {
         // Utility class - not instantiable
+    }
+
+    /**
+     * Attaches the application-wide stylesheet to a dialog pane so CSS classes
+     * apply inside dialogs (which have their own scenes).
+     *
+     * @param dialogPane the dialog pane to style
+     */
+    static void addApplicationStylesheet(DialogPane dialogPane) {
+        var cssResource = FaceUi.class.getResource("/css/styles.css");
+        if (cssResource != null) {
+            dialogPane.getStylesheets().add(cssResource.toExternalForm());
+        }
+    }
+
+    /**
+     * Sets the name-existence status style on a label: removes any previous
+     * status class and adds the given one, or only clears when {@code null}.
+     *
+     * @param label       the label to restyle
+     * @param statusClass the {@code name-status-*} class to add, or {@code null}
+     */
+    static void setStatusClass(Label label, String statusClass) {
+        label.getStyleClass().removeAll(NAME_STATUS_EXISTS, NAME_STATUS_NEW);
+        if (statusClass != null) {
+            label.getStyleClass().add(statusClass);
+        }
     }
 
     /**
@@ -178,7 +210,7 @@ final class FaceUi {
         String name = field.getText() == null ? "" : field.getText().trim();
         if (name.isEmpty()) {
             label.setText("");
-            label.setStyle("");
+            setStatusClass(label, null);
             return;
         }
 
@@ -197,10 +229,10 @@ final class FaceUi {
             Optional<NameRecord> existing = task.getValue();
             if (existing.isPresent()) {
                 label.setText(I18n.format(existsKey, existing.get().faceCount()));
-                label.setStyle("-fx-text-fill: #c9302c;");
+                setStatusClass(label, NAME_STATUS_EXISTS);
             } else {
                 label.setText(I18n.get(newKey));
-                label.setStyle("-fx-text-fill: #3c763d;");
+                setStatusClass(label, NAME_STATUS_NEW);
             }
         });
 

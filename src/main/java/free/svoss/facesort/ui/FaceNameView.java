@@ -347,7 +347,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
             VBox card = FaceUi.faceCard(face, THUMBNAIL_SIZE);
 
             Label sim = new Label(I18n.percent(candidate.similarity()));
-            sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
+            sim.getStyleClass().add("secondary-text");
 
             card.getChildren().add(sim);
             if (selectable) {

@@ -81,10 +81,11 @@ public class TagWithNameDialog extends Dialog<String> {
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         setResizable(false);
+        FaceUi.addApplicationStylesheet(getDialogPane());
 
         Label header = new Label(I18n.get("ui.faceName.differentName.header"));
         header.setWrapText(true);
-        header.setStyle("-fx-font-weight: bold;");
+        header.getStyleClass().add("dialog-header");
 
         ImageView selectedView = new ImageView();
         selectedView.setImage(toImage(selectedFace));
@@ -100,14 +101,14 @@ public class TagWithNameDialog extends Dialog<String> {
         nameRow.setPadding(new Insets(0, 0, 4, 0));
 
         hintLabel.setWrapText(true);
-        hintLabel.setStyle("-fx-text-fill: #3c763d;");
+        hintLabel.getStyleClass().add(FaceUi.NAME_STATUS_NEW);
 
         previewThumb.setFitWidth(PREVIEW_SIZE);
         previewThumb.setFitHeight(PREVIEW_SIZE);
         previewThumb.setPreserveRatio(true);
         previewThumb.setSmooth(true);
         previewSimilarityLabel.setWrapText(true);
-        previewSimilarityLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
+        previewSimilarityLabel.getStyleClass().add("secondary-text");
         previewBox = new VBox(6, previewThumb, previewSimilarityLabel);
         previewBox.setVisible(false);
         previewBox.setAlignment(Pos.TOP_CENTER);
@@ -162,12 +163,12 @@ public class TagWithNameDialog extends Dialog<String> {
             Optional<FaceToNameService.NamePreview> preview = task.getValue();
             if (preview.isEmpty()) {
                 hintLabel.setText(I18n.get("ui.faceName.differentName.newName"));
-                hintLabel.setStyle("-fx-text-fill: #3c763d;");
+                FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_NEW);
                 previewBox.setVisible(false);
             } else {
                 FaceToNameService.NamePreview p = preview.get();
                 hintLabel.setText(I18n.get("ui.faceName.differentName.exists"));
-                hintLabel.setStyle("-fx-text-fill: #c9302c;");
+                FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_EXISTS);
                 previewThumb.setImage(toImage(p.representative()));
                 previewSimilarityLabel.setText(
                         I18n.format("ui.faceName.differentName.similar", name, p.similarity() * 100));

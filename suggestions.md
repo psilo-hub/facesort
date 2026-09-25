@@ -10,7 +10,7 @@ feature ideas were absorbed by the implemented work, so they are gone too. §11'
 that shipped instead (todo.txt item 27).
 
 All line numbers below refer to the current state of the codebase
-(2026-09-24, full suite green: 353 tests / 41 classes, 0 failures).
+(2026-09-25, full suite green: 353 tests / 41 classes, 0 failures).
 
 ---
 
@@ -59,11 +59,17 @@ All line numbers below refer to the current state of the codebase
   whole table (`FaceDao.java:158`). Deferred because the path filter restricts via EXISTS
   subqueries, so offset-based sampling would complicate the query for little gain; revisit
   if `findRandomUnnamed` ever becomes a hotspot. **Low effort.**
-- [ ] **Inline hex → CSS** — ~20 `setStyle` sites with 16 hex literals
+- [x] **Inline hex → CSS** — ~20 `setStyle` sites with 16 hex literals
   (`FaceUi.java:200,203`, `ViewView.java:229-272`, `TagWithNameDialog.java:103,165,170`,
   `NameFaceView.java:111,332`, ...) while `styles.css` already defines matching-but-unused
   classes (`.name-label`, `.count-label`, `.name-card`, ...). Pure-presentation change,
-  no functional benefit. **Medium effort, purely cosmetic.**
+  no functional benefit. Done — no inline `setStyle` call or hex literal remains in the UI
+  code: the sites now use stylesheet classes (new `.subtitle-label`, `.frame-title`,
+  `.dialog-header`, `.secondary-text`, `.name-status-*`, `.representative-frame`,
+  `.image-thumbnail`/`.caption-label`, plus the now-used `.name-card`/`.name-label`/
+  `.count-label`), and the two dialogs load the stylesheet via `FaceUi.addApplicationStylesheet`
+  (todo.txt item 28). The only visible difference is the intended blue-border+shadow hover on
+  the View name cards. **Medium effort, purely cosmetic.**
 
 ---
 

@@ -108,7 +108,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
         representativeView.setFitHeight(REPRESENTATIVE_SIZE);
         representativeView.setPreserveRatio(true);
         representativeView.setSmooth(true);
-        representativeView.setStyle("-fx-border-color: #4a90d9; -fx-border-width: 2;");
+        representativeView.getStyleClass().add("representative-frame");
 
         nameField.setPromptText(I18n.get("ui.nameFace.namePrompt"));
         tagButton.setDefaultButton(true);
@@ -329,7 +329,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             VBox card = FaceUi.faceCard(face, CANDIDATE_SIZE);
 
             Label sim = new Label(I18n.percent(candidate.similarity()));
-            sim.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
+            sim.getStyleClass().add("secondary-text");
 
             Button tag = new Button(I18n.get("ui.nameFace.tag"));
             tag.setOnAction(e -> onTagCandidate(face.id()));

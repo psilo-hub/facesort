@@ -57,7 +57,7 @@ public class ModelDownloadView extends VBox {
         setPadding(new Insets(20));
         setMaxWidth(Double.MAX_VALUE);
 
-        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        titleLabel.getStyleClass().add("frame-title");
         hintLabel.setWrapText(true);
         hintLabel.setMaxWidth(620);
 

@@ -7,6 +7,37 @@
     -fx-font-size: 14px;
 }
 
+/* ---- Section titles, subheaders and muted text ---- */
+
+.subtitle-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 14;
+}
+
+.frame-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 20px;
+}
+
+.dialog-header {
+    -fx-font-weight: bold;
+}
+
+.secondary-text {
+    -fx-font-size: 11;
+    -fx-text-fill: #666666;
+}
+
+/* Name-existence status: the typed name already exists (red) or is new
+   (green). */
+.name-status-exists {
+    -fx-text-fill: #c9302c;
+}
+
+.name-status-new {
+    -fx-text-fill: #3c763d;
+}
+
 /* ---- Tab panes ---- */
 
 .tab-pane {
@@ -46,12 +77,13 @@
 .name-card {
     -fx-alignment: center;
     -fx-padding: 8px;
-    -fx-border-color: #cccccc;
+    -fx-border-color: #ccccdd;
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
     -fx-background-radius: 6px;
-    -fx-background-color: white;
+    -fx-background-color: #f4f4f8;
     -fx-spacing: 6px;
+    -fx-cursor: hand;
 }
 
 .name-card:hover {
@@ -62,9 +94,26 @@
 
 .name-card .name-label {
     -fx-font-weight: bold;
+    -fx-font-size: 13;
 }
 
 .name-card .count-label {
+    -fx-font-size: 11;
+    -fx-text-fill: #666666;
+}
+
+/* ---- Image thumbnails (View tab, one name's images) ---- */
+
+.image-thumbnail {
+    -fx-background-color: #f4f4f8;
+    -fx-background-radius: 6;
+    -fx-border-color: #ccccdd;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+
+.image-thumbnail .caption-label {
+    -fx-font-size: 10;
     -fx-text-fill: #666666;
 }
 
@@ -94,6 +143,13 @@
     -fx-hgap: 10px;
     -fx-vgap: 10px;
     -fx-padding: 8px;
+}
+
+/* ---- Representative face frame (Put a name to a face) ---- */
+
+.representative-frame {
+    -fx-border-color: #4a90d9;
+    -fx-border-width: 2;
 }
 
 /* ---- Scroll panes ---- */

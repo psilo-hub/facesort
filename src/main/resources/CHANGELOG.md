@@ -161,6 +161,13 @@ All notable changes to Face Sort will be documented in this file.
   change): the context-menu, open-original / open-containing-folder,
   path-tooltip, name-existence-check and error-alert plumbing that each of the
   five face views duplicated now lives once in a `FaceUi` helper (2026-09-23)
+- Inline fonts and colors moved into the stylesheet (internal, no visible
+  behavior change): the hard-coded `-fx-text-fill`/`-fx-font-*` inline styles
+  spread across the views, `FaceUi` and the dialogs are gone and now come from
+  named CSS classes in `css/styles.css` (the two dialogs, which have their own
+  scenes, now load the stylesheet themselves). The View-tab name cards gain a
+  subtle blue border + shadow highlight on hover (purely presentational)
+  (2026-09-25)
 - The import budgets are configurable: the JPEG quality of stored thumbnails and
   face sub-images (default 0.85), the maximum number of frames extracted per
   video (default 120) and the face crop size (default 160 px) are no longer

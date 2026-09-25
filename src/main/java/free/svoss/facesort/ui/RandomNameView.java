@@ -209,7 +209,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
                     namingService::findImagePaths);
 
             Label idLabel = new Label(I18n.format("ui.randomName.idPrefix", face.id()));
-            idLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #666666;");
+            idLabel.getStyleClass().add("secondary-text");
 
             card.getChildren().add(idLabel);
             card.setOnMouseClicked(e -> {

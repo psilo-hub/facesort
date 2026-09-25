@@ -53,6 +53,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> {
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         setResizable(false);
+        FaceUi.addApplicationStylesheet(getDialogPane());
         buildUi();
         setResultConverter(dialogButton -> performed);
     }
@@ -60,7 +61,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> {
     private void buildUi() {
         Label header = new Label(I18n.get("ui.import.removeByPrefix.header"));
         header.setWrapText(true);
-        header.setStyle("-fx-font-weight: bold;");
+        header.getStyleClass().add("dialog-header");
 
         Label prefixLabel = new Label(I18n.get("ui.import.removeByPrefix.prefixLabel"));
         prefixField.setPromptText(I18n.get("ui.import.removeByPrefix.prefixPrompt"));
