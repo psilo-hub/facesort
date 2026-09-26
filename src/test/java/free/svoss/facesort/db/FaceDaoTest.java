@@ -243,6 +243,43 @@ class FaceDaoTest {
     }
 
     @Test
+    void sampleRandom_returnsAllWhenTheLimitReachesTheCandidateCount() {
+        List<Long> ids = List.of(1L, 2L, 3L);
+        assertEquals(ids, FaceDao.sampleRandom(ids, 3, new java.util.Random(42L)));
+        assertEquals(ids, FaceDao.sampleRandom(ids, 50, new java.util.Random(42L)));
+    }
+
+    @Test
+    void sampleRandom_emptyForEmptyCandidatesAndNonPositiveLimits() {
+        assertTrue(FaceDao.sampleRandom(List.of(), 25, new java.util.Random(42L)).isEmpty());
+        assertTrue(FaceDao.sampleRandom(List.of(1L, 2L), 0, new java.util.Random(42L)).isEmpty());
+        assertTrue(FaceDao.sampleRandom(List.of(1L, 2L), -1, new java.util.Random(42L)).isEmpty());
+    }
+
+    @Test
+    void sampleRandom_returnsDistinctInputIdsUpToTheLimit() {
+        List<Long> ids = new ArrayList<>();
+        for (long i = 0; i < 100; i++) {
+            ids.add(i);
+        }
+        List<Long> sample = FaceDao.sampleRandom(ids, 25, new java.util.Random(7L));
+
+        assertEquals(25, sample.size());
+        assertEquals(25, sample.stream().distinct().count(), "the sample must not contain duplicates");
+        assertTrue(ids.containsAll(sample), "every sampled id must come from the candidate list");
+    }
+
+    @Test
+    void sampleRandom_isDeterministicForASeed() {
+        List<Long> ids = new ArrayList<>();
+        for (long i = 0; i < 100; i++) {
+            ids.add(i);
+        }
+        assertEquals(FaceDao.sampleRandom(ids, 25, new java.util.Random(7L)),
+                FaceDao.sampleRandom(ids, 25, new java.util.Random(7L)));
+    }
+
+    @Test
     void assignName_updatesFaceAndMovesBetweenQueries() throws Exception {
         insertImage("img1");
         long faceId = insertFace("img1", 0, 0, new float[]{1.0f}, null);

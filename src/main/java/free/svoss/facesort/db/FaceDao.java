@@ -5,8 +5,13 @@ import free.svoss.facesort.util.EmbeddingUtils;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
 
 /**
  * Data access object for the faces table.
@@ -15,8 +20,7 @@ public class FaceDao {
 
     /**
      * Number of {@code ?} placeholders in {@link #pathFilterClause()}, all bound
-     * to the same prefix by {@link #bindPathFilter}. The optional LIMIT clause
-     * of {@link #findRandomUnnamed} starts directly after them.
+     * to the same prefix by {@link #bindPathFilter}.
      */
     private static final int PATH_FILTER_PLACEHOLDERS = 5;
 
@@ -128,8 +132,12 @@ public class FaceDao {
     /**
      * Returns up to {@code limit} unnamed faces chosen at random.
      *
-     * <p>A non-positive limit yields an empty list (SQLite would otherwise
-     * interpret a negative LIMIT as "unbounded").</p>
+     * <p>Sampling happens in two steps to avoid SQLite sorting the whole
+     * matching row set (blobs included) with {@code ORDER BY RANDOM()}: the
+     * matching ids alone are read, a random subset is picked in Java via
+     * {@link #sampleRandom}, and only those faces are fetched by primary key.</p>
+     *
+     * <p>A non-positive limit yields an empty list.</p>
      *
      * @param limit maximum number of faces to return; must not be negative
      * @return up to {@code limit} random unnamed faces
@@ -146,8 +154,15 @@ public class FaceDao {
      * starts with it. A {@code null} or blank prefix disables the
      * restriction.
      *
-     * <p>A non-positive limit yields an empty list (SQLite would otherwise
-     * interpret a negative LIMIT as "unbounded").</p>
+     * <p>Sampling happens in two steps to avoid SQLite sorting the whole
+     * matching row set (blobs included) with {@code ORDER BY RANDOM()}: the
+     * matching ids alone are read, a random subset is picked in Java via
+     * {@link #sampleRandom}, and only those faces are fetched by primary key.
+     * Faces tagged or deleted by another worker between the id pick and the
+     * fetch are silently dropped, so a result may contain fewer than
+     * {@code limit} entries under concurrency.</p>
+     *
+     * <p>A non-positive limit yields an empty list.</p>
      *
      * @param limit      maximum number of faces to return; must not be negative
      * @param pathPrefix path prefix the stored photo/video path must start with,
@@ -159,15 +174,95 @@ public class FaceDao {
         if (limit <= 0) {
             return List.of();
         }
-        List<FaceRecord> faces = new ArrayList<>();
+        List<Long> ids = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL" + pathFilterClause()
-                + " ORDER BY RANDOM() LIMIT ?")) {
+                "SELECT id FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
             bindPathFilter(ps, pathPrefix);
-            ps.setInt(1 + PATH_FILTER_PLACEHOLDERS, limit);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                faces.add(mapRow(rs));
+                ids.add(rs.getLong(1));
+            }
+        }
+        List<Long> sampled = sampleRandom(ids, limit, new Random());
+        return findByIds(sampled);
+    }
+
+    /**
+     * Picks up to {@code limit} distinct ids from {@code candidates}, chosen
+     * uniformly at random. The selection is a partial Fisher–Yates shuffle:
+     * only the first {@code limit} positions are randomized, so the cost is
+     * proportional to the sample size, not the candidate count.
+     *
+     * <p>This is the Java-side replacement for SQLite's {@code ORDER BY
+     * RANDOM()} sampling, which previously forced the database to sort the
+     * whole matching row set (including the embedding / thumbnail blobs) on
+     * every call. A deterministic {@code Random} makes the call reproducible
+     * for tests.</p>
+     *
+     * @param candidates ids to sample from; must not be {@code null}
+     * @param limit      maximum number of ids to return; a non-positive limit
+     *                   yields an empty list
+     * @param rng        the random source
+     * @return up to {@code limit} distinct candidate ids, in random order; the
+     *         whole candidate list when it is not larger than the limit
+     */
+    static List<Long> sampleRandom(List<Long> candidates, int limit, Random rng) {
+        if (limit <= 0 || candidates.isEmpty()) {
+            return List.of();
+        }
+        List<Long> shuffled = new ArrayList<>(candidates);
+        if (shuffled.size() <= limit) {
+            return shuffled;
+        }
+        List<Long> sampled = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            int j = i + rng.nextInt(shuffled.size() - i);
+            Collections.swap(shuffled, i, j);
+            sampled.add(shuffled.get(i));
+        }
+        return sampled;
+    }
+
+    /**
+     * Maximum number of ids fetched per {@code WHERE id IN (...)} lookup, kept
+     * well below SQLite's variable-number limit so a large {@code limit} cannot
+     * exhaust it.
+     */
+    private static final int MAX_IN_IDS = 500;
+
+    /**
+     * Loads the faces with the given ids by primary key.
+     *
+     * @param ids the ids to load; must not be {@code null}
+     * @return the matching faces, in the given id order; ids that no longer
+     *         exist (deleted between the id pick and this fetch) are skipped
+     * @throws SQLException on database error
+     */
+    private List<FaceRecord> findByIds(List<Long> ids) throws SQLException {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, FaceRecord> byId = new LinkedHashMap<>();
+        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
+            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
+            String placeholders = chunk.stream().map(id -> "?").collect(Collectors.joining(","));
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id IN (" + placeholders + ") AND name_id IS NULL")) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setLong(i + 1, chunk.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    FaceRecord face = mapRow(rs);
+                    byId.put(face.id(), face);
+                }
+            }
+        }
+        List<FaceRecord> faces = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            FaceRecord face = byId.get(id);
+            if (face != null) {
+                faces.add(face);
             }
         }
         return faces;
@@ -311,8 +406,9 @@ public class FaceDao {
      * {@link #pathFilterClause()} to the given prefix. The prefix is trimmed;
      * a {@code null} or blank prefix leaves the clause disabled.
      *
-     * <p>The clause's placeholders live at indexes 1..5, so a query that adds
-     * further placeholders (e.g. LIMIT) must start them at index 6.</p>
+     * <p>The clause's placeholders live at indexes 1..5; {@link #findByIds}
+     * is the only other query that binds placeholders and it is built
+     * independently.</p>
      *
      * @param ps         the prepared statement to bind
      * @param pathPrefix the trimmed prefix, or {@code null} for no filter

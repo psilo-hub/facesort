@@ -80,11 +80,6 @@ All line numbers below refer to the current state of the codebase
   builders ignore `device()`, so exposing the option now would be a visible no-op. Add
   device support upstream first, then a config field wired through `FaceAiService.toFaceAIConfig`.
   **Low–Medium effort once unblocked.**
-- [ ] **Hardcoded integrations** — `FeedbackService.ACCESS_KEY`/`SUBMIT_URL`
-  (`FeedbackService.java:29,34`) and `UpdateChecker`'s `CHANGELOG_URL`/`CHECK_INTERVAL`
-  (`UpdateChecker.java:50,56`) stay in code. The access key is a public client-side form
-  key (safe by design) and rotating it would need a config UI or JSON key — revisit only
-  if key rotation becomes a real workflow. **Low priority.**
 
 ---
 
