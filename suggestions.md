@@ -55,7 +55,7 @@ All line numbers below refer to the current state of the codebase
 
 ## 7. Bugs & small UX issues (deferred from the first pass)
 
-- [ ] **`ORDER BY RANDOM()` scan** — `FaceDao.findRandomUnnamed` still scans + sorts the
+- [x] **`ORDER BY RANDOM()` scan** — `FaceDao.findRandomUnnamed` still scans + sorts the
   whole table (`FaceDao.java:158`). Deferred because the path filter restricts via EXISTS
   subqueries, so offset-based sampling would complicate the query for little gain; revisit
   if `findRandomUnnamed` ever becomes a hotspot. **Low effort.**
