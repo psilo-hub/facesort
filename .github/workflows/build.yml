@@ -17,7 +17,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - name: Cache ~/.m2
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
@@ -39,7 +39,7 @@ jobs:
       # hands Maven a bogus lifecycle phase instead.
       - run: mvn -B package -DskipTests -Dbuild.number=build-${{ github.run_number }}
         shell: bash
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: facesort-fat
           path: target/facesort-1.0-SNAPSHOT.jar
@@ -74,7 +74,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - name: Cache ~/.m2
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
@@ -98,7 +98,7 @@ jobs:
         # as a lifecycle phase and fails before it compiles anything.
         shell: bash
         run: mvn -B package -P${{ matrix.platform }} -DskipTests -Dbuild.number=build-${{ github.run_number }} -Djavafx.platform=${{ matrix.javafx-platform }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: facesort-${{ matrix.platform }}
           path: target/facesort-1.0-SNAPSHOT-${{ matrix.platform }}.jar
@@ -112,12 +112,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts/
           merge-multiple: true
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
