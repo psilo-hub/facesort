@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **357 tests / 41 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **360 tests / 42 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -14,7 +14,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 
 ## 1. Correctness bugs
 
-- [ ] **ffmpeg native resources leak on every unreadable video** —
+- [x] **ffmpeg native resources leak on every unreadable video** —
   `Session.open` only catches `FFmpegException` and `RuntimeException`
   (`FfmpegVideoFrameSource.java:239-247`), but `checkVideoDecodable` throws
   `IOException` (`:179-188`). On the most common failure path (corrupt/mislabelled
@@ -22,6 +22,15 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `input` / `io` cleanup the other two catches perform, leaking native
   AVIO + AVFormatContext allocations. Catch `IOException` too, or close in a
   `finally` whatever was opened. **High payoff, small.**
+  *Done — the cleanup moved into a `finally` guarded by an `opened` flag, so every
+  failure path (the `checkVideoDecodable` `IOException`, `FFmpegException`,
+  `RuntimeException`, `Error`) releases the chain in reverse creation order while
+  a successful open keeps it for the `Session`. Pinned by the new
+  `FfmpegVideoFrameSourceTest` (3 cases), which asserts on
+  `FFmpegIO.getStatesInUse()`: 3 rejected videos left 3 live native I/O states
+  before the fix, 0 after. Also removed the now-redundant `RuntimeException`
+  catch, and `TinyAviVideo.writeUndecodable` builds the triggering file (an AVI
+  whose `strf` BITMAPINFOHEADER is blank) in pure Java.*
 - [ ] **A failed video import permanently poisons the video** —
   `videoDao.insert` + `addPath` are committed *before* the frame loop
   (`VideoImportService.java:220-223`) so frame links can resolve their FK. If any
@@ -296,11 +305,12 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `UpdateChecker`'s package-private `RemoteFetcher` seam; a narrow `TaggingService`
   / `ReviewService` interface per view would give the UI the same testability
   without changing behaviour. **High effort payoff, medium effort.**
-- [ ] **No regression test exists for any of the §1 bugs** — items 1.1 (ffmpeg
-  leak), 1.2 (poisoned video), 1.3/1.4 (config write/load), 1.5 (re-export), 1.6
+- [ ] **No regression test exists for most of the §1 bugs** — items 1.2 (poisoned
+  video), 1.3/1.4 (config write/load), 1.5 (re-export), 1.6
   (over-broad catch) and 1.7 (null estimate) are all reachable from tests today.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
+  *1.1 is done — see the note on the item itself.*
 
 ---
 

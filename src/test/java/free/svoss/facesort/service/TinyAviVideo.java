@@ -30,6 +30,9 @@ final class TinyAviVideo {
     private static final String MJPG = "MJPG";
     private static final String FOURCC_DC = "00dc";
 
+    /** Size of the {@code BITMAPINFOHEADER} declaring a video stream's format. */
+    private static final int BITMAP_INFO_HEADER_SIZE = 40;
+
     private TinyAviVideo() {
         // utility class
     }
@@ -44,7 +47,28 @@ final class TinyAviVideo {
         for (int i = 0; i < frameCount; i++) {
             jpegs.add(jpegFrame(width, height, i));
         }
-        Files.write(file, buildAvi(width, height, frameCount, jpegs));
+        Files.write(file, buildAvi(width, height, frameCount, jpegs, strf(width, height)));
+        return file;
+    }
+
+    /**
+     * Writes an AVI whose single video stream declares no pixel format: the
+     * {@code strf} BITMAPINFOHEADER is left blank. ffmpeg still opens the
+     * container and still finds the video stream, but the stream's codec
+     * parameters never leave {@code AV_PIX_FMT_NONE} — the corrupt or
+     * mislabelled-file shape that must be rejected with a clean
+     * {@link IOException} instead of aborting the JVM natively.
+     *
+     * @return the written file
+     */
+    static Path writeUndecodable(Path file, int width, int height, int frameCount)
+            throws IOException {
+        List<byte[]> jpegs = new ArrayList<>(frameCount);
+        for (int i = 0; i < frameCount; i++) {
+            jpegs.add(jpegFrame(width, height, i));
+        }
+        Files.write(file, buildAvi(width, height, frameCount, jpegs,
+                new byte[BITMAP_INFO_HEADER_SIZE]));
         return file;
     }
 
@@ -69,12 +93,12 @@ final class TinyAviVideo {
     }
 
     private static byte[] buildAvi(int width, int height, int frameCount,
-                                   List<byte[]> jpegs) {
+                                   List<byte[]> jpegs, byte[] streamFormat) {
         ByteArrayOutputStream hdrl = new ByteArrayOutputStream();
         chunk(hdrl, "avih", avih(frameCount, width, height));
         ByteArrayOutputStream strl = new ByteArrayOutputStream();
         chunk(strl, "strh", strh(width, height, frameCount));
-        chunk(strl, "strf", strf(width, height));
+        chunk(strl, "strf", streamFormat);
         list(hdrl, "strl", strl.toByteArray());
 
         ByteArrayOutputStream moviInner = new ByteArrayOutputStream();

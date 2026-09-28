@@ -195,6 +195,12 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Importing a corrupt or mislabelled video no longer leaks native ffmpeg memory:
+  a video that opens but turns out to be undecodable is now rejected with a clean
+  error *and* its already-allocated native handles are released. Previously only
+  two of the three failure paths released them, so every unreadable video in a
+  folder permanently leaked an ffmpeg I/O context, a format context and a source
+  stream (2026-09-28)
 - Releases contain a Windows jar again: the Windows CI job ran its Maven build
   under PowerShell, which splits a dotted `-D` property at the dot, so
   `-Dbuild.number=build-N` reached Maven as a stray `.number=build-N` and the

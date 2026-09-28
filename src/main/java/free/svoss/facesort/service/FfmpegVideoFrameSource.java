@@ -213,6 +213,12 @@ public final class FfmpegVideoFrameSource implements VideoFrameSource {
         /**
          * Opens a video file and prepares its video substream for decoding.
          *
+         * <p>Every native handle created here is owned by the returned
+         * {@code Session}. Until the chain is complete it belongs to nobody, so
+         * a failure at any step releases what was opened so far instead of
+         * leaking it — including the {@link IOException} raised after the
+         * handles are open but the stream turns out to be undecodable.</p>
+         *
          * @throws IOException if the file cannot be opened or contains no
          *                     decodable video stream
          */
@@ -221,6 +227,7 @@ public final class FfmpegVideoFrameSource implements VideoFrameSource {
             FFmpegIO io = null;
             FFmpegInput input = null;
             FFmpegSourceStream sourceStream = null;
+            boolean opened = false;
             try {
                 io = FFmpegIO.openInput(file.toFile(), FFmpegIO.DEFAULT_BUFFER_SIZE);
                 input = new FFmpegInput(io);
@@ -232,17 +239,17 @@ public final class FfmpegVideoFrameSource implements VideoFrameSource {
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "no video stream in " + file));
+                opened = true;
                 return new Session(file, io, input, sourceStream, videoStream);
             } catch (FFmpegException e) {
-                closeQuietly(sourceStream);
-                closeQuietly(input);
-                closeQuietly(io);
                 throw new IOException("Failed to open video: " + file, e);
-            } catch (RuntimeException e) {
-                closeQuietly(sourceStream);
-                closeQuietly(input);
-                closeQuietly(io);
-                throw e;
+            } finally {
+                if (!opened) {
+                    // Reverse creation order: each handle depends on the older one.
+                    closeQuietly(sourceStream);
+                    closeQuietly(input);
+                    closeQuietly(io);
+                }
             }
         }
 
