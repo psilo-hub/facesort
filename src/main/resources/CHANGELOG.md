@@ -195,6 +195,13 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Releases contain a Windows jar again: the Windows CI job ran its Maven build
+  under PowerShell, which splits a dotted `-D` property at the dot, so
+  `-Dbuild.number=build-N` reached Maven as a stray `.number=build-N` and the
+  build aborted with `Unknown lifecycle phase ".number=build-N"` before
+  compiling anything, failing the release. The build step now uses the same
+  `bash` shell as the rest of the job, so every release ships
+  `facesort-<version>-win-x86_64.jar` again (2026-09-28)
 - Feedback submissions and the automatic update check now give up instead of
   hanging: both requests have a bounded network timeout (15 s feedback, 20 s
   update check), so a stalled connection cannot leave the app waiting. The

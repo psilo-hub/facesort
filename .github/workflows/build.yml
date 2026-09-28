@@ -34,7 +34,11 @@ jobs:
           git -C ffmpeg4j-deps fetch --depth 1 origin 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           git -C ffmpeg4j-deps checkout 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
+      # shell: bash is required: Windows runners default to pwsh, whose parser
+      # splits dotted -D properties (e.g. -Dbuild.number=...) at the dot and
+      # hands Maven a bogus lifecycle phase instead.
       - run: mvn -B package -DskipTests -Dbuild.number=build-${{ github.run_number }}
+        shell: bash
       - uses: actions/upload-artifact@v5
         with:
           name: facesort-fat
@@ -88,6 +92,11 @@ jobs:
           git -C ffmpeg4j-deps checkout 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
           mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
       - name: Build platform jar
+        # shell: bash is required: the Windows runner defaults to pwsh, whose
+        # parser splits dotted -D properties (-Dbuild.number=...,
+        # -Djavafx.platform=...) at the dot, so Maven receives ".number=build-N"
+        # as a lifecycle phase and fails before it compiles anything.
+        shell: bash
         run: mvn -B package -P${{ matrix.platform }} -DskipTests -Dbuild.number=build-${{ github.run_number }} -Djavafx.platform=${{ matrix.javafx-platform }}
       - uses: actions/upload-artifact@v5
         with:
