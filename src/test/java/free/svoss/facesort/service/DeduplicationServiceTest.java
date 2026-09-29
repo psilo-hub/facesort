@@ -209,4 +209,36 @@ class DeduplicationServiceTest {
                 "candidate building must read not_dupes once, not run one query per name pair "
                         + "(15 pairs used to mean 15 serialized queries behind the shared connection)");
     }
+
+    @Test
+    void nextPair_readsAllFacesWithoutOneQueryPerName() throws SQLException {
+        addFaceBearingName("First");
+        addFaceBearingName("Second");
+        int withTwoNames = (int) countFaceQueries();
+        for (int i = 0; i < 6; i++) {
+            addFaceBearingName("Extra " + i);
+        }
+        int withEightNames = (int) countFaceQueries();
+
+        assertEquals(withTwoNames, withEightNames,
+                "adding names must not add face queries: loading every name's faces is the N+1 "
+                        + "being removed, so the count must not grow with the name count");
+    }
+
+    private long addFaceBearingName(String name) throws SQLException {
+        long nameId = addName(name);
+        addFace("img-" + name, nameId, identical());
+        return nameId;
+    }
+
+    /** Builds the next pair with a counting FaceDao and reports the face queries it took. */
+    private long countFaceQueries() throws SQLException {
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        DeduplicationService countingService = new DeduplicationService(
+                new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
+                nameDao, notDupeDao, new ImageDao(db.getConnection()),
+                new VideoDao(db.getConnection()), db.getTransactionRunner());
+        assertTrue(countingService.nextPair().isPresent());
+        return counting.queriesMatching("FROM faces");
+    }
 }

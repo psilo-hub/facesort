@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **367 tests / 43 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **373 tests / 43 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -270,11 +270,19 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   score → sort → `subList(0, limit)` truncation independently. Extract one
   `SimilarityRanker` with a shared `topK` helper, and source candidates from the
   long-lived HNSW index rather than the database. **High payoff, medium effort.**
-- [ ] **Two N+1 reads over the same embeddings** —
+- [x] **Two N+1 reads over the same embeddings** —
   `FaceToNameService.averageOfOtherNames` issues one `faceDao.findByNameId` per
   name (`FaceToNameService.java:193-206`), and `DeduplicationService.loadNamesWithAverages`
   (`:265-281`) has the same shape. One grouped `findByNameIds` (or a `GROUP BY`
   variant of the existing `findByIds`) serves both. **Medium payoff, small.**
+  _Resolution: new `FaceDao.findByNameIds(List<Long>)` returns every requested name's
+  faces in one grouped query set keyed by name id (empty list for a name without
+  faces, so callers never null-check); ids are de-duplicated and chunked through the
+  existing `MAX_IN_IDS`/`placeholders` seam, and within a name the faces keep their
+  stored order. Both callers now issue one query instead of one per name, and
+  `findByIds` reuses the same `placeholders` helper. Pinned by four `FaceDaoTest`
+  cases (grouping, duplicate/unknown ids, empty input, chunking) and by two query-count
+  tests that compare the face-query count at 1 vs 7/6 names._
 - [ ] **Path-prefix filters cannot use an index** — `image_paths` and `video_paths`
   are keyed `(hash, path)` (`Database.java:161-167,222-228`) with no index on
   `path`, yet every prefix filter is `substr(path, 1, length(?)) = ?`

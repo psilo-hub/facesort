@@ -7,11 +7,13 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Data access object for the faces table.
@@ -245,9 +247,9 @@ public class FaceDao {
         Map<Long, FaceRecord> byId = new LinkedHashMap<>();
         for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
             List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
-            String placeholders = chunk.stream().map(id -> "?").collect(Collectors.joining(","));
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id IN (" + placeholders + ") AND name_id IS NULL")) {
+                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id IN ("
+                            + placeholders(chunk.size()) + ") AND name_id IS NULL")) {
                 for (int i = 0; i < chunk.size(); i++) {
                     ps.setLong(i + 1, chunk.get(i));
                 }
@@ -282,6 +284,56 @@ public class FaceDao {
             }
         }
         return faces;
+    }
+
+    /**
+     * Loads the faces of every given name in one grouped query set, keyed by
+     * name id.
+     *
+     * <p>This is the batch form of {@link #findByNameId}: a caller that needs
+     * the faces of many names — averaging each name's embeddings, for
+     * instance — would otherwise issue one query per name. Every requested id
+     * is a key of the returned map, mapping to an empty list when the name has
+     * no faces, so callers never have to null-check.</p>
+     *
+     * <p>Ids are de-duplicated and issued in chunks of at most
+     * {@link #MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
+     * variable-number limit. Within a name the faces keep their stored
+     * (rowid) order, exactly as {@link #findByNameId} returns them.</p>
+     *
+     * @param nameIds the name ids to load; must not be {@code null}
+     * @return the faces per name id, keyed in the order the ids were requested
+     * @throws SQLException on database error
+     */
+    public Map<Long, List<FaceRecord>> findByNameIds(List<Long> nameIds) throws SQLException {
+        List<Long> ids = new ArrayList<>(new LinkedHashSet<>(nameIds));
+        Map<Long, List<FaceRecord>> byName = new LinkedHashMap<>();
+        for (Long nameId : ids) {
+            byName.put(nameId, new ArrayList<>());
+        }
+        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
+            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IN ("
+                            + placeholders(chunk.size()) + ")")) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setLong(i + 1, chunk.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    FaceRecord face = mapRow(rs);
+                    byName.get(face.nameId()).add(face);
+                }
+            }
+        }
+        return byName;
+    }
+
+    /**
+     * Returns a comma-separated list of {@code count} bind placeholders.
+     */
+    private static String placeholders(int count) {
+        return IntStream.range(0, count).mapToObj(i -> "?").collect(Collectors.joining(","));
     }
 
     /**
@@ -441,9 +493,9 @@ public class FaceDao {
      * {@link #pathFilterClause()} to the given prefix. The prefix is trimmed;
      * a {@code null} or blank prefix leaves the clause disabled.
      *
-     * <p>The clause's placeholders live at indexes 1..5; {@link #findByIds}
-     * is the only other query that binds placeholders and it is built
-     * independently.</p>
+     * <p>The clause's placeholders live at indexes 1..5; the
+     * {@code IN (...)} lookups that use {@link #placeholders} are built
+     * independently and bind their ids in order.</p>
      *
      * @param ps         the prepared statement to bind
      * @param pathPrefix the trimmed prefix, or {@code null} for no filter

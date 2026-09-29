@@ -10,6 +10,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -353,6 +355,69 @@ class FaceDaoTest {
                 "a thumbnail list must not hydrate the per-face JPEG: " + sql);
         assertFalse(sql.contains("embedding"),
                 "a thumbnail list must not hydrate the 512-float embedding: " + sql);
+    }
+
+    @Test
+    void findByNameIds_groupsFacesByName() throws Exception {
+        insertImage("imgA");
+        insertImage("imgB");
+        insertImage("imgC");
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long ghost = nameDao.insert("Ghost");
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+        insertFace("imgB", 0, 0, new float[]{2.0f}, alice);
+        insertFace("imgC", 0, 0, new float[]{3.0f}, bob);
+
+        Map<Long, List<FaceRecord>> grouped = faceDao.findByNameIds(List.of(alice, bob, ghost));
+
+        assertEquals(Set.of(alice, bob, ghost), grouped.keySet(),
+                "every requested name must be a key, even one with no faces");
+        assertEquals(List.of("imgA", "imgB"),
+                grouped.get(alice).stream().map(FaceRecord::imageHash).toList());
+        assertEquals(List.of("imgC"),
+                grouped.get(bob).stream().map(FaceRecord::imageHash).toList(),
+                "another name's faces must not leak into the group");
+        assertEquals(List.of(), grouped.get(ghost), "a name with no faces maps to an empty list");
+    }
+
+    @Test
+    void findByNameIds_ignoresDuplicateAndUnknownIds() throws Exception {
+        insertImage("imgA");
+        long alice = nameDao.insert("Alice");
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+
+        Map<Long, List<FaceRecord>> grouped = faceDao.findByNameIds(List.of(alice, alice, 999L));
+
+        assertEquals(List.of("imgA"),
+                grouped.get(alice).stream().map(FaceRecord::imageHash).toList(),
+                "a repeated id must not duplicate its faces");
+        assertEquals(List.of(), grouped.get(999L), "an unknown id maps to an empty list");
+    }
+
+    @Test
+    void findByNameIds_emptyInputYieldsEmptyMap() throws Exception {
+        assertEquals(Map.of(), faceDao.findByNameIds(List.of()));
+    }
+
+    @Test
+    void findByNameIds_chunksTheIdListToStayBelowSqlitesVariableLimit() throws Exception {
+        // 501 ids cannot be bound in one statement, so the DAO must chunk them.
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i < 501; i++) {
+            long nameId = nameDao.insert("Name " + i);
+            insertImage("img" + i);
+            insertFace("img" + i, 0, 0, new float[]{1.0f}, nameId);
+            ids.add(nameId);
+        }
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        Map<Long, List<FaceRecord>> grouped = countingDao.findByNameIds(ids);
+
+        assertEquals(501, grouped.size());
+        assertEquals(2, counting.queriesMatching("FROM faces"),
+                "501 ids must be split into chunks, not bound in one oversized statement");
     }
 
     @Test

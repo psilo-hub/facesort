@@ -190,16 +190,18 @@ public class FaceToNameService {
      * @throws SQLException on database error
      */
     private Map<Long, float[]> averageOfOtherNames(long nameId) throws SQLException {
-        Map<Long, float[]> averages = new HashMap<>();
+        List<Long> otherIds = new ArrayList<>();
         for (NameRecord other : nameDao.findAll()) {
-            if (other.id() == nameId) {
-                continue;
+            if (other.id() != nameId) {
+                otherIds.add(other.id());
             }
-            List<FaceRecord> faces = faceDao.findByNameId(other.id());
-            if (faces.isEmpty()) {
-                continue;
+        }
+
+        Map<Long, float[]> averages = new HashMap<>();
+        for (Map.Entry<Long, List<FaceRecord>> entry : faceDao.findByNameIds(otherIds).entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                averages.put(entry.getKey(), faceSelector.averageOf(entry.getValue()));
             }
-            averages.put(other.id(), faceSelector.averageOf(faces));
         }
         return averages;
     }

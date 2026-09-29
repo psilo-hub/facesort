@@ -5,6 +5,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.SimilarityResult;
@@ -54,6 +55,36 @@ class FaceToNameServiceTest {
         new ImageDao(db.getConnection()).insert(imageHash, 0, "{}", 1);
         return faceDao.insert(new FaceRecord(
                 0, imageHash, 10, 10, 80, 80, 0.9, embedding, new byte[]{1}, nameId));
+    }
+
+    @Test
+    void findUnnamedForName_readsOtherNamesFacesWithoutOneQueryPerName() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgU", xLike(), null); // an unnamed candidate to rank
+
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgB", xLike(), bob);
+        long withOneOther = faceQueriesFor(alice, 10);
+        for (int i = 0; i < 5; i++) {
+            long other = nameDao.insert("Other " + i);
+            addImageAndFace("imgO" + i, xLike(), other);
+        }
+        long withSixOthers = faceQueriesFor(alice, 10);
+
+        assertEquals(withOneOther, withSixOthers,
+                "averaging the other names' embeddings must not cost one query per name: the "
+                        + "face query count must not grow with the number of other names");
+    }
+
+    /** Runs one ranking with a counting FaceDao and reports the face queries it took. */
+    private long faceQueriesFor(long nameId, int limit) throws SQLException {
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceToNameService countingService = new FaceToNameService(
+                new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
+                nameDao, imageDao, new VideoDao(db.getConnection()), config);
+        countingService.findUnnamedForName(nameId, limit, true, null);
+        return counting.queriesMatching("FROM faces");
     }
 
     private static float[] xLike() {

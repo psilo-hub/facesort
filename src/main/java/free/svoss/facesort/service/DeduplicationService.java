@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -285,8 +286,10 @@ public class DeduplicationService {
         List<NameRecord> allNames = nameDao.findAll();
         List<NameWithAverage> result = new ArrayList<>();
 
+        Map<Long, List<FaceRecord>> facesByName =
+                faceDao.findByNameIds(allNames.stream().map(NameRecord::id).toList());
         for (NameRecord record : allNames) {
-            List<FaceRecord> faces = faceDao.findByNameId(record.id());
+            List<FaceRecord> faces = facesByName.get(record.id());
             if (faces.isEmpty()) {
                 continue;
             }

@@ -200,6 +200,13 @@ All notable changes to Face Sort will be documented in this file.
   cropped face JPEG, which neither of them uses. They now read just the image
   list and fetch the image thumbnail they display. The pictures shown and the
   files exported are unchanged (2026-09-28)
+- Working with a large number of named people is faster in the "Add faces to a
+  name" and Deduplicate tabs: both asked the database for each person's faces
+  one person at a time, and because every query is serialized behind a single
+  shared connection that made ranking slow with many names in the database. Both
+  now read all the faces they need in one go, so the work no longer grows with
+  the number of people. The suggestions and their order are unchanged
+  (2026-09-28)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and
