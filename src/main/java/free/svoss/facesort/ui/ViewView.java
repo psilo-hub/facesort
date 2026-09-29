@@ -1,6 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
+import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.ViewService;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -26,6 +27,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * "View" tab: shows a grid of name cards (representative face, name, face
@@ -351,24 +353,28 @@ public class ViewView extends BorderPane implements Refreshable {
 
     /**
      * Untags every face in the given image that is currently tagged with the
-     * active name, then reloads the image grid so the image disappears from
-     * the list.
+     * name selected at this moment, then reloads that name's image grid so the
+     * image disappears from the list. Selecting a different person while the
+     * untag runs does not redirect it.
      *
      * @param hash content hash of the image
      */
     private void untagFaces(String hash) {
-        statusLabel.setText(I18n.format("ui.view.untagging", activeNameText));
+        NameBoundWork.Bound<Integer> untag = NameBoundWork.forSelectedName(this::activeNameRecord,
+                name -> viewService.untagFacesFromImage(hash, name.id()));
+        statusLabel.setText(I18n.format("ui.view.untagging", untag.name().name()));
         Task<Integer> task = new Task<>() {
             @Override
-            protected Integer call() throws SQLException {
-                return viewService.untagFacesFromImage(hash, activeNameId);
+            protected Integer call() throws Exception {
+                return untag.work().call();
             }
         };
 
         task.setOnSucceeded(e -> {
             int count = task.getValue();
-            statusLabel.setText(I18n.format("ui.view.untagged", count, activeNameText));
-            openNameImages(activeNameId, activeNameText);
+            String name = untag.name().name();
+            statusLabel.setText(I18n.format("ui.view.untagged", count, name));
+            openNameImages(untag.name().id(), name);
         });
 
         task.setOnFailed(e -> {
@@ -377,6 +383,16 @@ public class ViewView extends BorderPane implements Refreshable {
         });
 
         taskRunner.start(task, "view-untagger");
+    }
+
+    /**
+     * The name whose images are currently on screen, as a record so a
+     * background action can capture it.
+     *
+     * @return the active name
+     */
+    private NameRecord activeNameRecord() {
+        return new NameRecord(activeNameId, Objects.requireNonNullElse(activeNameText, ""), null);
     }
 
     /**

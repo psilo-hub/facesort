@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-29, `mvn test` green: **389 tests / 44 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **394 tests / 45 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -149,13 +149,38 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   taken out of its busy state. The other two cases cover the normal outcomes
   (no match → message, Remove stays disabled; a match → the four counts shown,
   Remove enabled).*
-- [ ] **`ViewView.untagFaces` reads a mutable field off the background thread** —
-  the mutable `activeNameId` is read inside `call()` and again in the success
-  handler (`ViewView.java:359-372`), so changing the selected person mid-flight
-  untags and refreshes the wrong one. The same defect exists at
-  `FaceNameView.java:582-588` (`activeName`). Both should capture a `final` local
-  before creating the task — the pattern already used at `RandomNameView.java:309`
-  and `FaceNameView.java:673`. **High payoff, small.**
+- [x] **A view's mutable "active name" is read off the background thread** — the
+  selected name is plain mutable state, so work that reads the field from its
+  `Task` body operates on whichever name happens to be selected when the work
+  runs, not the one the user acted on. Three sites: `ViewView.untagFaces` reads
+  `activeNameId` in `call()` and `activeNameId`/`activeNameText` again in the
+  success handler (`ViewView.java:359-372`); `FaceNameView.onTagSelected` reads
+  `activeName` in `call()` and in the success handler
+  (`FaceNameView.java:578-590`); and `FaceNameView.onRename` reads
+  `activeName.id()` in `call()` and then *assigns* `activeName` in the success
+  handler (`FaceNameView.java:628-640`) — the worst of the three, because a
+  rename is a destructive write, so clicking another person mid-rename renames
+  the wrong one. `FaceNameView.onExport` already does the right thing at `:673`.
+  **High payoff, small.**
+  *Done — all three sites now bind their work to the selected name through the
+  new package-private `NameBoundWork.forSelectedName(Supplier<NameRecord>,
+  Work)`, which reads the selection **once, synchronously, on the calling
+  thread** and returns a `Bound<T>` holding both the frozen `NameRecord` and the
+  `Callable<T>` to run later. The task body invokes `bound.work()`, and the
+  success handlers report and refresh `bound.name()` — so neither the work nor
+  the follow-up can be redirected by a selection change made after the click.
+  `ViewView` gained a small `activeNameRecord()` accessor (its state is an id
+  plus a display string rather than a `NameRecord`). The rename handler now
+  adopts the renamed record only while that name is still the selected one, so
+  a user who moved on in the meantime is no longer yanked back to it.
+  `NameBoundWork` deliberately contains no `javafx.concurrent.Task`: binding work
+  and running it later is plain Java, so it is pinnable headlessly with no
+  JavaFX toolkit. Pinned by the new `NameBoundWorkTest` (5 cases). I verified the
+  capture is load-bearing by changing `forSelectedName` to resolve the
+  selection inside the `Callable` — exactly the original defect — after which
+  `workRunsAgainstTheNameSelectedWhenItWasBound` fails with
+  `expected: <untagged from Alice> but was: <untagged from Bob>` and
+  `repeatedRunsKeepTargetingTheSameName` with `expected: <1> but was: <2>`.*
 - [ ] **`FaceSortApp.stop()` can leak the database handle** — the three `close()`
   calls are unguarded (`FaceSortApp.java:350-363`). `importService.close()` and
   `faceAiService.close()` both release native resources and both rethrow the
@@ -485,7 +510,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 ## 5. Tests, TDD & process
 
 - [ ] **CI never runs the test suite** — both jobs build with `-DskipTests` and no
-  test job exists (`.github/workflows/build.yml:33,81`). All 389 tests are
+  test job exists (`.github/workflows/build.yml:33,81`). All 394 tests are
   therefore only ever run locally, and a red suite can still produce a release.
   Add a `test` job running `mvn -B test` on `pull_request`, and make `release`
   depend on it. **Highest-leverage process gap in the repo, tiny effort.**
@@ -493,14 +518,19 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   PMD, Checkstyle or Enforcer plugin, so nothing catches dead code, accidental
   null-dereference patterns or complexity regressions. At minimum add JaCoCo with
   a floor and `maven-enforcer-plugin` pinning the Java 17 toolchain. **Medium effort.**
-- [ ] **11 of the 15 classes in `ui/` have no tests, and all four that do test
+- [ ] **12 of the 17 classes in `ui/` have no tests, and all five that do test
   extracted helpers rather than views** — `FaceNameViewTest`, `ViewViewTest`,
-  `ModelDownloadViewTest` and `RemoveByPrefixDialogTest` exist, and they
+  `ModelDownloadViewTest`, `RemoveByPrefixDialogTest` and `NameBoundWorkTest`
+  exist, and they
   exercise the pure static seams (`ViewView.filterNames`,
   `FaceNameView.rangeSelection`, `ModelDownloadView.formatBytes`,
-  `RemoveByPrefixDialog.applyScanResult`) that were extracted precisely to be
-  testable — the last one added by the §1.7 fix, which extracted a
-  `ScanPresenter` seam to pin a bug that was otherwise unreachable headlessly.
+  `RemoveByPrefixDialog.applyScanResult`, `NameBoundWork.forSelectedName`) that
+  were extracted precisely to be
+  testable — `ScanPresenter` added by the §1.7 fix (to pin a bug otherwise
+  unreachable headlessly) and `NameBoundWork` added by the §1.8 fix (which
+  pins work being bound to the name selected when it was requested). Note that
+  none of these can run a real `javafx.concurrent.Task`: `Task` needs an
+  initialized toolkit, so every seam here is deliberately Task-free.
   Keep extending that pattern into
   `SettingsView.onReset` (the field-by-field default copy), `DedupeView`'s
   decision state machine and `NameFaceView`/`RandomNameView` selection logic —
@@ -516,9 +546,9 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   partly.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
-  *1.1, 1.2, 1.3/1.4 and 1.7 are done — see the notes on those items. 1.7 also
-  opened the first test seam in `ui/` outside the three classes below, so
-  `RemoveByPrefixDialog` now has coverage too.*
+  *1.1, 1.2, 1.3/1.4, 1.7 and 1.8 are done — see the notes on those items. 1.7
+  and 1.8 each opened a test seam in `ui/` outside the three classes below, so
+  `RemoveByPrefixDialog` and `NameBoundWork` now have coverage too.*
 
 ---
 

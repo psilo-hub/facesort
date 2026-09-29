@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 389 tests / 44 classes,
+State as of 2026-09-29. `mvn test` is green: 394 tests / 45 classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (35 open items, with the
+The detailed backlog lives in `suggestions.md` (34 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -13,6 +13,24 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §1.8 A view's mutable "active name" is no longer read off the background
+  thread. Three sites had the defect: `ViewView.untagFaces`,
+  `FaceNameView.onTagSelected` and — worst — `FaceNameView.onRename`, which
+  could rename the *wrong person* (a destructive write) if you picked
+  another name while the rename was in flight. All three now bind their work
+  through the new package-private `NameBoundWork.forSelectedName`, which
+  snapshots the selection once, synchronously, on the calling thread and
+  hands back both the frozen `NameRecord` and the deferred work. The task
+  body runs the bound work; the success handlers report and refresh the
+  bound name, so nothing can be redirected after the click. The rename
+  handler now only adopts the renamed record while that name is still the
+  selected one, so you are not yanked back if you moved on.
+  `NameBoundWork` contains no `javafx.concurrent.Task` on purpose: a `Task`
+  needs an initialized JavaFX toolkit, so a Task-free seam is what makes
+  this pinnable headlessly. Pinned by the new `NameBoundWorkTest` (5
+  cases), mutation-verified: resolving the selection inside the deferred
+  work — exactly the original bug — fails 2 of them with `expected:
+  <untagged from Alice> but was: <untagged from Bob>`.
 * §1.2 A failed video import no longer poisons the video — the frame loop
   is wrapped in `try/catch (Exception | Error)`, and a failure now undoes
   the registration via the new `VideoDao.delete(hash)`, so the next import
@@ -47,9 +65,12 @@ Just completed
   Both pinned by three new `AppConfigTest` cases, written first: the
   failed-write test reproduced the exact truncated-at-`maxImportThreads`
   file before the fix.
-* Docs: `suggestions.md` (items ticked with resolutions), `CHANGELOG.md`
+* Docs: `suggestions.md` (items ticked with resolutions, §5 ui-coverage
+  counts refreshed to 12 untested / 5 tested classes), `CHANGELOG.md`
   (### Fixed), `README.md` and all five translations (config file is
   hand-editable, unknown keys ignored, values clamped, writes atomic).
+  The §1.8 round needed no README change: it fixes a race, and the README
+  documents no behaviour that changed.
 
 
 Queued next (highest payoff first, all still open in suggestions.md)
@@ -59,10 +80,8 @@ Queued next (highest payoff first, all still open in suggestions.md)
   closes out the "correctness first" pass:
   1. §1.5  Re-exporting a person to the same folder aborts (medium/small)
   2. §1.6  `ImportService` swallows unrelated database failures (medium)
-  3. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
-           the background thread (high/small)
-  4. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
-  5. §1.10 Null-safety gaps in the seams that face native code (medium)
+  3. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
+  4. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

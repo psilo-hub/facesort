@@ -233,6 +233,10 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Tagging, untagging and renaming a person now always affect the person you
+  clicked, even if you pick somebody else from the list while the operation is
+  still running. Previously the operation read the selection again once it
+  started, so it could quietly tag, untag — or rename — the wrong person (2026-09-29)
 - A video whose import fails partway through is no longer lost forever: importing
   again now picks the video back up and finishes it, instead of skipping it as
   "already imported" while it had no faces at all. If a video fails during

@@ -575,18 +575,22 @@ public class FaceNameView extends BorderPane implements Refreshable {
             return;
         }
 
-        statusLabel.setText(I18n.format("ui.faceName.tagging", faceIds.size(), activeName.name()));
+        NameBoundWork.Bound<Void> tag = NameBoundWork.forSelectedName(() -> activeName,
+                name -> {
+                    faceToNameService.tagFaces(faceIds, name.id());
+                    return null;
+                });
+        statusLabel.setText(I18n.format("ui.faceName.tagging", faceIds.size(), tag.name().name()));
         Task<Void> task = new Task<>() {
             @Override
-            protected Void call() throws SQLException {
-                faceToNameService.tagFaces(faceIds, activeName.id());
-                return null;
+            protected Void call() throws Exception {
+                return tag.work().call();
             }
         };
 
         task.setOnSucceeded(e -> {
-            statusLabel.setText(I18n.format("ui.faceName.tagged", faceIds.size(), activeName.name()));
-            selectName(activeName); // refresh: tagged faces disappear
+            statusLabel.setText(I18n.format("ui.faceName.tagged", faceIds.size(), tag.name().name()));
+            selectName(tag.name()); // refresh: tagged faces disappear
         });
 
         task.setOnFailed(e ->
@@ -626,16 +630,24 @@ public class FaceNameView extends BorderPane implements Refreshable {
         }
 
         statusLabel.setText(I18n.format("ui.faceName.renaming", newName));
+        NameBoundWork.Bound<NameRecord> rename = NameBoundWork.forSelectedName(() -> activeName,
+                name -> faceToNameService.renameName(name.id(), newName));
         Task<NameRecord> task = new Task<>() {
             @Override
-            protected NameRecord call() throws SQLException {
-                return faceToNameService.renameName(activeName.id(), newName);
+            protected NameRecord call() throws Exception {
+                return rename.work().call();
             }
         };
 
         task.setOnSucceeded(e -> {
-            activeName = task.getValue();
-            statusLabel.setText(I18n.format("ui.faceName.renamed", activeName.name()));
+            NameRecord renamed = task.getValue();
+            // Adopt the renamed record only while that name is still the
+            // selected one: if the user picked somebody else while the rename
+            // ran, they must not be dragged back to it.
+            if (renamed.id() == rename.name().id()) {
+                activeName = renamed;
+            }
+            statusLabel.setText(I18n.format("ui.faceName.renamed", renamed.name()));
             loadNames(true); // refresh list and candidates for the renamed name
         });
 
