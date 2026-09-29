@@ -13,11 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Provides the data for the browse/view flow (View tab).
@@ -80,19 +78,19 @@ public class ViewService {
      * Returns the distinct images that contain at least one face with the given
      * name, together with their stored thumbnails.
      *
+     * <p>Only the images are read, not the faces: the grid shows image
+     * thumbnails, so the per-face embedding and sub-image JPEG are never
+     * hydrated.</p>
+     *
      * <p>Thumbnail data may be {@code null} for an image when none is stored yet;
      * the UI decides how to render that case.</p>
      *
      * @param nameId id of the name
-     * @return distinct images in the order the faces were found
+     * @return distinct images in the order of each image's first tagged face
      * @throws SQLException on database access failure
      */
     public List<NamedImage> getImagesForName(long nameId) throws SQLException {
-        List<FaceRecord> faces = faceDao.findByNameId(nameId);
-        Set<String> hashes = new LinkedHashSet<>();
-        for (FaceRecord face : faces) {
-            hashes.add(face.imageHash());
-        }
+        List<String> hashes = faceDao.findImageHashesByNameId(nameId);
         List<NamedImage> images = new ArrayList<>(hashes.size());
         for (String hash : hashes) {
             images.add(new NamedImage(hash, imageDao.getThumbnail(hash)));

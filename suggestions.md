@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **363 tests / 42 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **367 tests / 43 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -194,13 +194,72 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   order) so the loaded set is proven to be consulted for every pair. The
   `isNotDupe` call site was the last production user of that DAO method, so it
   is now added to the §4 dead-code list.*
-- [ ] **Every face query hydrates both BLOB columns** — `SELECT_COLUMNS` always
+- [x] **Every face query hydrates both BLOB columns** — `SELECT_COLUMNS` always
   projects `embedding` and `sub_image_jpg` (`FaceDao.java:33-34`), so even a
   thumbnail-list read pays a 512-float array plus a JPEG per row.
   `findUnnamed()` (`:119-128`) is the hot path for both `findSimilarUnnamed` and
   the clustering load. Add a `SELECT_COLUMNS_NO_BLOBS` variant for the display
   paths; `mapRow` already reads columns by name, so the split is low-risk.
   **High payoff, small.**
+  *Done, but **re-scoped after the premise turned out to be wrong** — recording
+  the correction here so the item is not re-attempted as originally written. Two
+  facts a full call-site audit (every production caller of all six `FaceDao`
+  read methods) turned up:*
+  1. *The "display paths" mostly **do** need `sub_image_jpg` — that BLOB **is**
+  the thumbnail they render (`FaceUi.toImage` and `TagWithNameDialog.toImage`
+  are its only readers in the whole UI layer). Only **two** production call
+  sites need neither BLOB, and both did the byte-identical
+  `findByNameId` → `LinkedHashSet<imageHash>` dance:*
+  `ViewService.getImagesForName` (the View tab, once per name) and
+  `FaceToNameService.exportImagesForName`.*
+  2. *A projection without `embedding` **cannot produce a `FaceRecord` at all**,
+  because `FaceRecord` does `requireNonNull(embedding)`
+  (`FaceRecord.java:36`). "`mapRow` already reads columns by name, so the split
+  is low-risk" is true of the *column* list and false of the *record* — the
+  no-BLOB variant would have needed a new model type plus a `FaceUi` overload,
+  not just a second column list.*
+
+  *What landed: a single-purpose projection instead, `FaceDao.findImageHashesByNameId`
+  — `SELECT image_hash ... GROUP BY image_hash ORDER BY MIN(id)`. It returns the
+  distinct hashes, so it hydrates neither BLOB and does not construct a
+  `FaceRecord` at all, and the duplicated `LinkedHashSet` de-duplication moved
+  into the SQL. `ORDER BY MIN(id)` pins the "order the faces were found" that
+  the Javadoc promised, instead of leaving it to the query planner's scan
+  choice. Both callers adopted it and each lost a loop; the View tab stops
+  reading a 2 KB embedding plus a JPEG for every face of every name, which
+  matters because a name can have thousands of faces. Pinned by 4 new tests,
+  all written first: `FaceDaoTest.findImageHashesByNameId_returnsDistinctHashesInFirstFaceOrder`,
+  `..._emptyForNameWithoutFaces`, `..._doesNotProjectTheBlobColumns` and
+  `ViewServiceTest.getImagesForName_doesNotHydratePerFaceBlobs` — the last two
+  run the call through the shared `QueryCountingConnection` test utility and
+  assert the recorded SQL never mentions `embedding` or `sub_image_jpg`, which
+  is the actual payoff stated as a contract. That utility was extracted from
+  the §3 dedupe-candidate item's test so both items share one copy.*
+
+  *Still open, and correctly so: `findUnnamed`, `findByNameId` and `findById`
+  are **off limits** for a no-BLOB variant — every production caller of all
+  three reads `embedding()` (clustering, `findSimilarUnnamed`, all of
+  `FaceToNameService`, `DeduplicationService`). Their BLOB cost is the next
+  item's problem, not this one's. The one remaining display path that only
+  needs the JPEG and not the embedding is
+  `NamingService.findRandomUnnamed` → `RandomNameView`; stripping the embedding
+  there needs a new lightweight record (e.g. `FaceThumb(id, imageHash,
+  subImageJpg)`), a `FaceUi.faceCard` overload and a
+  `NamingService`/`RandomNameView` signature change, i.e. **medium effort, not
+  small** — left as new work below.*
+- [ ] **The random-faces view hydrates embeddings it never uses** —
+  `NamingService.findRandomUnnamed` is a pass-through to
+  `FaceDao.findRandomUnnamed` (`NamingService.java:219-227`), and its only
+  production caller is `RandomNameView`, which reads just `id()`,
+  `imageHash()` and `subImageJpg()` — `FaceUi.faceCard` renders the thumbnail
+  and nothing computes a similarity. So the Random-faces tab pays a 512-float
+  array per card for nothing. Fix: a lightweight `FaceThumb(id, imageHash,
+  subImageJpg)` record plus a `findRandomUnnamedThumbs` projection, an
+  `FaceUi.faceCard` overload and the two signature changes. This is the
+  *remaining* half of the "every face query hydrates both BLOBs" item above,
+  which could not be done as one change because `FaceRecord` forbids a null
+  embedding. *Found by the call-site audit for that item.*
+  **Medium payoff, medium effort.**
 - [ ] **`findSimilarUnnamed` loads and sorts the whole unnamed corpus to keep a
   handful** — after *every* tag it materialises every unnamed face with both
   BLOBs, scores all of them, sorts everything, then keeps `limit` (typically 5–10)

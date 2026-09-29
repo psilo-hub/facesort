@@ -5,22 +5,14 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -204,7 +196,7 @@ class DeduplicationServiceTest {
             long nameId = addName("Name " + i);
             addFace("img" + i, nameId, identical());
         }
-        SqlCountingConnection counting = new SqlCountingConnection(db.getConnection());
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
         DeduplicationService countingService = new DeduplicationService(
                 new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao,
                 new NotDupeDao(counting.connection()),
@@ -216,66 +208,5 @@ class DeduplicationServiceTest {
         assertEquals(1, counting.queriesMatching("not_dupes"),
                 "candidate building must read not_dupes once, not run one query per name pair "
                         + "(15 pairs used to mean 15 serialized queries behind the shared connection)");
-    }
-
-    /**
-     * A connection proxy that records the SQL of every statement created or
-     * executed through it, so a test can assert how many queries a code path
-     * issues and not just what it returns.
-     */
-    private static final class SqlCountingConnection implements InvocationHandler {
-
-        private final Connection delegate;
-        private final List<String> statements = new ArrayList<>();
-
-        SqlCountingConnection(Connection delegate) {
-            this.delegate = delegate;
-        }
-
-        /** A counting view of the given connection. */
-        Connection connection() {
-            return (Connection) Proxy.newProxyInstance(
-                    Connection.class.getClassLoader(), new Class<?>[]{Connection.class}, this);
-        }
-
-        /** How many recorded statements whose SQL contains {@code sqlFragment}. */
-        long queriesMatching(String sqlFragment) {
-            return statements.stream().filter(sql -> sql.contains(sqlFragment)).count();
-        }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            if (method.getName().equals("prepareStatement")) {
-                statements.add((String) args[0]);
-                return recordingStatement((Statement) call(method, delegate, args), PreparedStatement.class);
-            }
-            if (method.getName().equals("createStatement")) {
-                if (args != null && args.length > 0 && args[0] instanceof String sql) {
-                    statements.add(sql);
-                }
-                return recordingStatement((Statement) call(method, delegate, args), Statement.class);
-            }
-            return call(method, delegate, args);
-        }
-
-        private Object recordingStatement(Statement statement, Class<?> api) {
-            return Proxy.newProxyInstance(api.getClassLoader(), new Class<?>[]{api},
-                    (proxy, method, args) -> {
-                        if (method.getName().startsWith("execute")
-                                && args != null && args.length > 0 && args[0] instanceof String sql) {
-                            statements.add(sql);
-                        }
-                        return call(method, statement, args);
-                    });
-        }
-    }
-
-    /** Invokes reflectively, unwrapping so callers see the real exception. */
-    private static Object call(Method method, Object target, Object[] args) throws Throwable {
-        try {
-            return method.invoke(target, args);
-        } catch (InvocationTargetException e) {
-            throw e.getCause();
-        }
     }
 }

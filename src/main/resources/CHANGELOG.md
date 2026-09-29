@@ -194,6 +194,12 @@ All notable changes to Face Sort will be documented in this file.
   people meant ~500,000 serialized queries queued behind the shared database
   connection. Those answers are now read once and kept in memory, so 15 pairs
   cost 1 query instead of 15. The pairs you are offered are unchanged (2026-09-28)
+- The View tab and the "Export a person's photos" action load far less data:
+  both only needed to know which images a person appears in, but they read every
+  face of that person in full — including the face-detection embedding and the
+  cropped face JPEG, which neither of them uses. They now read just the image
+  list and fetch the image thumbnail they display. The pictures shown and the
+  files exported are unchanged (2026-09-28)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

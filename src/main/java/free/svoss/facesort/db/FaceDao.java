@@ -285,6 +285,41 @@ public class FaceDao {
     }
 
     /**
+     * Returns the distinct image hashes of the faces with a given name_id, in
+     * the order each image's first such face was stored.
+     *
+     * <p>This is the projection for callers that only need to know <em>which
+     * images</em> a name appears in — for example a thumbnail list or an export
+     * — rather than the faces themselves. It projects neither
+     * {@code embedding} nor {@code sub_image_jpg}, so it never pays the
+     * 512-float array plus a JPEG per row that {@link #findByNameId} does; that
+     * matters because a name can have thousands of faces.</p>
+     *
+     * <p>{@code ORDER BY MIN(id)} makes the "first such face" ordering explicit
+     * instead of leaving it to whichever scan the query planner picks, and
+     * {@code GROUP BY} does the de-duplication the callers used to do in
+     * Java.</p>
+     *
+     * @param nameId id of the name
+     * @return the distinct image hashes, in first-face order; empty when the
+     *         name has no faces
+     * @throws SQLException on database error
+     */
+    public List<String> findImageHashesByNameId(long nameId) throws SQLException {
+        List<String> hashes = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT image_hash FROM faces WHERE name_id = ? "
+                        + "GROUP BY image_hash ORDER BY MIN(id)")) {
+            ps.setLong(1, nameId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                hashes.add(rs.getString(1));
+            }
+        }
+        return hashes;
+    }
+
+    /**
      * Returns all faces (for clustering, etc.).
      */
     public List<FaceRecord> findAll() throws SQLException {

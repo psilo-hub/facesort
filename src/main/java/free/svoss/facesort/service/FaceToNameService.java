@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -491,12 +490,11 @@ public class FaceToNameService {
             throws SQLException, IOException {
         Files.createDirectories(Objects.requireNonNull(outputDir, "outputDir"));
 
-        List<FaceRecord> faces = faceDao.findByNameId(nameId);
-        Set<String> hashes = new LinkedHashSet<>();
-        for (FaceRecord face : faces) {
-            hashes.add(face.imageHash());
-        }
-
+        // Only the images are read, not the faces: the export copies originals
+        // and falls back to image thumbnails, so the per-face embedding and
+        // sub-image JPEG are never needed.
+        List<String> hashes = faceDao.findImageHashesByNameId(nameId);
+        int distinctImages = hashes.size();
         int originalsCopied = 0;
         int thumbnailsCopied = 0;
         int missing = 0;
@@ -525,7 +523,7 @@ public class FaceToNameService {
             thumbnailsCopied++;
         }
 
-        return new ExportResult(hashes.size(), originalsCopied, thumbnailsCopied, missing);
+        return new ExportResult(distinctImages, originalsCopied, thumbnailsCopied, missing);
     }
 
     /**

@@ -4,6 +4,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
@@ -152,6 +153,28 @@ class ViewServiceTest {
         assertEquals(2, images.size(), "two faces in one image must yield one entry");
         assertTrue(images.stream().anyMatch(i -> "imgA".equals(i.hash())));
         assertTrue(images.stream().anyMatch(i -> "imgB".equals(i.hash())));
+    }
+
+    @Test
+    void getImagesForName_doesNotHydratePerFaceBlobs() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        imageDao.insert("imgA", 0, "{}", 2);
+        imageDao.insert("imgB", 0, "{}", 1);
+        faceDao.insert(new FaceRecord(0, "imgA", 0, 0, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+        faceDao.insert(new FaceRecord(0, "imgB", 0, 0, 80, 80, 0.9,
+                new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        ViewService countingService = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+                new FaceDao(counting.connection()), nameDao, imageDao, videoDao);
+
+        assertEquals(2, countingService.getImagesForName(alice).size());
+
+        String sql = String.join("; ", counting.statements());
+        assertFalse(sql.contains("sub_image_jpg"),
+                "the View tab renders image thumbnails, so it must not read a per-face JPEG: " + sql);
+        assertFalse(sql.contains("embedding"),
+                "the View tab needs no similarity math, so it must not read embeddings: " + sql);
     }
 
     @Test

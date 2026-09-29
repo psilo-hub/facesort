@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -310,6 +311,48 @@ class FaceDaoTest {
     @Test
     void countByNameId_zeroForUnknownName() throws Exception {
         assertEquals(0, faceDao.countByNameId(999L));
+    }
+
+    @Test
+    void findImageHashesByNameId_returnsDistinctHashesInFirstFaceOrder() throws Exception {
+        insertImage("imgA");
+        insertImage("imgB");
+        insertImage("imgC");
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        // imgA, imgB, imgA -> two distinct hashes, in the order they first appear
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+        insertFace("imgB", 0, 0, new float[]{2.0f}, alice);
+        insertFace("imgA", 20, 0, new float[]{3.0f}, alice);
+        insertFace("imgC", 0, 0, new float[]{4.0f}, bob);
+
+        assertEquals(List.of("imgA", "imgB"), faceDao.findImageHashesByNameId(alice));
+        assertEquals(List.of("imgC"), faceDao.findImageHashesByNameId(bob),
+                "another name's images must not leak in");
+    }
+
+    @Test
+    void findImageHashesByNameId_emptyForNameWithoutFaces() throws Exception {
+        long alice = nameDao.insert("Alice");
+
+        assertEquals(List.of(), faceDao.findImageHashesByNameId(alice));
+    }
+
+    @Test
+    void findImageHashesByNameId_doesNotProjectTheBlobColumns() throws Exception {
+        insertImage("imgA");
+        long alice = nameDao.insert("Alice");
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        assertEquals(List.of("imgA"), countingDao.findImageHashesByNameId(alice));
+
+        String sql = String.join("; ", counting.statements());
+        assertFalse(sql.contains("sub_image_jpg"),
+                "a thumbnail list must not hydrate the per-face JPEG: " + sql);
+        assertFalse(sql.contains("embedding"),
+                "a thumbnail list must not hydrate the 512-float embedding: " + sql);
     }
 
     @Test
