@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-29, `mvn test` green: **394 tests / 45 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **400 tests / 46 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -181,13 +181,36 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `workRunsAgainstTheNameSelectedWhenItWasBound` fails with
   `expected: <untagged from Alice> but was: <untagged from Bob>` and
   `repeatedRunsKeepTargetingTheSameName` with `expected: <1> but was: <2>`.*
-- [ ] **`FaceSortApp.stop()` can leak the database handle** — the three `close()`
+- [x] **`FaceSortApp.stop()` can leak the database handle** — the three `close()`
   calls are unguarded (`FaceSortApp.java:350-363`). `importService.close()` and
   `faceAiService.close()` both release native resources and both rethrow the
   first failure, so if either throws, `database.close()` never runs. Give each its
   own try/catch, suppress the rest, close the database in a `finally`. The same
   gap exists in the import-worker construction loop (`FaceSortApp.java:213-216`):
   if the 9th `FaceAiService` fails, the 8 already-built ones leak. **Medium payoff, small.**
+  *Done — both gaps now go through one package-private static
+  `FaceSortApp.closeAll(AutoCloseable...)`, which closes every resource in
+  order, skips nulls (a `start()` that bailed out early leaves fields unset), and
+  on failure rethrows the **first** one with every later failure attached via
+  `addSuppressed` — so nothing is skipped and nothing is silently lost.
+  `stop()` is now a single `closeAll(importService, faceAiService, database)`,
+  and the import-worker loop wraps its construction in `try/catch (Exception |
+  Error)`, closing the services built so far before rethrowing. That second one
+  matters because JavaFX does **not** call `stop()` when `start()` throws: a
+  half-built worker pool previously leaked up to 8 native face models into a
+  process that would never show a window. `closeAll` lives as a static on the
+  app class rather than in a utility because both call sites are here, and a
+  static is what makes it headlessly testable — loading `FaceSortApp` pulls in
+  no toolkit, only a logger and two constants. Pinned by the new
+  `FaceSortAppTest` (6 cases) driving recording `AutoCloseable`s: all closed in
+  order; a failing close does not skip the rest; every later failure is attached
+  to the first; nulls are skipped; no resources is not an error; an `Error` is
+  rethrown unwrapped rather than boxed in an `Exception`. Mutation-verified:
+  making `closeAll` `break` on the first failure — the original behaviour —
+  fails 3 of the 6, with
+  `aFailureDoesNotStopTheRemainingResourcesFromClosing` reporting
+  `expected: <[importService, faceAiService, database]> but was: <[importService]>`,
+  i.e. the database handle was never released.*
 - [ ] **Null-safety gaps in the two seams that face native code** —
   `FaceDetectionUtils` consumes `service.detectFaces(...)` without a null check
   (`FaceDetectionUtils.java:63`), and `VideoFrameSource.SampledFrame`
@@ -510,7 +533,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 ## 5. Tests, TDD & process
 
 - [ ] **CI never runs the test suite** — both jobs build with `-DskipTests` and no
-  test job exists (`.github/workflows/build.yml:33,81`). All 394 tests are
+  test job exists (`.github/workflows/build.yml:33,81`). All 400 tests are
   therefore only ever run locally, and a red suite can still produce a release.
   Add a `test` job running `mvn -B test` on `pull_request`, and make `release`
   depend on it. **Highest-leverage process gap in the repo, tiny effort.**

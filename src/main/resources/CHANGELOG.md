@@ -233,6 +233,11 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Closing Face Sort now always releases everything it opened, even if part of
+  the shutdown fails: the database file is closed even when a native face model
+  cannot be unloaded, and no error is swallowed. A startup that fails partway
+  also releases the face models it had already loaded, instead of leaving them
+  loaded in a process that never shows a window (2026-09-29)
 - Tagging, untagging and renaming a person now always affect the person you
   clicked, even if you pick somebody else from the list while the operation is
   still running. Previously the operation read the selection again once it

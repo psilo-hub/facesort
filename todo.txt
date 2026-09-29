@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 394 tests / 45 classes,
+State as of 2026-09-29. `mvn test` is green: 400 tests / 46 classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (34 open items, with the
+The detailed backlog lives in `suggestions.md` (33 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -13,6 +13,23 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §1.9 Shutdown no longer leaks. `stop()` had three unguarded `close()`
+  calls, and since `importService.close()` and `faceAiService.close()`
+  both release native resources *and rethrow the first failure*, one
+  throw skipped the rest — including `database.close()`, leaking the
+  SQLite handle. Both this and the import-worker construction loop (where
+  a failure on the 9th `FaceAiService` leaked the 8 already built — and
+  which matters more than it looks, because JavaFX does **not** call
+  `stop()` when `start()` throws) now go through one package-private
+  static `FaceSortApp.closeAll(AutoCloseable...)`: close everything in
+  order, skip nulls, rethrow the first failure with the later ones
+  attached as suppressed. Nothing skipped, nothing swallowed.
+  A static on the app class keeps it next to both call sites and is what
+  makes it headlessly testable — loading `FaceSortApp` pulls in no
+  toolkit. Pinned by the new `FaceSortAppTest` (6 cases), mutation-
+  verified: making `closeAll` stop at the first failure (the original
+  behaviour) fails 3 of them with `expected: <[importService,
+  faceAiService, database]> but was: <[importService]>`.
 * §1.8 A view's mutable "active name" is no longer read off the background
   thread. Three sites had the defect: `ViewView.untagFaces`,
   `FaceNameView.onTagSelected` and — worst — `FaceNameView.onRename`, which
@@ -80,8 +97,7 @@ Queued next (highest payoff first, all still open in suggestions.md)
   closes out the "correctness first" pass:
   1. §1.5  Re-exporting a person to the same folder aborts (medium/small)
   2. §1.6  `ImportService` swallows unrelated database failures (medium)
-  3. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
-  4. §1.10 Null-safety gaps in the seams that face native code (medium)
+  3. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

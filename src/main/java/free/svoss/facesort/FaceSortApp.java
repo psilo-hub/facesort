@@ -211,8 +211,16 @@ public class FaceSortApp extends Application {
         //    runs after the photo phase inside one Task, so the two never
         //    detect concurrently.
         List<FaceAiService> importAiServices = new ArrayList<>();
-        for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
-            importAiServices.add(new FaceAiService(config));
+        try {
+            for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
+                importAiServices.add(new FaceAiService(config));
+            }
+        } catch (Exception | Error e) {
+            // JavaFX does not call stop() after start() throws, so the services
+            // built so far have to be released here or their native models
+            // stay loaded for a process that will never show a window.
+            closeAll(importAiServices.toArray(new AutoCloseable[0]));
+            throw e;
         }
         importService = new ImportService(imageDao, faceDao, importAiServices, config,
                 database.getTransactionRunner());
@@ -351,14 +359,44 @@ public class FaceSortApp extends Application {
     public void stop() throws Exception {
         // videoImportService shares the import worker FaceAI services with
         // importService, so closing importService releases them exactly once.
-        if (importService != null) {
-            importService.close();
+        closeAll(importService, faceAiService, database);
+    }
+
+    /**
+     * Closes every resource, even when one of them fails.
+     *
+     * <p>Shutdown is the worst place to let the first failure hide the rest:
+     * {@code importService.close()} releases eight native face models, so if
+     * any of them is already torn down it throws — and an unguarded sequence
+     * would then skip {@code faceAiService.close()} and, worse,
+     * {@code database.close()}, leaking the SQLite handle for the rest of the
+     * process. The first failure is rethrown and every later one is attached
+     * to it, so no error is lost and no resource is skipped.</p>
+     *
+     * @param resources the resources to close, in order; nulls are skipped
+     * @throws Exception the first failure, with any later ones suppressed
+     */
+    static void closeAll(AutoCloseable... resources) throws Exception {
+        Throwable firstFailure = null;
+        for (AutoCloseable resource : resources) {
+            if (resource == null) {
+                continue;
+            }
+            try {
+                resource.close();
+            } catch (Exception | Error failure) {
+                if (firstFailure == null) {
+                    firstFailure = failure;
+                } else if (firstFailure != failure) {
+                    firstFailure.addSuppressed(failure);
+                }
+            }
         }
-        if (faceAiService != null) {
-            faceAiService.close();
+        if (firstFailure instanceof Exception exception) {
+            throw exception;
         }
-        if (database != null) {
-            database.close();
+        if (firstFailure != null) {
+            throw (Error) firstFailure;
         }
     }
 
