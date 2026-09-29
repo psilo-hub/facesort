@@ -233,6 +233,13 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- A video whose import fails partway through is no longer lost forever: importing
+  again now picks the video back up and finishes it, instead of skipping it as
+  "already imported" while it had no faces at all. If a video fails during
+  extraction (an ffmpeg error, a disk error, a crash) its registration is undone
+  so the next import retries it, and the picture of the frames that *were*
+  extracted is reused rather than re-extracted. The original error is still what
+  you see if the retry cannot clean up (2026-09-29)
 - The "Remove by path prefix..." dialog can no longer get stuck: if a preview
   ever came back with nothing to report, the dialog stayed disabled with no way
   back to it. It now always becomes usable again, telling you there is nothing

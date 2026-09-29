@@ -84,6 +84,61 @@ class VideoImportServiceTest {
                 config(), VideoImportServiceTest::openSource, db.getTransactionRunner());
     }
 
+    /**
+     * Service whose frame source fails on the Nth {@code seekTo} call of every
+     * video (1-based), simulating a frame that cannot be read or decoded after
+     * earlier frames were already stored.
+     *
+     * @param service  the face service the worker uses
+     * @param failAtFrame the 1-based frame index that throws; {@link
+     *                   Integer#MAX_VALUE} never fails
+     */
+    private VideoImportService newService(FaceAiService service, int failAtFrame) {
+        return new VideoImportService(imageDao, faceDao, videoDao, List.of(service),
+                config(), file -> failingSource(file, failAtFrame), db.getTransactionRunner());
+    }
+
+    /** Wraps {@link #openSource} so the Nth served frame throws. */
+    private static VideoFrameSource failingSource(Path file, int failAtFrame) throws IOException {
+        VideoFrameSource delegate = openSource(file);
+        if (failAtFrame == Integer.MAX_VALUE) {
+            return delegate;
+        }
+        return new FailingFrameSource(delegate, failAtFrame);
+    }
+
+    /** Delegates to a source but throws on the Nth delivered frame. */
+    private static final class FailingFrameSource implements VideoFrameSource {
+
+        private final VideoFrameSource delegate;
+        private final int failAtFrame;
+        private int served;
+
+        FailingFrameSource(VideoFrameSource delegate, int failAtFrame) {
+            this.delegate = delegate;
+            this.failAtFrame = failAtFrame;
+        }
+
+        @Override
+        public double getDuration() {
+            return delegate.getDuration();
+        }
+
+        @Override
+        public SampledFrame seekTo(double targetSeconds) throws IOException {
+            SampledFrame frame = delegate.seekTo(targetSeconds);
+            if (frame != null && ++served == failAtFrame) {
+                throw new IOException("simulated decode failure on frame " + failAtFrame);
+            }
+            return frame;
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+    }
+
     private VideoImportService parallelService(int threads, FaceAiService... services) {
         ConfigModel config = config();
         config.setMaxImportThreads(threads);
@@ -480,6 +535,54 @@ class VideoImportServiceTest {
         }
         assertTrue(engineA.detectCalls() > 0, "every configured engine must be used");
         assertTrue(engineB.detectCalls() > 0, "every configured engine must be used");
+    }
+
+    @Test
+    void frameFailure_deletesThePartiallyImportedVideoSoItIsNotPoisoned() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("videos"));
+        Path file = createVideo(dir, "clip.mp4", "3.0\nsample");
+        String videoHash = HashUtils.hashFile(file);
+
+        VideoImportService.VideoImportResult result;
+        try (VideoImportService service = newService(oneFaceService(), 1)) {
+            result = service.importFolder(dir, null);
+        }
+
+        assertEquals(1, result.errors(), "the video whose frame failed is counted as an error");
+        assertFalse(videoDao.exists(videoHash),
+                "a failed import must not leave the video row behind, or the next import "
+                        + "skips it as already imported forever");
+        assertTrue(videoDao.getPaths(videoHash).isEmpty(),
+                "the path recorded for the failed video must be rolled back with it");
+        assertTrue(videoDao.findFramesForVideo(videoHash).isEmpty(),
+                "the frame links of a failed video must not survive");
+    }
+
+    @Test
+    void videoThatFailedMidFrames_isFullyImportedOnReimport() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("videos"));
+        Path file = createVideo(dir, "clip.mp4", "3.0\nsample");
+        String videoHash = HashUtils.hashFile(file);
+
+        try (VideoImportService service = newService(oneFaceService(), 2)) {
+            service.importFolder(dir, null);
+        }
+        assertEquals(1, imageDao.getAllHashes().size(),
+                "the frame stored before the failure is kept, so the retry can reuse it");
+
+        VideoImportService.VideoImportResult retry;
+        try (VideoImportService service = newService(oneFaceService(), Integer.MAX_VALUE)) {
+            retry = service.importFolder(dir, null);
+        }
+
+        assertEquals(1, retry.newVideos(), "the retry must import the video, not skip it");
+        assertEquals(0, retry.skipped());
+        assertEquals(0, retry.errors());
+        assertEquals(2, retry.newFrames(),
+                "only the two frames that were never stored are new; the surviving one is reused");
+        assertEquals(3, videoDao.findByHash(videoHash).orElseThrow().frameCount());
+        assertEquals(3, imageDao.getAllHashes().size(), "no duplicate frame images");
+        assertEquals(3, faceDao.findUnnamed().size(), "no duplicate faces");
     }
 
     @Test

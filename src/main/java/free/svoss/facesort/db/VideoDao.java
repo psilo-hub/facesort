@@ -40,6 +40,25 @@ public class VideoDao {
     }
 
     /**
+     * Deletes a video by hash, cascading to its stored paths and frame links.
+     * Used to undo the registration of a video whose frame extraction failed,
+     * so the next import processes it again instead of skipping it as already
+     * imported. The linked frame images are <em>not</em> deleted: they are
+     * content-addressed and may be shared with photos, and a re-import reuses
+     * them.
+     *
+     * @param hash the content hash of the video
+     * @return the number of deleted video rows (0 when the video was not stored)
+     */
+    public int delete(String hash) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "DELETE FROM videos WHERE hash = ?")) {
+            ps.setString(1, hash);
+            return ps.executeUpdate();
+        }
+    }
+
+    /**
      * Checks if a video with the given hash exists.
      */
     public boolean exists(String hash) throws SQLException {

@@ -18,6 +18,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Orchestrates the import of video files into the Face Sort database.
@@ -42,8 +44,17 @@ import java.util.function.BooleanSupplier;
  * serialized through a single lock because the shared SQLite connection is not
  * thread-safe. Each video is processed independently; errors are counted but do
  * not abort the overall import.</p>
+ *
+ * <p>A video is registered in the database before its frames are extracted, so
+ * the frame links can resolve their foreign key. If the extraction then fails,
+ * the registration is removed again, so the video is retried on the next
+ * import rather than being skipped as already imported forever. Frames that
+ * were stored before the failure are kept, because they are content-addressed
+ * and a re-import reuses them instead of re-running detection on them.</p>
  */
 public class VideoImportService implements AutoCloseable {
+
+    private static final Logger LOG = Logger.getLogger(VideoImportService.class.getName());
 
     /**
      * Supported video file extensions (case-insensitive, without the leading
@@ -217,68 +228,108 @@ public class VideoImportService implements AutoCloseable {
             List<Double> targets = FrameSampler.sampleTargets(duration, config.getMaxFramesPerVideo());
             long detectionTs = System.currentTimeMillis();
 
-            // Register the video row before extracting any frames so the frame
-            // links can resolve their foreign key.
-            videoDao.insert(hash, detectionTs, criteriaJson, duration);
-            videoDao.addPath(hash, absolutePath);
+            // The video row is registered before extracting any frames so the
+            // frame links can resolve their foreign key, and removed again if
+            // the extraction fails. Without the removal a failure left the
+            // video row behind with only the frames stored so far, and the next
+            // import's "already imported" short-circuit skipped it forever —
+            // silently, with no error and no way to recover short of deleting
+            // the row by hand. The frame images themselves survive the rollback
+            // (they are content-addressed and shared with photos), so a re-import
+            // reuses them instead of re-running detection.
+            try {
+                videoDao.insert(hash, detectionTs, criteriaJson, duration);
+                videoDao.addPath(hash, absolutePath);
 
-            for (double target : targets) {
-                VideoFrameSource.SampledFrame sampled = source.seekTo(target);
-                if (sampled == null) {
-                    break; // stream ended before the target
-                }
-                BufferedImage frame = sampled.image();
-                long timestampMs = Math.round(sampled.positionSeconds() * 1000);
-                byte[] frameJpg = ImageUtils.toJpegBytes(frame, config.getThumbnailQuality());
-                String frameHash = HashUtils.hashBytes(frameJpg);
-
-                // Frame content already known (identical frame, or a photo with
-                // identical content): keep the existing image row and only link
-                // it, so costly detection runs only for genuinely new frames.
-                boolean knownFrame = imageDao.exists(frameHash);
-                FaceDetectionUtils.DetectionResult detection = knownFrame
-                        ? new FaceDetectionUtils.DetectionResult(List.of(), 0)
-                        : FaceDetectionUtils.detectFaces(frameHash, frame,
-                                maxDetectionDimension, minBbox, minConfidence,
-                                maxFacesPerImage, config.getFaceCropSize(),
-                                config.getThumbnailQuality(), service,
-                                file + " @ " + timestampMs + " ms");
-                List<FaceRecord> faceRecords = detection.faces();
-
-                // The thumbnail is encoded before the transaction starts: JPEG
-                // encoding must never run while holding the connection monitor.
-                byte[] thumbJpg = knownFrame ? null
-                    : Thumbnailer.encode(frame, config.getThumbnailSize(),
-                            config.getThumbnailQuality());
-
-                // ---- One atomic unit per frame (insert + thumbnail + faces
-                //      + link) ----
-                FrameOutcome outcome = transactionRunner.inTransaction(() -> {
-                    boolean stored = false;
-                    if (!imageDao.exists(frameHash)) {
-                        // New frame: image row + thumbnail + faces.
-                        imageDao.insert(frameHash, detectionTs, criteriaJson,
-                                faceRecords.size());
-                        imageDao.saveThumbnail(frameHash, thumbJpg);
-                        for (FaceRecord faceRecord : faceRecords) {
-                            faceDao.insert(faceRecord);
-                        }
-                        stored = true;
+                for (double target : targets) {
+                    VideoFrameSource.SampledFrame sampled = source.seekTo(target);
+                    if (sampled == null) {
+                        break; // stream ended before the target
                     }
-                    // A link is dropped when another video already imported
-                    // the same frame (a frame belongs to at most one video).
-                    videoDao.linkFrame(frameHash, hash, timestampMs);
-                    return new FrameOutcome(stored, faceRecords.size());
-                });
+                    BufferedImage frame = sampled.image();
+                    long timestampMs = Math.round(sampled.positionSeconds() * 1000);
+                    byte[] frameJpg = ImageUtils.toJpegBytes(frame, config.getThumbnailQuality());
+                    String frameHash = HashUtils.hashBytes(frameJpg);
 
-                droppedFaces += detection.droppedFaces();
-                if (outcome.storedNewFrame) {
-                    framesAdded++;
-                    facesAdded += outcome.facesAdded;
+                    // Frame content already known (identical frame, or a photo
+                    // with identical content): keep the existing image row and
+                    // only link it, so costly detection runs only for genuinely
+                    // new frames.
+                    boolean knownFrame = imageDao.exists(frameHash);
+                    FaceDetectionUtils.DetectionResult detection = knownFrame
+                            ? new FaceDetectionUtils.DetectionResult(List.of(), 0)
+                            : FaceDetectionUtils.detectFaces(frameHash, frame,
+                                    maxDetectionDimension, minBbox, minConfidence,
+                                    maxFacesPerImage, config.getFaceCropSize(),
+                                    config.getThumbnailQuality(), service,
+                                    file + " @ " + timestampMs + " ms");
+                    List<FaceRecord> faceRecords = detection.faces();
+
+                    // The thumbnail is encoded before the transaction starts:
+                    // JPEG encoding must never run while holding the
+                    // connection monitor.
+                    byte[] thumbJpg = knownFrame ? null
+                        : Thumbnailer.encode(frame, config.getThumbnailSize(),
+                                config.getThumbnailQuality());
+
+                    // ---- One atomic unit per frame (insert + thumbnail + faces
+                    //      + link) ----
+                    FrameOutcome outcome = transactionRunner.inTransaction(() -> {
+                        boolean stored = false;
+                        if (!imageDao.exists(frameHash)) {
+                            // New frame: image row + thumbnail + faces.
+                            imageDao.insert(frameHash, detectionTs, criteriaJson,
+                                    faceRecords.size());
+                            imageDao.saveThumbnail(frameHash, thumbJpg);
+                            for (FaceRecord faceRecord : faceRecords) {
+                                faceDao.insert(faceRecord);
+                            }
+                            stored = true;
+                        }
+                        // A link is dropped when another video already imported
+                        // the same frame (a frame belongs to at most one video).
+                        videoDao.linkFrame(frameHash, hash, timestampMs);
+                        return new FrameOutcome(stored, faceRecords.size());
+                    });
+
+                    droppedFaces += detection.droppedFaces();
+                    if (outcome.storedNewFrame) {
+                        framesAdded++;
+                        facesAdded += outcome.facesAdded;
+                    }
                 }
+            } catch (Exception | Error e) {
+                discardFailedVideo(hash, e);
+                throw e;
             }
 
             return VideoFileResult.newVideo(framesAdded, facesAdded, droppedFaces);
+        }
+    }
+
+    /**
+     * Removes the video row of a video whose frame extraction failed, so the
+     * next import processes it again instead of skipping it as already
+     * imported. Cascades to the video's paths and frame links; the frame
+     * images and their faces are kept, since they are content-addressed and a
+     * re-import reuses them.
+     *
+     * <p>A failure of the cleanup itself is attached to the original failure
+     * rather than replacing it, so the import still reports the real cause.</p>
+     *
+     * @param hash    the content hash of the failed video
+     * @param failure the failure that triggered the cleanup
+     */
+    private void discardFailedVideo(String hash, Throwable failure) {
+        try {
+            transactionRunner.inTransaction(() -> {
+                videoDao.delete(hash);
+                return null;
+            });
+        } catch (Exception cleanupFailure) {
+            LOG.log(Level.WARNING, "Could not remove the failed video " + hash
+                    + "; it will be skipped on the next import", cleanupFailure);
+            failure.addSuppressed(cleanupFailure);
         }
     }
 

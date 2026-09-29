@@ -97,6 +97,44 @@ class VideoDaoTest {
         assertFalse(dao.hasPath("missing", "/x.mp4"));
     }
 
+    // ---- delete ----
+
+    @Test
+    void delete_removesTheVideoWithItsPathsAndFrameLinks() throws Exception {
+        insertVideoWithFrame("video1", 60.0, "frame1", 1000L);
+        insertVideoWithFrame("video1", 60.0, "frame2", 2000L);
+        dao.addPath("video1", "/videos/a.mp4");
+        dao.addPath("video1", "/videos/b.mp4");
+
+        assertEquals(1, dao.delete("video1"));
+
+        assertFalse(dao.exists("video1"), "the video row must be gone");
+        assertTrue(dao.getPaths("video1").isEmpty(), "its paths must cascade away");
+        assertTrue(dao.findFramesForVideo("video1").isEmpty(), "its frame links must cascade away");
+        assertTrue(imageDao.exists("frame1"),
+                "the frame image is content-addressed and must survive, so a re-import reuses it");
+        assertTrue(imageDao.exists("frame2"));
+    }
+
+    @Test
+    void delete_leavesOtherVideosAlone() throws Exception {
+        insertVideoWithFrame("video1", 60.0, "frame1", 1000L);
+        insertVideoWithFrame("video2", 60.0, "frame2", 2000L);
+
+        assertEquals(1, dao.delete("video1"));
+
+        assertTrue(dao.exists("video2"), "an unrelated video must not be deleted");
+        assertEquals(1, dao.findFramesForVideo("video2").size());
+    }
+
+    @Test
+    void delete_unknownVideo_deletesNothing() throws Exception {
+        insertVideo("video1", 5.0);
+
+        assertEquals(0, dao.delete("missing"), "an unknown hash deletes no rows");
+        assertTrue(dao.exists("video1"));
+    }
+
     // ---- frame links ----
 
     @Test

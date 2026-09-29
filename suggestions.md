@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-29, `mvn test` green: **384 tests / 44 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **389 tests / 44 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -31,13 +31,35 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   before the fix, 0 after. Also removed the now-redundant `RuntimeException`
   catch, and `TinyAviVideo.writeUndecodable` builds the triggering file (an AVI
   whose `strf` BITMAPINFOHEADER is blank) in pure Java.*
-- [ ] **A failed video import permanently poisons the video** —
+- [x] **A failed video import permanently poisons the video** —
   `videoDao.insert` + `addPath` are committed *before* the frame loop
   (`VideoImportService.java:220-223`) so frame links can resolve their FK. If any
   frame then fails, the video row survives with zero frames, and on re-import the
   "already imported" short-circuit skips it forever — silently, with no error and
   no recovery. Either wrap the insert in the same transaction unit as the frames
   or delete the row in a compensating step on failure. **High payoff.**
+  *Done — the frame loop is wrapped in `try { … } catch (Exception | Error e) {
+  discardFailedVideo(hash, e); throw e; }`, so every failure path (checked
+  exception, unchecked exception or `Error`) rolls back the registration. The
+  insert itself stays outside the transaction on purpose: the loop runs ffmpeg
+  and face detection per frame, and holding the connection monitor across that
+  work would block every other DB user — the frame loop must not run under the
+  monitor (the same reason JPEG thumbnail encoding is already done outside it).
+  `discardFailedVideo` deletes the row in its own `TransactionRunner` unit via
+  the new `VideoDao.delete(hash)` (`DELETE FROM videos WHERE hash = ?`), which
+  cascades to `video_paths` and `video_frames`. The frame *images* are
+  deliberately kept: they are content-addressed, may be shared with a photo, and a
+  re-import reuses them instead of re-extracting the same picture. A cleanup
+  failure is logged and attached to the original failure via
+  `Throwable.addSuppressed`, so the import still reports its real cause rather
+  than being masked by the rollback. Pinned by 2 new `VideoImportServiceTest`
+  cases and 3 new `VideoDaoTest` cases. Before the fix
+  `frameFailure_deletesThePartiallyImportedVideoSoItIsNotPoisoned` failed with
+  `expected: <false> but was: <true>` on `videoDao.exists(hash)` — the poisoned
+  row the old code left behind — and
+  `videoThatFailedMidFrames_isFullyImportedOnReimport` pins the user-visible
+  recovery: the retry reuses the 1 frame image that survived, adds the 2 that were
+  missing, and ends with all 3 frames and faces registered.*
 - [x] **`AppConfig.save` is not atomic** — `MAPPER.writeValue(File, …)`
   (`AppConfig.java:63-69`) truncates the target and streams into it. A crash
   mid-write leaves a truncated `facesort-config.json`, and the next launch throws
@@ -463,7 +485,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 ## 5. Tests, TDD & process
 
 - [ ] **CI never runs the test suite** — both jobs build with `-DskipTests` and no
-  test job exists (`.github/workflows/build.yml:33,81`). All 357 tests are
+  test job exists (`.github/workflows/build.yml:33,81`). All 389 tests are
   therefore only ever run locally, and a red suite can still produce a release.
   Add a `test` job running `mvn -B test` on `pull_request`, and make `release`
   depend on it. **Highest-leverage process gap in the repo, tiny effort.**
@@ -489,12 +511,12 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `UpdateChecker`'s package-private `RemoteFetcher` seam; a narrow `TaggingService`
   / `ReviewService` interface per view would give the UI the same testability
   without changing behaviour. **High effort payoff, medium effort.**
-- [ ] **No regression test exists for most of the §1 bugs** — items 1.2 (poisoned
-  video), 1.5 (re-export), 1.6 (over-broad catch) and 1.7
-  (null estimate) are all reachable from tests today.
+- [ ] **No regression test exists for most of the §1 bugs** — items 1.5 (re-export)
+  and 1.6 (over-broad catch) are still reachable from tests today, 1.5 only
+  partly.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
-  *1.1, 1.3/1.4 and 1.7 are done — see the notes on those items. 1.7 also
+  *1.1, 1.2, 1.3/1.4 and 1.7 are done — see the notes on those items. 1.7 also
   opened the first test seam in `ui/` outside the three classes below, so
   `RemoveByPrefixDialog` now has coverage too.*
 

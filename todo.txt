@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 384 tests / 44 classes,
+State as of 2026-09-29. `mvn test` is green: 389 tests / 44 classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (36 open items, with the
+The detailed backlog lives in `suggestions.md` (35 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -13,6 +13,19 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §1.2 A failed video import no longer poisons the video — the frame loop
+  is wrapped in `try/catch (Exception | Error)`, and a failure now undoes
+  the registration via the new `VideoDao.delete(hash)`, so the next import
+  retries the video instead of skipping it as "already imported" with zero
+  frames. The compensating delete is deliberate rather than one big
+  transaction: the loop runs ffmpeg + detection per frame and must not
+  hold the DB connection monitor across that work. Frame *images* are
+  kept — they are content-addressed and shared with photos, so the retry
+  reuses them. A cleanup failure is logged and attached to the original
+  as suppressed, so the real cause still surfaces. Pinned by 2 new
+  `VideoImportServiceTest` cases (verified failing first: `expected:
+  <false> but was: <true>` on `videoDao.exists`) and 3 new `VideoDaoTest`
+  cases (mutation-verified: neutering the DELETE fails 2 of them).
 * §1.7 `RemoveByPrefixDialog` can no longer get stuck disabled — the
   preview success handler returned before `setBusy(false)` on a `null`
   estimate, leaving the dialog with no way back. The handler body is
@@ -34,7 +47,7 @@ Just completed
   Both pinned by three new `AppConfigTest` cases, written first: the
   failed-write test reproduced the exact truncated-at-`maxImportThreads`
   file before the fix.
-* Docs: `suggestions.md` (both items ticked with resolutions), `CHANGELOG.md`
+* Docs: `suggestions.md` (items ticked with resolutions), `CHANGELOG.md`
   (### Fixed), `README.md` and all five translations (config file is
   hand-editable, unknown keys ignored, values clamped, writes atomic).
 
@@ -44,13 +57,12 @@ Queued next (highest payoff first, all still open in suggestions.md)
 
 §1 Correctness — the only section that is nearly done, so finishing it
   closes out the "correctness first" pass:
-  1. §1.2  A failed video import permanently poisons the video (high)
-  2. §1.5  Re-exporting a person to the same folder aborts (medium/small)
-  3. §1.6  `ImportService` swallows unrelated database failures (medium)
-  4. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
+  1. §1.5  Re-exporting a person to the same folder aborts (medium/small)
+  2. §1.6  `ImportService` swallows unrelated database failures (medium)
+  3. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
            the background thread (high/small)
-  5. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
-  6. §1.10 Null-safety gaps in the seams that face native code (medium)
+  4. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
+  5. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —
