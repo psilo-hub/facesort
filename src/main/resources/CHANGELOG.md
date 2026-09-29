@@ -188,6 +188,12 @@ All notable changes to Face Sort will be documented in this file.
   comparisons. Each HNSW entry now carries the position of its face in the
   list, so the pass is O(n·k). Same clusters, same representatives, just without
   the quadratic scan (2026-09-28)
+- Building the list of duplicate-name candidates in the Deduplicate tab is much
+  faster for large name sets: it asked the database once per name pair whether
+  that pair had already been answered with "These are not dupes", so 1,000
+  people meant ~500,000 serialized queries queued behind the shared database
+  connection. Those answers are now read once and kept in memory, so 15 pairs
+  cost 1 query instead of 15. The pairs you are offered are unchanged (2026-09-28)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

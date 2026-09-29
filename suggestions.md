@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **361 tests / 42 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **363 tests / 42 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -169,13 +169,31 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `{0→70, 1→10, 2→40}` — so a position derived from anything but the list order
   fails. The four existing behavioural `clusterUnnamed_*` tests still cover
   `buildAdjacency` end to end.*
-- [ ] **Deduplicate candidate building issues O(n²) SQL queries** — one
+- [x] **Deduplicate candidate building issues O(n²) SQL queries** — one
   `notDupeDao.isNotDupe(...)` per name pair (`DeduplicationService.java:243-254`);
   1,000 names is ~500,000 serialized `SELECT`s behind the one global connection
   monitor. `NotDupeDao.findAll` already exists (`NotDupeDao.java:70`) and has no
   production caller — hoist it into an in-memory `Set` of normalized
   `minId:maxId` keys. This also settles the fate of `NotDupeDao.findAll` in §4:
   adopt it here or delete it there. **High payoff, small.**
+  *Done — `buildCandidates` now reads `not_dupes` once via
+  `NotDupeDao.findAll()` into a `Set<String>` of `minId:maxId` keys
+  (`loadNotDupeKeys`) and filters each pair with `notDupes.contains(key(...))`,
+  reusing the class's existing `key(...)` helper so the persisted and the
+  skipped-this-run pair keys share one normalization. Pair filtering is now
+  O(1) in-memory, and building the ranking costs one database round-trip
+  instead of one per pair: 15 pairs went from 15 `SELECT`s to 1. Pinned by
+  `DeduplicationServiceTest.nextPair_queriesNotDupesOnceRegardlessOfPairCount`,
+  which builds 6 comparable names (15 pairs), hands the service a
+  `NotDupeDao` on a counting `Connection` proxy and asserts exactly 1 statement
+  touching `not_dupes` — it failed with `expected: <1> but was: <15>` before the
+  change, and it pins the query count rather than the chosen data structure.
+  A second test,
+  `nextPair_offersOnlyThePairsThatAreNotMarkedAsDistinct`, covers 3 identical
+  names with 2 of the 3 pairs marked as distinct (one stored in reverse
+  order) so the loaded set is proven to be consulted for every pair. The
+  `isNotDupe` call site was the last production user of that DAO method, so it
+  is now added to the §4 dead-code list.*
 - [ ] **Every face query hydrates both BLOB columns** — `SELECT_COLUMNS` always
   projects `embedding` and `sub_image_jpg` (`FaceDao.java:33-34`), so even a
   thumbnail-list read pays a 512-float array plus a JPEG per row.
@@ -240,13 +258,14 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `src/main` or `src/test`; the Javadoc even says "reserved for tuning"
   (`:66`). Remove the field, the parameter, the import and the argument at
   `FaceSortApp.java:222`. **Tiny.**
-- [ ] **Seven DAO methods have no production caller** — `NotDupeDao.findAll`,
+- [ ] **Eight DAO methods have no production caller** — `NotDupeDao.isNotDupe`
+  (dead since §3's dedupe-candidate item moved to `NotDupeDao.findAll`),
   `NotDupeDao.findByNameId`, `NotDupeDao.deleteForName`, `FaceDao.findAll`,
   `FaceDao.delete`, `VideoDao.findByHash`, and `ImageDao.findByHash` /
   `getAllHashes` (which are the only reason the whole `ImageRecord` type exists).
-  All are exercised only by tests. Either adopt them (see the O(n²) dedupe-query
-  item in §3, which wants `NotDupeDao.findAll`) or delete them with their tests.
-  **Small.**
+  All are exercised only by tests. `NotDupeDao.findAll` used to be on this list
+  and no longer is — it was adopted by the dedupe-candidate fix in §3. Adopt the
+  rest where it makes sense or delete them with their tests. **Small.**
 - [ ] **The face-source bridge is rebuilt in all five views, and the failure
   handler in all five** — the 6-line `handleFailure` is pasted into
   `NameFaceView.java:414`, `ViewView.java:398`, `DedupeView.java:327`,

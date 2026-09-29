@@ -7,6 +7,7 @@ import free.svoss.facesort.db.NotDupeDao;
 import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.NamePair;
 import free.svoss.facesort.model.NameRecord;
 
 import java.io.IOException;
@@ -235,16 +236,22 @@ public class DeduplicationService {
 
     /**
      * Builds and sorts the ranked list of candidate pairs.
+     *
+     * <p>The not-dupe pairs are read once into a set of normalized keys rather
+     * than queried per pair, so building the ranking is O(n²) in-memory
+     * comparisons and O(1) database round-trips regardless of how many names
+     * there are.</p>
      */
     private List<DupeCandidate> buildCandidates() throws SQLException {
         List<NameWithAverage> names = loadNamesWithAverages();
+        Set<String> notDupes = loadNotDupeKeys();
         List<DupeCandidate> result = new ArrayList<>();
 
         for (int i = 0; i < names.size(); i++) {
             NameWithAverage a = names.get(i);
             for (int j = i + 1; j < names.size(); j++) {
                 NameWithAverage b = names.get(j);
-                if (notDupeDao.isNotDupe(a.record.id(), b.record.id())) {
+                if (notDupes.contains(key(a.record.id(), b.record.id()))) {
                     continue;
                 }
                 double similarity = faceAiService.calcSimilarity(a.average, b.average);
@@ -255,6 +262,18 @@ public class DeduplicationService {
 
         result.sort(Comparator.comparingDouble(DupeCandidate::similarity).reversed());
         return result;
+    }
+
+    /**
+     * Reads every recorded not-dupe pair into a set of normalized keys, so
+     * candidate building can filter pairs with an in-memory lookup.
+     */
+    private Set<String> loadNotDupeKeys() throws SQLException {
+        Set<String> keys = new HashSet<>();
+        for (NamePair pair : notDupeDao.findAll()) {
+            keys.add(key(pair.a(), pair.b()));
+        }
+        return keys;
     }
 
     /**
