@@ -213,6 +213,44 @@ class FaceToNameServiceExportTest {
     }
 
     @Test
+    void exportImagesForName_exportingTheSamePersonTwiceRefreshesTheFiles() throws Exception {
+        long alice = nameDao.insert("Alice");
+        Path src = Files.createDirectory(tempDir.resolve("src"));
+        Path photo = Files.writeString(src.resolve("photo.jpg"), "first version");
+        addTaggedFaceAndPath("img1", alice, photo);
+
+        Path out = tempDir.resolve("out");
+        service.exportImagesForName(alice, out);
+        assertEquals("first version", Files.readString(out.resolve("photo.jpg")));
+
+        Files.writeString(photo, "second version");
+        FaceToNameService.ExportResult second = service.exportImagesForName(alice, out);
+
+        assertEquals(1, second.originalsCopied());
+        assertEquals("second version", Files.readString(out.resolve("photo.jpg")),
+                "a re-export must refresh the copy, not abort or leave a stale duplicate");
+        assertEquals(1, fileCount(out));
+    }
+
+    @Test
+    void exportImagesForName_reExportOverwritesThumbnailsTooLikeItOverwritesOriginals() throws Exception {
+        long alice = nameDao.insert("Alice");
+        addTaggedFace("img1", alice);
+        imageDao.addPath("img1", "/vanished/photo.jpg");
+        imageDao.saveThumbnail("img1", new byte[]{1, 2, 3});
+
+        Path out = tempDir.resolve("out");
+        service.exportImagesForName(alice, out);
+        imageDao.saveThumbnail("img1", new byte[]{9, 9, 9});
+        FaceToNameService.ExportResult second = service.exportImagesForName(alice, out);
+
+        assertEquals(1, second.thumbnailsCopied());
+        assertArrayEquals(new byte[]{9, 9, 9}, Files.readAllBytes(out.resolve("photo.jpg")),
+                "the thumbnail branch already overwrote; originals must behave the same");
+        assertEquals(1, fileCount(out));
+    }
+
+    @Test
     void exportImagesForName_exportingIntoSourceFolderDoesNotFail() throws Exception {
         long alice = nameDao.insert("Alice");
         Path src = Files.createDirectory(tempDir.resolve("src"));

@@ -12,6 +12,7 @@ import free.svoss.facesort.model.SimilarityResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -508,7 +509,12 @@ public class FaceToNameService {
                         outputDir, existing.get().getFileName().toString(), usedNames);
                 if (!destination.toAbsolutePath().normalize()
                         .equals(existing.get().toAbsolutePath().normalize())) {
-                    Files.copy(existing.get(), destination);
+                    // REPLACE_EXISTING, like the Files.write on the thumbnail
+                    // branch below: exporting the same person to the same
+                    // folder again refreshes the copies. uniqueDestination only
+                    // resolves names within one run, so without it a second
+                    // export aborted with FileAlreadyExistsException.
+                    Files.copy(existing.get(), destination, StandardCopyOption.REPLACE_EXISTING);
                 }
                 originalsCopied++;
                 continue;

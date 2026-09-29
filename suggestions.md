@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-29, `mvn test` green: **400 tests / 46 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **402 tests / 46 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -108,13 +108,28 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `UnrecognizedPropertyException` naming all 21 known properties. Nothing is lost
   on save: the writer still only emits the properties this build knows, so a
   round-trip through a newer build simply drops the keys it cannot represent.*
-- [ ] **Re-exporting a person to the same folder aborts** — `Files.copy` is called
+- [x] **Re-exporting a person to the same folder aborts** — `Files.copy` is called
   without `StandardCopyOption.REPLACE_EXISTING` (`FaceToNameService.java:511`),
   and `uniqueDestination` only guards against names used *within this run*, so a
   second export derives the identical destination and throws
   `FileAlreadyExistsException`. The thumbnail branch two lines down uses
   `Files.write`, which *does* overwrite — the two branches behave inconsistently.
   **Medium payoff, small.**
+  *Done — `Files.copy` now passes `REPLACE_EXISTING`, which is exactly the
+  semantics the thumbnail branch already had (`Files.write` defaults to
+  CREATE + TRUNCATE_EXISTING), so the two branches are consistent and a re-export
+  refreshes the copies. Overwriting rather than suffixing is the deliberate
+  choice: `uniqueDestination` exists to stop *this run* from writing two
+  different originals onto one name, and the exported folder is a derived copy of
+  the library, not the library itself — a second export of the same person is a
+  refresh, not a merge. Pinned by 2 new cases in
+  `FaceToNameServiceExportTest`: exporting the same person twice to one folder
+  refreshes the file content and leaves a single file (no ` (1)` duplicates),
+  and a re-export overwrites the thumbnail exactly like the original. The first
+  was red against the unmodified code with
+  `java.nio.file.FileAlreadyExistsException: ...\out\photo.jpg`, while the
+  thumbnail case already passed — which is precisely the inconsistency the item
+  described, so no mutation was needed to prove the assertions bite.*
 - [ ] **`ImportService` swallows unrelated database failures** — the collision
   handler catches a bare `SQLException` and, whenever any row for that hash
   exists, reinterprets *any* error (disk full, `SQLITE_CORRUPT`, a constraint
@@ -533,7 +548,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 ## 5. Tests, TDD & process
 
 - [ ] **CI never runs the test suite** — both jobs build with `-DskipTests` and no
-  test job exists (`.github/workflows/build.yml:33,81`). All 400 tests are
+  test job exists (`.github/workflows/build.yml:33,81`). All 402 tests are
   therefore only ever run locally, and a red suite can still produce a release.
   Add a `test` job running `mvn -B test` on `pull_request`, and make `release`
   depend on it. **Highest-leverage process gap in the repo, tiny effort.**
@@ -564,14 +579,13 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   `UpdateChecker`'s package-private `RemoteFetcher` seam; a narrow `TaggingService`
   / `ReviewService` interface per view would give the UI the same testability
   without changing behaviour. **High effort payoff, medium effort.**
-- [ ] **No regression test exists for most of the §1 bugs** — items 1.5 (re-export)
-  and 1.6 (over-broad catch) are still reachable from tests today, 1.5 only
-  partly.
+- [ ] **No regression test exists for most of the §1 bugs** — only 1.6 (over-broad
+  catch) is still reachable from tests today.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
-  *1.1, 1.2, 1.3/1.4, 1.7 and 1.8 are done — see the notes on those items. 1.7
-  and 1.8 each opened a test seam in `ui/` outside the three classes below, so
-  `RemoveByPrefixDialog` and `NameBoundWork` now have coverage too.*
+  *1.1, 1.2, 1.3/1.4, 1.5, 1.7, 1.8 and 1.9 are done — see the notes on those
+  items. 1.7 and 1.8 each opened a test seam in `ui/` outside the three classes
+  below, so `RemoveByPrefixDialog` and `NameBoundWork` now have coverage too.*
 
 ---
 

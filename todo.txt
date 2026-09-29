@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 400 tests / 46 classes,
+State as of 2026-09-29. `mvn test` is green: 402 tests / 46 classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (33 open items, with the
+The detailed backlog lives in `suggestions.md` (32 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -13,6 +13,18 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §1.5 Re-exporting a person to the same folder no longer aborts with
+  `FileAlreadyExistsException`. `Files.copy` now passes `REPLACE_EXISTING`,
+  which is what the `Files.write` on the thumbnail branch two lines below
+  already did by default — so the two branches finally agree and a second
+  export refreshes the copies instead of failing. Overwriting is the
+  deliberate choice over suffixing: `uniqueDestination` exists to stop one
+  *run* from writing two different originals onto one name, and the export
+  folder is a derived copy, not the library. Pinned by 2 new
+  `FaceToNameServiceExportTest` cases — the first was red against
+  unmodified code with `FileAlreadyExistsException: ...\out\photo.jpg`
+  while the thumbnail case already passed, which is exactly the
+  inconsistency the item described (so no mutation was needed here).
 * §1.9 Shutdown no longer leaks. `stop()` had three unguarded `close()`
   calls, and since `importService.close()` and `faceAiService.close()`
   both release native resources *and rethrow the first failure*, one
@@ -95,9 +107,8 @@ Queued next (highest payoff first, all still open in suggestions.md)
 
 §1 Correctness — the only section that is nearly done, so finishing it
   closes out the "correctness first" pass:
-  1. §1.5  Re-exporting a person to the same folder aborts (medium/small)
-  2. §1.6  `ImportService` swallows unrelated database failures (medium)
-  3. §1.10 Null-safety gaps in the seams that face native code (medium)
+  1. §1.6  `ImportService` swallows unrelated database failures (medium)
+  2. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

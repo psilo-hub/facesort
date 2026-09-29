@@ -233,6 +233,10 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Exporting the same person to the same folder twice no longer fails with a
+  "file already exists" error. A second export now refreshes the exported
+  originals, and behaves the same as the thumbnail exports that already worked
+  this way (2026-09-29)
 - Closing Face Sort now always releases everything it opened, even if part of
   the shutdown fails: the database file is closed even when a native face model
   cannot be unloaded, and no error is swallowed. A startup that fails partway
