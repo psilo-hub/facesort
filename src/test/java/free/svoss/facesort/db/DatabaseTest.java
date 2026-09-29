@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link Database}: schema versioning through {@code PRAGMA user_version}.
+ * Tests for {@link Database}: the connection's journal and locking settings, and
+ * schema versioning through {@code PRAGMA user_version}.
  */
 class DatabaseTest {
 
@@ -189,9 +190,80 @@ class DatabaseTest {
         }
     }
 
+    @Test
+    void fileDatabase_runsInWriteAheadLogMode() throws Exception {
+        Path dbFile = tempDir.resolve("wal.db");
+        try (Database db = new Database(dbFile)) {
+            assertEquals("wal", pragma(db, "journal_mode"),
+                    "a reader must not block the writer, so the file database must use WAL");
+        }
+    }
+
+    @Test
+    void fileDatabase_waitsForABusyLockInsteadOfFailingImmediately() throws Exception {
+        Path dbFile = tempDir.resolve("busy.db");
+        try (Database db = new Database(dbFile)) {
+            assertEquals(Database.BUSY_TIMEOUT_MILLIS, pragmaInt(db, "busy_timeout"),
+                    "a concurrent write must wait for the lock instead of failing with "
+                            + "SQLITE_BUSY; sqlite-jdbc happens to default to 3000, so this is "
+                            + "pinned explicitly rather than left to the driver");
+        }
+    }
+
+    @Test
+    void fileDatabase_doesNotFsyncEveryCommit() throws Exception {
+        Path dbFile = tempDir.resolve("sync.db");
+        try (Database db = new Database(dbFile)) {
+            assertEquals(1, pragmaInt(db, "synchronous"),
+                    "synchronous must be NORMAL (1), which is the safe pairing for WAL and skips "
+                            + "an fsync per commit");
+        }
+    }
+
+    @Test
+    void inMemoryDatabase_appliesTheSettingsThatApplyToIt() throws Exception {
+        try (Database db = Database.inMemory()) {
+            assertEquals(Database.BUSY_TIMEOUT_MILLIS, pragmaInt(db, "busy_timeout"),
+                    "the busy timeout must be applied on the in-memory path too, so tests exercise "
+                            + "the same configuration code as production");
+            assertEquals(1, pragmaInt(db, "synchronous"));
+            assertEquals("memory", pragma(db, "journal_mode"),
+                    "SQLite keeps in-memory databases in memory journaling mode; WAL is a file "
+                            + "setting and is expected to be a no-op here");
+        }
+    }
+
+    @Test
+    void walModeSurvivesReopen() throws Exception {
+        Path dbFile = tempDir.resolve("reopen.db");
+        try (Database db = new Database(dbFile)) {
+            assertEquals("wal", pragma(db, "journal_mode"));
+        }
+
+        try (Database reopened = new Database(dbFile)) {
+            assertEquals("wal", pragma(reopened, "journal_mode"),
+                    "WAL is a persistent property of the database file, so reopening must not "
+                            + "revert it");
+        }
+    }
+
     private static int userVersion(Database db) throws SQLException {
         try (Statement stmt = db.getConnection().createStatement();
              ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
+            return rs.next() ? rs.getInt(1) : -1;
+        }
+    }
+
+    private static String pragma(Database db, String name) throws SQLException {
+        try (Statement stmt = db.getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA " + name)) {
+            return rs.next() ? rs.getString(1) : null;
+        }
+    }
+
+    private static int pragmaInt(Database db, String name) throws SQLException {
+        try (Statement stmt = db.getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA " + name)) {
             return rs.next() ? rs.getInt(1) : -1;
         }
     }

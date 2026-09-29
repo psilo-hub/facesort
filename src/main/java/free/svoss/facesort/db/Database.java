@@ -23,20 +23,27 @@ public class Database implements AutoCloseable {
      */
     public static final int SCHEMA_VERSION = 2;
 
+    /**
+     * Milliseconds SQLite waits for a lock held by another connection before
+     * giving up with {@code SQLITE_BUSY}. Inside the app every call is already
+     * serialized behind {@link SynchronizedConnection}'s monitor, so this only
+     * covers another process holding the file; sqlite-jdbc defaults to 3000,
+     * which is set explicitly here so the value does not depend on the driver.
+     */
+    static final int BUSY_TIMEOUT_MILLIS = 5_000;
+
     private final Connection connection;
     private final Connection sharedConnection;
     private final TransactionRunner transactionRunner;
 
     /**
      * Opens or creates a database at the given path.
-     * Enables foreign keys and initializes the schema.
+     * Applies the connection settings and initializes the schema.
      */
     public Database(Path dbPath) throws SQLException {
         String url = "jdbc:sqlite:" + dbPath.toAbsolutePath();
         this.connection = DriverManager.getConnection(url);
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("PRAGMA foreign_keys = ON");
-        }
+        configure(connection);
         initializeSchema();
         SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
         this.sharedConnection = synchronizing.proxy();
@@ -53,13 +60,43 @@ public class Database implements AutoCloseable {
 
     private Database() throws SQLException {
         this.connection = DriverManager.getConnection("jdbc:sqlite::memory:");
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("PRAGMA foreign_keys = ON");
-        }
+        configure(connection);
         initializeSchema();
         SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
         this.sharedConnection = synchronizing.proxy();
         this.transactionRunner = new TransactionRunner(synchronizing);
+    }
+
+    /**
+     * Applies the connection settings the app relies on. Shared by both
+     * constructors so the in-memory database used by the tests is configured by
+     * exactly the same code as the file database used in production.
+     *
+     * <p>Foreign keys are enforced. Write-ahead logging is enabled so a reader
+     * never blocks the writer — {@link SynchronizedConnection} serializes calls
+     * made through one connection, but a second connection to the same file
+     * (another process, a look at the library while the app runs) is outside that
+     * monitor's reach. WAL also makes commits cheap, which pairs with
+     * {@code synchronous = NORMAL}: under WAL this skips the fsync per commit and
+     * is still safe against corruption, at the cost of losing the last
+     * transactions on a power cut. The busy timeout makes a writer wait for a
+     * lock held elsewhere instead of failing immediately.</p>
+     *
+     * <p>{@code journal_mode} is a property of the database file rather than of
+     * the connection, and SQLite keeps an in-memory database in memory journaling
+     * mode, so that one setting is a no-op for {@link #inMemory()}.</p>
+     *
+     * <p>WAL keeps recent changes in the {@code facesort.db-wal} sidecar file
+     * next to the database until they are checkpointed, which happens on a clean
+     * shutdown.</p>
+     */
+    private static void configure(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("PRAGMA foreign_keys = ON");
+            stmt.execute("PRAGMA journal_mode = WAL");
+            stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MILLIS);
+            stmt.execute("PRAGMA synchronous = NORMAL");
+        }
     }
 
     /**

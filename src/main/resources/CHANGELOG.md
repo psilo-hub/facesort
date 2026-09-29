@@ -207,6 +207,18 @@ All notable changes to Face Sort will be documented in this file.
   now read all the faces they need in one go, so the work no longer grows with
   the number of people. The suggestions and their order are unchanged
   (2026-09-28)
+- Writing to the database is faster, which mostly speeds up importing a large
+  photo library: the database now writes through a write-ahead log instead of a
+  rollback journal, and no longer flushes the file to disk on every single
+  change. A read also no longer blocks a write, and a write waits for a lock held
+  by another program instead of failing. Your library is unchanged, and the
+  previous settings are applied to existing databases on their next start
+  (2026-09-28)
+- Note for anyone copying `config/facesort.db` by hand: the database now also
+  creates `config/facesort.db-wal` and `config/facesort.db-shm` next to it while
+  the app runs, and the newest changes live in the `-wal` file until the app
+  closes cleanly. To back up your library, close the app first and copy the
+  `config` folder (2026-09-28)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **373 tests / 43 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **378 tests / 43 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -291,7 +291,7 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   card today — see the FX-thread item in §2). Add an index on `path` and rewrite
   the predicate as a lexicographic range (`path >= ? AND path < ?`).
   **Medium payoff, medium effort.**
-- [ ] **SQLite runs without WAL or a busy timeout** — the connection sets only
+- [x] **SQLite runs without WAL or a busy timeout** — the connection sets only
   `PRAGMA foreign_keys = ON` (`Database.java:38,57`). Without `journal_mode = WAL`
   a reader blocks the writer, which matters because reads and writes interleave
   from several `TaskRunner` threads through the one shared connection; without
@@ -299,6 +299,28 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   of waiting. Also worth pairing with `synchronous = NORMAL` and a periodic
   `PRAGMA optimize` (mass deletes are a shipped feature, so the file fragments
   badly). **High payoff, small.**
+  _Resolution: the item's premise is partly wrong — reads and writes never
+  interleave inside the app, because `SynchronizedConnection` serializes every call
+  behind one monitor, so the intra-app `SQLITE_BUSY` it describes cannot happen and
+  `busy_timeout` only covers a second connection from another process. Two
+  consequences worth keeping: sqlite-jdbc already sets `busy_timeout = 3000`
+  implicitly, so that setting is now pinned explicitly rather than left to the
+  driver; and the real cost is the fsync per commit, not lock contention. Shipped
+  `PRAGMA journal_mode = WAL`, `busy_timeout = 5000` and `synchronous = NORMAL`
+  from one private `Database.configure(Connection)` shared by both constructors, so
+  the in-memory test path runs the same code as production. Pinned by five
+  `DatabaseTest` cases (WAL, busy timeout, synchronous, WAL surviving a reopen, and
+  the in-memory path). `PRAGMA optimize` was deliberately left out — filed as the
+  follow-up item below._
+- [ ] **Query-planner statistics are never refreshed** (follow-up to the WAL item) —
+  the database now runs in WAL mode, but nothing ever refreshes SQLite's statistics,
+  so the planner works from whatever `ANALYZE` last wrote. Mass deletes are a
+  shipped feature (`DataRemovalService.remove`), so the file fragments badly and
+  the stored statistics drift further from reality after every removal. A
+  `PRAGMA optimize` on open is cheap and covers the accumulated drift; a second
+  one after a successful `remove` covers the case that hurts. The open needs a
+  seam, since `DataRemovalService` currently holds only its DAO and the
+  transaction runner. **Medium payoff, small.**
 - [ ] **The import folder is walked twice, and the import log grows without bound**
   — `ImportCoordinator` calls `importFolder` per phase (`ImportCoordinator.java:70-76`),
   and each phase independently runs its own `Files.walkFileTree`, so a large
