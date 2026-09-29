@@ -121,8 +121,12 @@ public class ClusteringService {
 
     /**
      * Builds an HNSW index over the given faces, keyed by face id.
+     *
+     * <p>Every item also carries its position in {@code faces}, so
+     * {@link #buildAdjacency} can turn a neighbour hit into a list index
+     * directly instead of scanning for the matching id.
      */
-    private HnswIndex<Long, float[], EmbeddingItem, Float> buildIndex(List<FaceRecord> faces) {
+    HnswIndex<Long, float[], EmbeddingItem, Float> buildIndex(List<FaceRecord> faces) {
         int dimensions = faces.get(0).embedding().length;
         HnswIndex<Long, float[], EmbeddingItem, Float> index = HnswIndex
                 .<float[], Float>newBuilder(dimensions, DistanceFunctions.FLOAT_COSINE_DISTANCE, faces.size())
@@ -130,8 +134,9 @@ public class ClusteringService {
                 .withEfConstruction(config.getHnswEfConstruction())
                 .withEf(config.getHnswEfSearch())
                 .build();
-        for (FaceRecord face : faces) {
-            index.add(new EmbeddingItem(face.id(), face.embedding()));
+        for (int position = 0; position < faces.size(); position++) {
+            FaceRecord face = faces.get(position);
+            index.add(new EmbeddingItem(face.id(), face.embedding(), position));
         }
         return index;
     }
@@ -140,6 +145,9 @@ public class ClusteringService {
      * Builds the sparse neighbour graph: node i is linked to node j when the
      * cosine similarity of their embeddings is at or above the threshold.
      * Self-matches returned by the k-NN query are ignored.
+     *
+     * <p>Resolving a neighbour hit costs O(1): the HNSW item carries the
+     * position it was inserted at, so the whole pass is O(n·k).
      */
     private List<Set<Integer>> buildAdjacency(List<FaceRecord> faces,
                                               HnswIndex<Long, float[], EmbeddingItem, Float> index,
@@ -155,34 +163,18 @@ public class ClusteringService {
             float[] embedding = faces.get(i).embedding();
             List<SearchResult<EmbeddingItem, Float>> neighbours = index.findNearest(embedding, k);
             for (SearchResult<EmbeddingItem, Float> result : neighbours) {
-                EmbeddingItem item = result.item();
-                if (item.id() == faces.get(i).id()) {
+                int j = result.item().position();
+                if (j == i) {
                     continue; // the query point itself (distance 0)
                 }
                 double similarity = 1.0 - result.distance().doubleValue();
                 if (similarity >= threshold - EPSILON) {
-                    int j = indexOf(faces, item.id());
-                    if (j >= 0 && j != i) {
-                        adjacency.get(i).add(j);
-                        adjacency.get(j).add(i);
-                    }
+                    adjacency.get(i).add(j);
+                    adjacency.get(j).add(i);
                 }
             }
         }
         return adjacency;
-    }
-
-    /**
-     * Finds the list position of the face with the given id, or -1.
-     * Faces must be unique in the table, so the first match is the match.
-     */
-    private int indexOf(List<FaceRecord> faces, long id) {
-        for (int i = 0; i < faces.size(); i++) {
-            if (faces.get(i).id() == id) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     /**
@@ -219,8 +211,16 @@ public class ClusteringService {
         return components;
     }
 
-    /** HNSW item wrapping a face's embedding, keyed by the face's database id. */
-    private record EmbeddingItem(Long id, float[] vector) implements Item<Long, float[]> {
+    /**
+     * HNSW item wrapping a face's embedding, keyed by the face's database id.
+     *
+     * @param id       the face's database id, the HNSW index key
+     * @param vector   the face's embedding
+     * @param position the item's index in the face list the index was built
+     *                 from, so a neighbour hit resolves to a list position
+     *                 without searching for its id
+     */
+    record EmbeddingItem(Long id, float[] vector, int position) implements Item<Long, float[]> {
 
         @Override
         public int dimensions() {

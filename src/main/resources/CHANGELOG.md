@@ -181,6 +181,13 @@ All notable changes to Face Sort will be documented in this file.
   version, the auto-generated release notes and a link to the release page. The
   update-check cache in the config folder is now `config/latest-release.json`
   (2026-09-24)
+- Clustering large unnamed-face collections is much faster: building the
+  neighbour graph resolved every one of the n·k neighbour hits with a linear
+  scan over the face list, which undid the point of the HNSW index — roughly
+  50,000 unnamed faces at the default 20 neighbours cost about 5·10¹⁰ id
+  comparisons. Each HNSW entry now carries the position of its face in the
+  list, so the pass is O(n·k). Same clusters, same representatives, just without
+  the quadratic scan (2026-09-28)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

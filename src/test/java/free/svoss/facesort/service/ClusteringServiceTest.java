@@ -1,5 +1,6 @@
 package free.svoss.facesort.service;
 
+import com.github.jelmerk.hnswlib.core.hnsw.HnswIndex;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
@@ -11,7 +12,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -121,5 +124,29 @@ class ClusteringServiceTest {
 
         assertEquals(1, clusters.size());
         assertEquals(2, clusters.get(0).faces().size());
+    }
+
+    @Test
+    void buildIndex_carriesThePositionOfEachFaceInTheList() {
+        // Deliberately non-monotonic ids: an HNSW item's position is its index
+        // in the face list, never anything derived from the id. That is what
+        // lets the neighbour graph resolve a hit in constant time.
+        List<FaceRecord> faces = List.of(
+                detachedFace(70L, vectorX()),
+                detachedFace(10L, vectorY()),
+                detachedFace(40L, vectorX()));
+
+        HnswIndex<Long, float[], ClusteringService.EmbeddingItem, Float> index = service.buildIndex(faces);
+
+        Map<Integer, Long> idByPosition = new HashMap<>();
+        for (ClusteringService.EmbeddingItem item : index.items()) {
+            idByPosition.put(item.position(), item.id());
+        }
+        assertEquals(Map.of(0, 70L, 1, 10L, 2, 40L), idByPosition);
+    }
+
+    /** A face that only needs to exist in memory, never in the database. */
+    private static FaceRecord detachedFace(long id, float[] embedding) {
+        return new FaceRecord(id, "img" + id, 10, 10, 80, 80, 0.9, embedding, new byte[]{1}, null);
     }
 }

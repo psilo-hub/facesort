@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **360 tests / 42 classes, 0 failures, 0 skipped**).
+(2026-09-28, `mvn test` green: **361 tests / 42 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -147,13 +147,28 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
 
 ## 3. Performance & scalability
 
-- [ ] **`ClusteringService` is O(n²·k) where it should be O(n·k)** — `buildAdjacency`
+- [x] **`ClusteringService` is O(n²·k) where it should be O(n·k)** — `buildAdjacency`
   calls `indexOf(faces, item.id())` for every one of the n·k neighbour hits
   (`ClusteringService.java:164,179-186`), and `indexOf` is a plain linear scan
   (`:174-186`). The whole point of the HNSW index is sub-linear neighbour
   lookup, and this undoes it: ~50k unnamed faces at `knnK=20` is ~5·10¹⁰
   comparisons. A `Map<Long, Integer>` built once (or keying the embedding item by
   position) fixes it. **Highest single performance payoff, tiny effort.**
+  *Done — the private `EmbeddingItem` record now carries the face's position in
+  the list it was built from (`record EmbeddingItem(Long id, float[] vector,
+  int position)`), so `buildAdjacency` reads `result.item().position()` instead
+  of scanning for the id: the neighbour pass is now O(n·k) with no map and no
+  hashing, and the `indexOf` linear scan is deleted outright. The self-match
+  check became a position comparison (`j == i`), which also subsumed the old
+  `j >= 0` guard — every index item was inserted from the same list, so the
+  unknown-id branch was unreachable. `buildIndex` and `EmbeddingItem` went from
+  `private` to package-private purely as a test seam, pinned by
+  `ClusteringServiceTest.buildIndex_carriesThePositionOfEachFaceInTheList`,
+  which builds an index over faces with deliberately non-monotonic ids
+  (70, 10, 40) and asserts the id→position map is exactly
+  `{0→70, 1→10, 2→40}` — so a position derived from anything but the list order
+  fails. The four existing behavioural `clusterUnnamed_*` tests still cover
+  `buildAdjacency` end to end.*
 - [ ] **Deduplicate candidate building issues O(n²) SQL queries** — one
   `notDupeDao.isNotDupe(...)` per name pair (`DeduplicationService.java:243-254`);
   1,000 names is ~500,000 serialized `SELECT`s behind the one global connection
