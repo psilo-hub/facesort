@@ -1,0 +1,70 @@
+FaceSort — project todo
+========================
+
+State as of 2026-09-29. `mvn test` is green: 381 tests / 43 classes,
+0 failures, 0 skipped.
+
+The detailed backlog lives in `suggestions.md` (37 open items, with the
+rationale, the file/line references and the notes for everything already
+done). This file is the short version: what just landed, and what is
+queued next. Keep both in sync in the same commit (see `AGENTS.md`).
+
+
+Just completed
+--------------
+
+* §1.3 `AppConfig.save` is atomic — a failed or interrupted save can no
+  longer leave a truncated `facesort-config.json` that stops the app from
+  starting. Staged in a sibling temp file + `ATOMIC_MOVE`, mirroring
+  `UpdateChecker.writeCacheAtomically`; the temp file is cleaned up in a
+  `finally`.
+* §1.4 `AppConfig.load` ignores unknown properties — `@JsonIgnoreProperties`
+  on `ConfigModel`, so a hand-edited, stale or foreign config file loads
+  with the known settings plus the defaults for the rest.
+  Both pinned by three new `AppConfigTest` cases, written first: the
+  failed-write test reproduced the exact truncated-at-`maxImportThreads`
+  file before the fix.
+* Docs: `suggestions.md` (both items ticked with resolutions), `CHANGELOG.md`
+  (### Fixed), `README.md` and all five translations (config file is
+  hand-editable, unknown keys ignored, values clamped, writes atomic).
+
+
+Queued next (highest payoff first, all still open in suggestions.md)
+--------------------------------------------------------------------
+
+§1 Correctness — the only section that is nearly done, so finishing it
+  closes out the "correctness first" pass:
+  1. §1.2  A failed video import permanently poisons the video (high)
+  2. §1.5  Re-exporting a person to the same folder aborts (medium/small)
+  3. §1.6  `ImportService` swallows unrelated database failures (medium)
+  4. §1.7  `RemoveByPrefixDialog` can become permanently unusable (high,
+          one line, needs a headless test seam)
+  5. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
+           the background thread (high/small)
+  6. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
+  7. §1.10 Null-safety gaps in the seams that face native code (medium)
+
+§2 Concurrency — the largest remaining risk area, all untouched so far:
+  * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —
+    make it an immutable record and swap the reference atomically
+  * DB and filesystem I/O on the JavaFX application thread (high)
+  * `TaskRunner`'s single-slot policy cancels unrelated user actions
+  * Untracked raw threads and a leaked `HttpClient` on language change
+  * Import progress starves the FX thread
+
+§3 Performance — 5 of 10 done (clustering O(n²·k)→O(n·k), dedupe
+  candidates, per-name BLOB hydration, the N+1 average-of-other-names
+  reads, SQLite WAL/busy_timeout/synchronous). Remaining:
+  * `findSimilarUnnamed` loads and sorts the whole unnamed corpus
+  * The random-faces view hydrates embeddings it never uses
+  * Path-prefix filters cannot use an index
+  * Query-planner statistics are never refreshed
+  * The import folder is walked twice; the import log grows without bound
+  * The View tab re-decodes every JPEG on every keystroke
+
+§4–§9 — clean-up, process, UX, i18n, features. Two easy ones worth
+  pulling forward because they are nearly free:
+  * §5   CI never runs the test suite (add a `test` job, `release`
+         depends on it) — highest-leverage process gap in the repo
+  * §8   The "Video import" bullet is missing from all five translated
+         READMEs — required by the `AGENTS.md` doc-sync rule

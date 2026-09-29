@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-28, `mvn test` green: **378 tests / 43 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **381 tests / 43 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -38,19 +38,54 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   "already imported" short-circuit skips it forever — silently, with no error and
   no recovery. Either wrap the insert in the same transaction unit as the frames
   or delete the row in a compensating step on failure. **High payoff.**
-- [ ] **`AppConfig.save` is not atomic** — `MAPPER.writeValue(File, …)`
+- [x] **`AppConfig.save` is not atomic** — `MAPPER.writeValue(File, …)`
   (`AppConfig.java:63-69`) truncates the target and streams into it. A crash
   mid-write leaves a truncated `facesort-config.json`, and the next launch throws
   in `load` — the app refuses to start over the user's only copy of their
   settings. The correct pattern already exists in this codebase:
   `UpdateChecker.writeCacheAtomically` (temp file + `ATOMIC_MOVE`). **High payoff, small.**
-- [ ] **`AppConfig.load` hard-fails on an unknown property** — the shared
+  *Done — `save` now serializes into a `facesort-config*.tmp` file in the target's
+  own directory (an absolute path's parent, so the staging file is always on the
+  same filesystem as the target) and moves it into place with `ATOMIC_MOVE` +
+  `REPLACE_EXISTING`, falling back to a plain `REPLACE_EXISTING` move on
+  `AtomicMoveNotSupportedException` — the same pattern as
+  `UpdateChecker.writeCacheAtomically`, which the update-check entry in the
+  changelog already credits. The temp file is deleted in a `finally`, so a
+  failed write leaves neither a truncated config nor a `.tmp` in the `config/`
+  folder. Pinned by `AppConfigTest.save_failedWrite_leavesThePreviousConfigIntact`,
+  which saves a real config and then saves a `ConfigModel` whose `getDbName()`
+  throws mid-serialization, then asserts the failure still surfaces *and* the
+  file on disk is byte-identical and still loadable. Before the fix the same test
+  left the file cut off mid-JSON at `"maxImportThreads" : 4` — precisely the
+  truncated config that makes the next launch throw. A second case,
+  `..._overwritesAnExistingConfigAndLeavesNoTemporaryFiles`, pins that a
+  repeated save replaces the config in place and leaves the directory holding
+  nothing but `config.json`.*
+- [x] **`AppConfig.load` hard-fails on an unknown property** — the shared
   `ObjectMapper` (`AppConfig.java:25-26`) leaves `FAIL_ON_UNKNOWN_PROPERTIES`
   enabled. A hand-edited, stale or renamed key makes the app refuse to launch.
   For a user-editable settings file this is a poor failure mode, and `AGENTS.md`
   requires a documented migration for config changes. Disable the flag
   (`@JsonIgnoreProperties(ignoreUnknown = true)`) and pin it with a test.
   **High payoff, small.**
+  *Done — `@JsonIgnoreProperties(ignoreUnknown = true)` on `ConfigModel` rather
+  than a mapper-level `disable(...)`, so the tolerance travels with the type
+  instead of depending on which `ObjectMapper` happens to read it: `FaceSortApp`
+  (`AppConfig.load`) and `ImportView` (`AppConfig.save`) keep using the shared
+  static mapper, and any future reader gets the same behaviour for free. This is
+  the strictly-more-permissive half of the file format, so it is backward
+  compatible — an old config still loads identically, a config from a *newer*
+  build now loads with this build's defaults for the keys it does not know
+  instead of aborting startup. `load_invalidHandEditedValues_areClampedByNormalize`
+  and `load_fileWithoutNewKeys_keepsDefaults` already pinned the hand-editing
+  story for known keys, so the new case
+  `AppConfigTest.load_fileWithAnUnknownKey_ignoresItInsteadOfRefusingToStart`
+  extends it to unknown ones: a file with `"dbName": "kept.db"` plus a
+  `"someFutureSetting"` key loaded with the db name kept and
+  `maxImportThreads` at its default. Before the fix it threw
+  `UnrecognizedPropertyException` naming all 21 known properties. Nothing is lost
+  on save: the writer still only emits the properties this build knows, so a
+  round-trip through a newer build simply drops the keys it cannot represent.*
 - [ ] **Re-exporting a person to the same folder aborts** — `Files.copy` is called
   without `StandardCopyOption.REPLACE_EXISTING` (`FaceToNameService.java:511`),
   and `uniqueDestination` only guards against names used *within this run*, so a
@@ -429,11 +464,11 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   / `ReviewService` interface per view would give the UI the same testability
   without changing behaviour. **High effort payoff, medium effort.**
 - [ ] **No regression test exists for most of the §1 bugs** — items 1.2 (poisoned
-  video), 1.3/1.4 (config write/load), 1.5 (re-export), 1.6
-  (over-broad catch) and 1.7 (null estimate) are all reachable from tests today.
+  video), 1.5 (re-export), 1.6 (over-broad catch) and 1.7
+  (null estimate) are all reachable from tests today.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
-  *1.1 is done — see the note on the item itself.*
+  *1.1 and 1.3/1.4 are done — see the notes on those items.*
 
 ---
 

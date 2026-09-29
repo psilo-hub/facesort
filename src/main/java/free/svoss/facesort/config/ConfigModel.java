@@ -1,5 +1,6 @@
 package free.svoss.facesort.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -7,8 +8,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <p>The field names match the keys written to {@code config/facesort-config.json}.
  * All fields have defaults so the application works out of the box when the
- * config file is absent or partially filled in.</p>
+ * config file is absent or partially filled in. Unknown keys are ignored on
+ * load, so a config written by a different build still starts the application
+ * instead of aborting it.</p>
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ConfigModel {
 
     public static final int DEFAULT_THUMBNAIL_SIZE = 256;

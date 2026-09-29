@@ -179,7 +179,10 @@ copy it to back up your library:
 
 All settings can be changed in the **Settings** tab (each control has an
 explanation tooltip); they are stored in `config/facesort-config.json`. The UI
-**language** is stored there too.
+**language** is stored there too. You can also edit that file by hand: settings
+it does not recognize are ignored, and values outside their valid range are
+clamped, so a file from a different version still starts the app. Settings are
+written atomically, so an interrupted save can never corrupt the file.
 
 Beyond the detection and clustering parameters, the import budgets are tunable
 as well: the JPEG quality of stored thumbnails and face crops, the maximum

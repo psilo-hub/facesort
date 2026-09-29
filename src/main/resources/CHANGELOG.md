@@ -233,6 +233,13 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Your settings file can no longer be lost or lock the app out of starting:
+  settings are now written to a temporary file and moved into place atomically,
+  so a crash or a failed write mid-save leaves the previous
+  `config/facesort-config.json` intact instead of a truncated file that made the
+  next launch fail; and a key the app does not recognize — a hand-edited
+  setting, or one left over from a different build — is now ignored instead of
+  aborting startup, with the remaining settings loaded as usual (2026-09-29)
 - Importing a corrupt or mislabelled video no longer leaks native ffmpeg memory:
   a video that opens but turns out to be undecodable is now rejected with a clean
   error *and* its already-allocated native handles are released. Previously only

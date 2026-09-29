@@ -174,7 +174,11 @@ arranque): cópiala para hacer una copia de seguridad de tu biblioteca.
 
 Todos los ajustes pueden cambiarse en la pestaña **Ajustes** (cada control tiene
 una información explicativa); se guardan en `config/facesort-config.json`.
-También puedes cambiar el **idioma** de la interfaz allí.
+También puedes cambiar el **idioma** de la interfaz allí. Ese archivo se puede
+editar a mano: los ajustes que la aplicación no reconoce se ignoran y los
+valores fuera de rango se limitan, de modo que un archivo de otra versión sigue
+arrancando la aplicación. Los ajustes se escriben de forma atómica, así que un
+guardado interrumpido nunca puede corromper el archivo.
 
 Además de los parámetros de detección y agrupación, también se pueden ajustar
 los presupuestos de importación: la calidad JPEG de las miniaturas y recortes de

@@ -3,11 +3,15 @@ package free.svoss.facesort.config;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -63,6 +67,18 @@ class AppConfigTest {
     }
 
     @Test
+    void load_fileWithAnUnknownKey_ignoresItInsteadOfRefusingToStart() throws Exception {
+        Path file = tempDir.resolve("unknown-key.json");
+        Files.writeString(file, "{\n  \"dbName\": \"kept.db\",\n  \"someFutureSetting\": 42\n}\n");
+
+        ConfigModel config = AppConfig.load(file);
+
+        assertEquals("kept.db", config.getDbName(), "the known keys must still be read");
+        assertEquals(ConfigModel.DEFAULT_MAX_IMPORT_THREADS, config.getMaxImportThreads(),
+                "an unknown key must not disturb the defaults of the keys it shadows");
+    }
+
+    @Test
     void saveAndLoad_roundTripsNewSettings() throws Exception {
         Path file = tempDir.resolve("config.json");
         ConfigModel written = AppConfig.getDefault();
@@ -81,5 +97,66 @@ class AppConfigTest {
         assertEquals(30, read.getMaxFramesPerVideo());
         assertEquals(128, read.getFaceCropSize());
         assertTrue(Files.exists(file));
+    }
+
+    @Test
+    void save_failedWrite_leavesThePreviousConfigIntact() throws Exception {
+        Path file = tempDir.resolve("config.json");
+        ConfigModel saved = AppConfig.getDefault();
+        saved.setDbName("survivor.db");
+        AppConfig.save(file, saved);
+        String before = Files.readString(file);
+
+        ConfigModel exploding = new ConfigModel() {
+            @Override
+            public String getDbName() {
+                throw new SimulatedWriteFailure();
+            }
+        };
+        Throwable thrown = assertThrows(Throwable.class, () -> AppConfig.save(file, exploding));
+
+        assertTrue(causedBy(thrown, SimulatedWriteFailure.class),
+                "the simulated serialization failure must still be reported, got: " + thrown);
+        assertEquals(before, Files.readString(file),
+                "a failed save must not damage the settings the user already had");
+        assertEquals("survivor.db", AppConfig.load(file).getDbName(),
+                "the config on disk must still be loadable after a failed save");
+    }
+
+    @Test
+    void save_overwritesAnExistingConfigAndLeavesNoTemporaryFiles() throws Exception {
+        Path file = tempDir.resolve("config.json");
+        AppConfig.save(file, AppConfig.getDefault());
+
+        ConfigModel second = AppConfig.getDefault();
+        second.setDbName("second.db");
+        second.setKnnK(7);
+        AppConfig.save(file, second);
+
+        assertEquals(List.of("config.json"), fileNamesIn(tempDir),
+                "saving must replace the config in place, without leaving temporary files behind");
+        ConfigModel reloaded = AppConfig.load(file);
+        assertEquals("second.db", reloaded.getDbName());
+        assertEquals(7, reloaded.getKnnK());
+    }
+
+    private static List<String> fileNamesIn(Path dir) throws IOException {
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.map(path -> path.getFileName().toString()).sorted().toList();
+        }
+    }
+
+    private static boolean causedBy(Throwable throwable, Class<? extends Throwable> type) {
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Marker for a config that fails while being written, see the test above. */
+    private static final class SimulatedWriteFailure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 }

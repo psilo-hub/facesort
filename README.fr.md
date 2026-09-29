@@ -183,7 +183,11 @@ lancement) — copiez-le pour sauvegarder votre bibliothèque :
 Tous les paramètres peuvent être modifiés dans l'onglet **Paramètres** (chaque
 contrôle possède une info-bulle explicative) ; ils sont stockés dans
 `config/facesort-config.json`. Vous pouvez aussi y changer la **langue** de
-l'interface.
+l'interface. Ce fichier peut être édité à la main : les paramètres inconnus sont
+ignorés et les valeurs hors limites sont ramenées dans leur plage, si bien
+qu'un fichier issu d'une autre version lance toujours l'application. Les
+paramètres sont écrits de façon atomique : un enregistrement interrompu ne peut
+donc jamais corrompre le fichier.
 
 Outre les paramètres de détection et de regroupement, les budgets d'importation
 sont également réglables : la qualité JPEG des vignettes et des recadrages de

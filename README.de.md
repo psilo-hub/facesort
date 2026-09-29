@@ -174,7 +174,11 @@ angelegt) – kopiere ihn, um deine Bibliothek zu sichern:
 Alle Einstellungen können im Tab **Einstellungen** geändert werden (jede
 Bedienelement hat einen Erklärungstooltip); sie werden in
 `config/facesort-config.json` gespeichert. Die **Sprache** der Benutzeroberfläche
-lässt sich dort ebenfalls umschalten.
+lässt sich dort ebenfalls umschalten. Die Datei kann auch von Hand bearbeitet
+werden: unbekannte Einstellungen werden ignoriert und Werte außerhalb des
+gültigen Bereichs werden begrenzt, sodass eine Datei aus einer anderen Version
+die App weiterhin startet. Einstellungen werden atomar geschrieben, ein
+abgebrochenes Speichern kann die Datei also nicht beschädigen.
 
 Neben den Erkennungs- und Clustering-Parametern sind auch die Import-Budgets
 einstellbar: die JPEG-Qualität gespeicherter Vorschaubilder und
