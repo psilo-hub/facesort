@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 381 tests / 43 classes,
+State as of 2026-09-29. `mvn test` is green: 384 tests / 44 classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (37 open items, with the
+The detailed backlog lives in `suggestions.md` (36 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -13,6 +13,16 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §1.7 `RemoveByPrefixDialog` can no longer get stuck disabled — the
+  preview success handler returned before `setBusy(false)` on a `null`
+  estimate, leaving the dialog with no way back. The handler body is
+  now `applyScanResult(Estimate, ScanPresenter)`, which releases the busy
+  state first and unconditionally; a `null` estimate takes the normal
+  "nothing to remove" path. The new `ScanPresenter` interface is a real
+  test seam, so `RemoveByPrefixDialogTest` (3 cases) pins the `null` path
+  headlessly — verified failing against the original ordering before the
+  fix. First `ui/` class to get coverage outside the three pre-existing
+  ones.
 * §1.3 `AppConfig.save` is atomic — a failed or interrupted save can no
   longer leave a truncated `facesort-config.json` that stops the app from
   starting. Staged in a sibling temp file + `ATOMIC_MOVE`, mirroring
@@ -37,12 +47,10 @@ Queued next (highest payoff first, all still open in suggestions.md)
   1. §1.2  A failed video import permanently poisons the video (high)
   2. §1.5  Re-exporting a person to the same folder aborts (medium/small)
   3. §1.6  `ImportService` swallows unrelated database failures (medium)
-  4. §1.7  `RemoveByPrefixDialog` can become permanently unusable (high,
-          one line, needs a headless test seam)
-  5. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
+  4. §1.8  `ViewView.untagFaces` / `FaceNameView` read a mutable field off
            the background thread (high/small)
-  6. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
-  7. §1.10 Null-safety gaps in the seams that face native code (medium)
+  5. §1.9  `FaceSortApp.stop()` can leak the database handle (medium)
+  6. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

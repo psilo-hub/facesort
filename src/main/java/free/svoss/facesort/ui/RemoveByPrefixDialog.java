@@ -30,7 +30,7 @@ import java.util.Objects;
  * that was executed, or {@code null} when the dialog was cancelled or closed
  * (including a preview that matched nothing, which has nothing to remove).</p>
  */
-public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> {
+public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> implements ScanPresenter {
 
     private final DataRemovalService service;
 
@@ -117,21 +117,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> {
             }
         }, "removal-scan");
 
-        task.setOnSucceeded(e -> {
-            DataRemovalService.Estimate estimate = task.getValue();
-            if (estimate == null) {
-                return;
-            }
-            setBusy(false);
-            if (!estimate.hasMatches()) {
-                resultLabel.setText(I18n.get("ui.import.removeByPrefix.nothingMatched"));
-            } else {
-                resultLabel.setText(I18n.format("ui.import.removeByPrefix.estimate",
-                        estimate.images(), estimate.videos(),
-                        estimate.thumbnails(), estimate.faceSubImages()));
-                removeButton.setDisable(false);
-            }
-        });
+        task.setOnSucceeded(e -> applyScanResult(task.getValue(), this));
         task.setOnFailed(e -> {
             setBusy(false);
             resultLabel.setText(I18n.format("ui.import.removeByPrefix.scanFailed",
@@ -188,5 +174,54 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> {
         return error != null && error.getMessage() != null
                 ? error.getMessage()
                 : I18n.get("app.unknownError");
+    }
+
+    @Override
+    public void setBusyState(boolean busy) {
+        setBusy(busy);
+    }
+
+    @Override
+    public void showMessage(String message) {
+        resultLabel.setText(message);
+    }
+
+    @Override
+    public void setRemoveEnabled(boolean enabled) {
+        removeButton.setDisable(!enabled);
+    }
+
+    /**
+     * Applies a finished scan to the dialog: leaves the busy state, then shows
+     * the preview and offers the removal.
+     *
+     * <p>The busy state is released first and unconditionally. A scan that
+     * returns no estimate at all used to return before that, leaving the whole
+     * dialog disabled with no way back to the user — a dead end reachable by a
+     * null estimate alone.</p>
+     *
+     * <p>Package-private static with an injected presenter so a headless test
+     * can pin the {@code null} path, which is otherwise unreachable without a
+     * JavaFX toolkit.</p>
+     *
+     * @param estimate  the scan result, or {@code null} when the scan produced none
+     * @param presenter the dialog, or a test double
+     */
+    static void applyScanResult(DataRemovalService.Estimate estimate, ScanPresenter presenter) {
+        presenter.setBusyState(false);
+        if (estimate == null) {
+            presenter.showMessage(I18n.get("ui.import.removeByPrefix.nothingMatched"));
+            presenter.setRemoveEnabled(false);
+            return;
+        }
+        if (!estimate.hasMatches()) {
+            presenter.showMessage(I18n.get("ui.import.removeByPrefix.nothingMatched"));
+            presenter.setRemoveEnabled(false);
+            return;
+        }
+        presenter.showMessage(I18n.format("ui.import.removeByPrefix.estimate",
+                estimate.images(), estimate.videos(),
+                estimate.thumbnails(), estimate.faceSubImages()));
+        presenter.setRemoveEnabled(true);
     }
 }

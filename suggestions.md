@@ -5,7 +5,7 @@ Checklist of open improvement suggestions for the codebase. Every item is a
 resolution into `todo.txt` + `CHANGELOG.md` in the same commit (see `AGENTS.md`).
 
 All line numbers refer to the current state of the codebase
-(2026-09-29, `mvn test` green: **381 tests / 43 classes, 0 failures, 0 skipped**).
+(2026-09-29, `mvn test` green: **384 tests / 44 classes, 0 failures, 0 skipped**).
 
 Items are ordered roughly by payoff. Sections 1–3 are correctness/robustness and
 should be done first; sections 4–9 are clean-up, process, UX and features.
@@ -100,11 +100,33 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   (`ImportService.java:225-239`). Narrow it to
   `SQLIntegrityConstraintViolationException` / `SQLTransactionRollbackException`.
   **Medium payoff, small.**
-- [ ] **`RemoveByPrefixDialog` can become permanently unusable** — in `onScan`, if
+- [x] **`RemoveByPrefixDialog` can become permanently unusable** — in `onScan`, if
   the estimate is `null` the success handler returns *before* `setBusy(false)`
   (`RemoveByPrefixDialog.java:120-125`), leaving the dialog disabled with no way
   back. Move `setBusy(false)` above the null check (or use `finally`).
   **High payoff, one line.** Needs a headless test seam to pin the null path.
+  *Done — the success handler's body moved into a package-private static
+  `applyScanResult(Estimate, ScanPresenter)` that releases the busy state
+  **first and unconditionally**, then handles the result; a `null` estimate
+  now takes the same "nothing matched" path as an empty one instead of
+  returning early, so the dialog can never be left disabled. The presenter is
+  a new package-private `ScanPresenter` interface (own file, so it is a real
+  seam rather than a nested type of the dialog) implemented by the dialog via
+  three thin delegates — `setBusyState` → the existing private `setBusy`,
+  `showMessage` → `resultLabel.setText`, `setRemoveEnabled` →
+  `removeButton.setDisable(!enabled)`. This is the codebase's existing
+  extracted-static-seam pattern (`ViewView.filterNames`,
+  `FaceNameView.rangeSelection`, `UpdateChecker.RemoteFetcher`) applied to the
+  one `ui/` class the §5 test-coverage item flags as untested, and it is the
+  first of the twelve untested `ui/` classes to gain coverage.
+  Pinned by the new `RemoveByPrefixDialogTest` (3 cases) driving a recording
+  presenter, so no JavaFX toolkit is needed. The null case is the regression
+  guard: I verified it *fails* against the original ordering by temporarily
+  reintroducing the early return — `nullEstimate_leavesTheDialogUsable` then
+  reported `expected: <[busy:false]> but was: <[]>`, i.e. the dialog was never
+  taken out of its busy state. The other two cases cover the normal outcomes
+  (no match → message, Remove stays disabled; a match → the four counts shown,
+  Remove enabled).*
 - [ ] **`ViewView.untagFaces` reads a mutable field off the background thread** —
   the mutable `activeNameId` is read inside `call()` and again in the success
   handler (`ViewView.java:359-372`), so changing the selected person mid-flight
@@ -449,11 +471,15 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   PMD, Checkstyle or Enforcer plugin, so nothing catches dead code, accidental
   null-dereference patterns or complexity regressions. At minimum add JaCoCo with
   a floor and `maven-enforcer-plugin` pinning the Java 17 toolchain. **Medium effort.**
-- [ ] **12 of the 15 classes in `ui/` have no tests, and the three that do test
-  extracted helpers rather than views** — only `FaceNameViewTest`, `ViewViewTest`
-  and `ModelDownloadViewTest` exist, and they exercise the pure static seams
-  (`ViewView.filterNames`, `FaceNameView.rangeSelection`) that were extracted
-  precisely to be testable. Keep extending that pattern into
+- [ ] **11 of the 15 classes in `ui/` have no tests, and all four that do test
+  extracted helpers rather than views** — `FaceNameViewTest`, `ViewViewTest`,
+  `ModelDownloadViewTest` and `RemoveByPrefixDialogTest` exist, and they
+  exercise the pure static seams (`ViewView.filterNames`,
+  `FaceNameView.rangeSelection`, `ModelDownloadView.formatBytes`,
+  `RemoveByPrefixDialog.applyScanResult`) that were extracted precisely to be
+  testable — the last one added by the §1.7 fix, which extracted a
+  `ScanPresenter` seam to pin a bug that was otherwise unreachable headlessly.
+  Keep extending that pattern into
   `SettingsView.onReset` (the field-by-field default copy), `DedupeView`'s
   decision state machine and `NameFaceView`/`RandomNameView` selection logic —
   all of which are currently unreachable from a headless test. **Medium effort.**
@@ -468,7 +494,9 @@ should be done first; sections 4–9 are clean-up, process, UX and features.
   (null estimate) are all reachable from tests today.
   Write the failing test first when fixing each, per `AGENTS.md`'s TDD rule, so
   every fix is pinned rather than merely applied. **Bundle with §1.**
-  *1.1 and 1.3/1.4 are done — see the notes on those items.*
+  *1.1, 1.3/1.4 and 1.7 are done — see the notes on those items. 1.7 also
+  opened the first test seam in `ui/` outside the three classes below, so
+  `RemoveByPrefixDialog` now has coverage too.*
 
 ---
 

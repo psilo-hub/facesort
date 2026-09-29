@@ -233,6 +233,10 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- The "Remove by path prefix..." dialog can no longer get stuck: if a preview
+  ever came back with nothing to report, the dialog stayed disabled with no way
+  back to it. It now always becomes usable again, telling you there is nothing
+  to remove (2026-09-29)
 - Your settings file can no longer be lost or lock the app out of starting:
   settings are now written to a temporary file and moved into place atomically,
   so a crash or a failed write mid-save leaves the previous
