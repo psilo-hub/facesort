@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-09-29. `mvn test` is green: 402 tests / 46 classes,
+State as of 2026-10-02. `mvn test` is green: 424 tests / 46 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (32 open items, with the
+The detailed backlog lives in `suggestions.md` (30 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,42 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* §3 The path-prefix filters can use an index. `substr(path, 1,
+  length(?)) = ?` cannot be served from any index, so both the folder
+  filter of the tagging views and the remove-by-folder preview walked
+  every stored path; they now match with the lexicographic range
+  `path >= ? AND path < ?`. The two bounds come from one shared,
+  package-private `PathPrefix` value object, so the successor can no
+  longer be computed twice, differently. The bound increments the last
+  *code point*, not the last UTF-16 unit: SQLite compares UTF-8, which
+  is order-preserving, so a code-point increment always orders right,
+  whereas breaking a surrogate pair yields a lone low surrogate that the
+  JDBC driver silently substitutes — a bound that is too small, i.e.
+  `DataRemovalDao` under-deleting. A prefix of only U+10FFFF has no
+  successor at all, so it degrades to `>=` alone. Semantics are
+  unchanged: still a plain, byte-wise, case-sensitive string prefix, so
+  `/photos/family` keeps matching `/photos/family-archive/` — the
+  sibling / near-miss cases in both DAO tests pin exactly that.
+  `idx_image_paths_path` and `idx_video_paths_path` serve it, declared
+  in the baseline schema *and* in the new version-3 migration
+  (`SCHEMA_VERSION` 2 -> 3), so an existing library gains them on the
+  next open; `createPathIndexes` is shared by both paths so the two
+  cannot drift. Pinned by the new `PathPrefixTest` (11 cases, no
+  database), 4 new `DataRemovalDaoTest`, 5 new `FaceDaoTest` and 2 new
+  `DatabaseTest` cases, plus the new `QueryPlans` test seam, which reads
+  `EXPLAIN QUERY PLAN` and asserts `SEARCH <ref> USING ...` rather than
+  the exact plan text. Mutation-verified: a `(char)(c + 1)` successor
+  fails 5 `PathPrefixTest` cases, and dropping `idx_video_paths_path`
+  fails the plan test with `SCAN video_paths` plus both `DatabaseTest`
+  index cases.
+* The follow-on item on the placeholder count is closed too:
+  `PATH_FILTER_PLACEHOLDERS`, `FaceDao.bindPathFilter` and
+  `DataRemovalDao.bindPrefix` are gone. A hand-maintained count of `?`
+  placeholders next to a hand-maintained binder *is* the defect, so both
+  went away with the `substr` form: `PathPrefix.bind(ps, firstIndex)`
+  binds one range and returns the next index, which is what makes the
+  fragment and the bound values impossible to desynchronize.
 
 * §1.5 Re-exporting a person to the same folder no longer aborts with
   `FileAlreadyExistsException`. `Files.copy` now passes `REPLACE_EXISTING`,
@@ -118,12 +154,12 @@ Queued next (highest payoff first, all still open in suggestions.md)
   * Untracked raw threads and a leaked `HttpClient` on language change
   * Import progress starves the FX thread
 
-§3 Performance — 5 of 10 done (clustering O(n²·k)→O(n·k), dedupe
+§3 Performance — 6 of 10 done (clustering O(n²·k)→O(n·k), dedupe
   candidates, per-name BLOB hydration, the N+1 average-of-other-names
-  reads, SQLite WAL/busy_timeout/synchronous). Remaining:
+  reads, SQLite WAL/busy_timeout/synchronous, the path-prefix filters).
+  Remaining:
   * `findSimilarUnnamed` loads and sorts the whole unnamed corpus
   * The random-faces view hydrates embeddings it never uses
-  * Path-prefix filters cannot use an index
   * Query-planner statistics are never refreshed
   * The import folder is walked twice; the import log grows without bound
   * The View tab re-decodes every JPEG on every keystroke

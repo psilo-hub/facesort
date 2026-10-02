@@ -16,34 +16,38 @@ import java.sql.SQLException;
  * thumbnail and faces, and deleting a video cascades to its paths and frame
  * links, so the counts derived here are exactly the rows that disappear.</p>
  *
- * <p>The prefix is compared byte-wise against the stored path string via
- * {@code substr(path, 1, length(?)) = ?}, the same semantics the path filter of
- * the tagging views uses.</p>
+ * <p>The prefix is matched as the lexicographic range {@link PathPrefix}
+ * builds, so SQLite can serve it from the index on the path column instead of
+ * evaluating the comparison on every stored path.</p>
  */
 public class DataRemovalDao {
-
-    /**
-     * The image hashes a prefix-based removal would delete: photos whose stored
-     * path starts with the prefix, plus the frames sampled from matching videos
-     * that are not also photos. Contains four {@code ?} placeholders for the
-     * same prefix, two per subquery.
-     */
-    private static final String AFFECTED_IMAGE_HASHES = """
-            SELECT DISTINCT ip.hash
-            FROM image_paths ip
-            WHERE substr(ip.path, 1, length(?)) = ?
-            UNION
-            SELECT DISTINCT vf.frame_hash
-            FROM video_frames vf
-            JOIN video_paths vp ON vp.hash = vf.video_hash
-            WHERE substr(vp.path, 1, length(?)) = ?
-              AND NOT EXISTS (SELECT 1 FROM image_paths op WHERE op.hash = vf.frame_hash)
-            """;
 
     private final Connection conn;
 
     public DataRemovalDao(Connection conn) {
         this.conn = conn;
+    }
+
+    /**
+     * Returns the statement listing the image hashes a prefix-based removal
+     * deletes: photos whose stored path starts with the prefix, plus the frames
+     * sampled from matching videos that are not also photos. The statement's
+     * placeholders are the two path ranges, bound by
+     * {@link #bindAffectedImageHashes}.
+     *
+     * @param filter the path prefix to match
+     * @return the SQL selecting the affected image hashes
+     */
+    static String affectedImageHashesSql(PathPrefix filter) {
+        return "SELECT DISTINCT ip.hash"
+                + " FROM image_paths ip"
+                + " WHERE " + filter.condition("ip.path")
+                + " UNION"
+                + " SELECT DISTINCT vf.frame_hash"
+                + " FROM video_frames vf"
+                + " JOIN video_paths vp ON vp.hash = vf.video_hash"
+                + " WHERE " + filter.condition("vp.path")
+                + " AND NOT EXISTS (SELECT 1 FROM image_paths op WHERE op.hash = vf.frame_hash)";
     }
 
     /**
@@ -54,9 +58,10 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int countAffectedImages(String prefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(prefix);
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT COUNT(*) FROM (" + AFFECTED_IMAGE_HASHES + ")")) {
-            bindPrefix(ps, prefix, 4);
+                "SELECT COUNT(*) FROM (" + affectedImageHashesSql(filter) + ")")) {
+            bindAffectedImageHashes(ps, filter);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -71,10 +76,9 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int countAffectedVideos(String prefix) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT COUNT(DISTINCT hash) FROM video_paths"
-                        + " WHERE substr(path, 1, length(?)) = ?")) {
-            bindPrefix(ps, prefix, 2);
+        PathPrefix filter = PathPrefix.of(prefix);
+        try (PreparedStatement ps = conn.prepareStatement(countAffectedVideosSql(filter))) {
+            filter.bind(ps, 1);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -89,9 +93,11 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int countAffectedThumbnails(String prefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(prefix);
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT COUNT(*) FROM thumbnails t WHERE t.hash IN (" + AFFECTED_IMAGE_HASHES + ")")) {
-            bindPrefix(ps, prefix, 4);
+                "SELECT COUNT(*) FROM thumbnails t WHERE t.hash IN ("
+                        + affectedImageHashesSql(filter) + ")")) {
+            bindAffectedImageHashes(ps, filter);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -107,9 +113,11 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int countAffectedFaces(String prefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(prefix);
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT COUNT(*) FROM faces f WHERE f.image_hash IN (" + AFFECTED_IMAGE_HASHES + ")")) {
-            bindPrefix(ps, prefix, 4);
+                "SELECT COUNT(*) FROM faces f WHERE f.image_hash IN ("
+                        + affectedImageHashesSql(filter) + ")")) {
+            bindAffectedImageHashes(ps, filter);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -125,9 +133,10 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int deleteAffectedImages(String prefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(prefix);
         try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM images WHERE hash IN (" + AFFECTED_IMAGE_HASHES + ")")) {
-            bindPrefix(ps, prefix, 4);
+                "DELETE FROM images WHERE hash IN (" + affectedImageHashesSql(filter) + ")")) {
+            bindAffectedImageHashes(ps, filter);
             return ps.executeUpdate();
         }
     }
@@ -141,17 +150,45 @@ public class DataRemovalDao {
      * @throws SQLException on database error
      */
     public int deleteAffectedVideos(String prefix) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM videos WHERE hash IN (SELECT DISTINCT hash FROM video_paths"
-                        + " WHERE substr(path, 1, length(?)) = ?)")) {
-            bindPrefix(ps, prefix, 2);
+        PathPrefix filter = PathPrefix.of(prefix);
+        try (PreparedStatement ps = conn.prepareStatement(deleteAffectedVideosSql(filter))) {
+            filter.bind(ps, 1);
             return ps.executeUpdate();
         }
     }
 
-    private static void bindPrefix(PreparedStatement ps, String prefix, int count) throws SQLException {
-        for (int i = 1; i <= count; i++) {
-            ps.setString(i, prefix);
-        }
+    /**
+     * Returns the statement counting the videos whose stored path starts with
+     * the prefix.
+     *
+     * @param filter the path prefix to match
+     * @return the SQL counting the affected videos
+     */
+    static String countAffectedVideosSql(PathPrefix filter) {
+        return "SELECT COUNT(DISTINCT hash) FROM video_paths WHERE " + filter.condition("path");
+    }
+
+    /**
+     * Returns the statement deleting the videos whose stored path starts with
+     * the prefix.
+     *
+     * @param filter the path prefix to match
+     * @return the SQL deleting the affected videos
+     */
+    static String deleteAffectedVideosSql(PathPrefix filter) {
+        return "DELETE FROM videos WHERE hash IN (SELECT DISTINCT hash FROM video_paths"
+                + " WHERE " + filter.condition("path") + ")";
+    }
+
+    /**
+     * Binds the two path ranges of an {@link #affectedImageHashesSql} statement,
+     * in the order the ranges appear in it.
+     *
+     * @param ps     the prepared statement to bind
+     * @param filter the path prefix both ranges match
+     * @throws SQLException on database error
+     */
+    private static void bindAffectedImageHashes(PreparedStatement ps, PathPrefix filter) throws SQLException {
+        filter.bind(ps, filter.bind(ps, 1));
     }
 }

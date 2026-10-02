@@ -57,6 +57,30 @@ class FaceDaoTest {
                 0, hash, bboxX, bboxY, 10, 10, 0.9, embedding, JPEG, nameId));
     }
 
+    /**
+     * Stores one unnamed face per folder that shares a beginning with the others,
+     * so a path-prefix filter has a matching folder, a sibling folder that must
+     * still match it, and near-miss folders that must not.
+     */
+    private void insertFolderFamilyFaces() throws Exception {
+        insertImage("imgFamily");
+        insertImage("imgArchive");
+        insertImage("imgShorter");
+        insertImage("imgOther");
+        imageDao.addPath("imgFamily", "/photos/family/winter.jpg");
+        imageDao.addPath("imgArchive", "/photos/family-archive/old.jpg");
+        imageDao.addPath("imgShorter", "/photos/fam/x.jpg");
+        imageDao.addPath("imgOther", "/photos/vacation/x.jpg");
+        insertFace("imgFamily", 0, 0, new float[]{1.0f}, null);
+        insertFace("imgArchive", 0, 0, new float[]{2.0f}, null);
+        insertFace("imgShorter", 0, 0, new float[]{3.0f}, null);
+        insertFace("imgOther", 0, 0, new float[]{4.0f}, null);
+    }
+
+    private static List<String> imageHashesOf(List<FaceRecord> faces) {
+        return faces.stream().map(FaceRecord::imageHash).sorted().toList();
+    }
+
     @Test
     void insert_returnsGeneratedId() throws Exception {
         insertImage("img1");
@@ -170,6 +194,49 @@ class FaceDaoTest {
     }
 
     @Test
+    void findUnnamed_withPathPrefix_matchesSiblingFoldersSharingTheBeginning() throws Exception {
+        insertFolderFamilyFaces();
+
+        List<String> matching = imageHashesOf(faceDao.findUnnamed("/photos/family"));
+
+        assertEquals(List.of("imgArchive", "imgFamily"), matching,
+                "a sibling folder whose name continues the prefix still matches, a shorter or a "
+                        + "different one does not");
+    }
+
+    @Test
+    void findUnnamed_withPathPrefix_isCaseSensitive() throws Exception {
+        insertImage("lower");
+        insertImage("upper");
+        imageDao.addPath("lower", "/photos/family/winter.jpg");
+        imageDao.addPath("upper", "/photos/Family/summer.jpg");
+        insertFace("lower", 0, 0, new float[]{1.0f}, null);
+        insertFace("upper", 0, 0, new float[]{2.0f}, null);
+
+        assertEquals(List.of("lower"), imageHashesOf(faceDao.findUnnamed("/photos/family")));
+        assertEquals(List.of("upper"), imageHashesOf(faceDao.findUnnamed("/photos/Family")),
+                "the stored path is compared byte-wise, so a case difference is a different path");
+    }
+
+    @Test
+    void findUnnamed_withEmojiPathPrefix_matchesOnlyThatFolder() throws Exception {
+        String winking = "\uD83D\uDE00";          // U+1F600, needs a surrogate pair
+        String faceWithTears = "\uD83D\uDE02";   // U+1F602, two code points above
+        insertImage("winking");
+        insertImage("laughing");
+        imageDao.addPath("winking", "/photos/" + winking + "/holiday.jpg");
+        imageDao.addPath("laughing", "/photos/" + faceWithTears + "/holiday.jpg");
+        insertFace("winking", 0, 0, new float[]{1.0f}, null);
+        insertFace("laughing", 0, 0, new float[]{2.0f}, null);
+
+        List<FaceRecord> matching = faceDao.findUnnamed("/photos/" + winking);
+
+        assertEquals(1, matching.size(),
+                "a prefix ending in a supplementary code point must bound the range at its successor");
+        assertEquals("winking", matching.get(0).imageHash());
+    }
+
+    @Test
     void findRandomUnnamed_returnsOnlyUnnamedFaces() throws Exception {
         insertImage("img1");
         long nameId = nameDao.insert("Alice");
@@ -222,6 +289,26 @@ class FaceDaoTest {
 
         assertEquals(2, random.size(), "both faces whose video file lives under the prefix");
         assertTrue(random.stream().noneMatch(f -> f.imageHash().equals("frame3")));
+    }
+
+    @Test
+    void findRandomUnnamed_withPathPrefix_matchesSiblingFoldersSharingTheBeginning() throws Exception {
+        insertFolderFamilyFaces();
+
+        List<String> matching = imageHashesOf(faceDao.findRandomUnnamed(10, "/photos/family"));
+
+        assertEquals(List.of("imgArchive", "imgFamily"), matching,
+                "sampling must select from the same rows the plain query selects");
+    }
+
+    @Test
+    void pathFilterQueries_useThePathIndexesInsteadOfScanningThePathTables() throws Exception {
+        insertFolderFamilyFaces();
+        PathPrefix filter = PathPrefix.of("/photos/family");
+        String sql = "SELECT " + FaceDao.SELECT_COLUMNS
+                + " FROM faces WHERE name_id IS NULL" + FaceDao.pathFilterClause(filter);
+
+        QueryPlans.assertSearchedByIndex(QueryPlans.of(db.getConnection(), sql), sql, "p", "vp");
     }
 
     @Test

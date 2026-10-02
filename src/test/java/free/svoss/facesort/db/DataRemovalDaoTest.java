@@ -164,6 +164,67 @@ class DataRemovalDaoTest {
         assertEquals(0, dao.countAffectedVideos("/v"));
     }
 
+    @Test
+    void prefixMatchesSiblingFoldersThatShareTheBeginning() throws Exception {
+        addPhoto("in-folder", "/media/vacation/a.jpg");
+        addPhoto("sibling", "/media/vacation-archive/b.jpg");
+        addPhoto("just-below", "/media/vacatio/c.jpg");
+        addPhoto("just-above", "/media/vacatiow/d.jpg");
+        insertVideo("video-in-folder", "/media/vacation/movie.mp4");
+        insertVideo("video-elsewhere", "/media/work/clip.mp4");
+
+        assertEquals(2, dao.countAffectedImages("/media/vacation"),
+                "a sibling folder whose name continues the prefix still matches, a shorter or a "
+                        + "different one does not");
+        assertEquals(1, dao.countAffectedVideos("/media/vacation"));
+
+        assertEquals(2, dao.deleteAffectedImages("/media/vacation"),
+                "the removal must delete exactly what the estimate counted");
+        assertTrue(imageDao.exists("just-below"));
+        assertTrue(imageDao.exists("just-above"));
+    }
+
+    @Test
+    void prefixMatch_isCaseSensitive() throws Exception {
+        addPhoto("lower", "/media/vacation/a.jpg");
+        addPhoto("upper", "/Media/Vacation/b.jpg");
+
+        assertEquals(1, dao.countAffectedImages("/media/vacation"),
+                "the stored path is compared byte-wise, so a case difference is a different path");
+        assertEquals(0, dao.countAffectedImages("/MEDIA/vacation"));
+    }
+
+    @Test
+    void prefixMatch_worksOnPathsOutsideTheBasicMultilingualPlane() throws Exception {
+        addPhoto("inside", "/photos/\uD83C\uDF05/a.jpg");
+        addPhoto("also-inside", "/photos/\uD83C\uDF05/b.jpg");
+        addPhoto("sibling", "/photos/\uD83C\uDF06/c.jpg");
+        addPhoto("below", "/photos/\uD83C\uDF04/d.jpg");
+        insertVideo("video-inside", "/photos/\uD83C\uDF05/movie.mp4");
+
+        assertEquals(2, dao.countAffectedImages("/photos/\uD83C\uDF05"),
+                "a prefix ending in a supplementary code point must bound the range correctly");
+        assertEquals(1, dao.countAffectedVideos("/photos/\uD83C\uDF05"));
+        assertEquals(1, dao.countAffectedImages("/photos/\uD83C\uDF04"),
+                "the code point below must bound the range below it, not above its own folder");
+    }
+
+    @Test
+    void prefixQueries_useThePathIndexesInsteadOfScanningThePathTables() throws Exception {
+        PathPrefix filter = PathPrefix.of("/media/vacation");
+
+        String affectedHashes = DataRemovalDao.affectedImageHashesSql(filter);
+        QueryPlans.assertSearchedByIndex(
+                QueryPlans.of(db.getConnection(), "SELECT COUNT(*) FROM (" + affectedHashes + ")"),
+                affectedHashes, "ip", "vp");
+        QueryPlans.assertSearchedByIndex(
+                QueryPlans.of(db.getConnection(), DataRemovalDao.countAffectedVideosSql(filter)),
+                DataRemovalDao.countAffectedVideosSql(filter), "video_paths");
+        QueryPlans.assertSearchedByIndex(
+                QueryPlans.of(db.getConnection(), DataRemovalDao.deleteAffectedVideosSql(filter)),
+                DataRemovalDao.deleteAffectedVideosSql(filter), "video_paths");
+    }
+
     // ---- deletion ----
 
     @Test

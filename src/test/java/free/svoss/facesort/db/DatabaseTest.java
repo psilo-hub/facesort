@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +38,42 @@ class DatabaseTest {
                 assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'faces'"));
                 assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'videos'"));
                 assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_faces_name_id'"));
+            }
+        }
+    }
+
+    @Test
+    void freshDatabase_createsThePathPrefixIndexes() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                assertEquals(List.of("path"), indexedColumns(stmt, "idx_image_paths_path"),
+                        "the folder filter of the tagging views needs an index on image_paths.path");
+                assertEquals(List.of("path"), indexedColumns(stmt, "idx_video_paths_path"),
+                        "the folder filter and the removal-by-prefix need an index on video_paths.path");
+            }
+        }
+    }
+
+    @Test
+    void databaseFromVersionTwo_gainsThePathPrefixIndexes() throws Exception {
+        Path dbFile = tempDir.resolve("v2.db");
+        try (Database db = new Database(dbFile)) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                // Recreate the version-2 schema: the same tables, no path indexes.
+                stmt.execute("DROP INDEX idx_image_paths_path");
+                stmt.execute("DROP INDEX idx_video_paths_path");
+                stmt.execute("PRAGMA user_version = 2");
+            }
+        }
+
+        try (Database migrated = new Database(dbFile)) {
+            assertEquals(Database.SCHEMA_VERSION, userVersion(migrated),
+                    "a version-2 database must be migrated to the current schema version");
+            try (Statement stmt = migrated.getConnection().createStatement()) {
+                assertEquals(List.of("path"), indexedColumns(stmt, "idx_image_paths_path"),
+                        "an existing library must gain the path index on the next open");
+                assertEquals(List.of("path"), indexedColumns(stmt, "idx_video_paths_path"),
+                        "an existing library must gain the path index on the next open");
             }
         }
     }
@@ -283,5 +321,20 @@ class DatabaseTest {
             }
         }
         return 0;
+    }
+
+    /**
+     * Returns the indexed columns of the named index in index order — empty when
+     * no such index exists, so one assertion covers both the index and the
+     * column it exists for.
+     */
+    private static List<String> indexedColumns(Statement stmt, String index) throws SQLException {
+        List<String> columns = new ArrayList<>();
+        try (ResultSet rs = stmt.executeQuery("PRAGMA index_info(" + index + ")")) {
+            while (rs.next()) {
+                columns.add(rs.getString("name"));
+            }
+        }
+        return columns;
     }
 }

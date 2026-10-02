@@ -21,12 +21,6 @@ import java.util.stream.IntStream;
 public class FaceDao {
 
     /**
-     * Number of {@code ?} placeholders in {@link #pathFilterClause()}, all bound
-     * to the same prefix by {@link #bindPathFilter}.
-     */
-    private static final int PATH_FILTER_PLACEHOLDERS = 5;
-
-    /**
      * The column list every {@code SELECT} projects — the ten columns that
      * {@link #mapRow} reads by name. Kept in one place so the queries cannot
      * drift apart; {@code FaceDaoTest} pins it to the columns {@link #mapRow}
@@ -119,10 +113,10 @@ public class FaceDao {
      * @throws SQLException on database error
      */
     public List<FaceRecord> findUnnamed(String pathPrefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(pathPrefix);
         List<FaceRecord> faces = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
-            bindPathFilter(ps, pathPrefix);
+        try (PreparedStatement ps = prepareWithPathFilter(
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL", filter)) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
@@ -177,9 +171,8 @@ public class FaceDao {
             return List.of();
         }
         List<Long> ids = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id FROM faces WHERE name_id IS NULL" + pathFilterClause())) {
-            bindPathFilter(ps, pathPrefix);
+        try (PreparedStatement ps = prepareWithPathFilter(
+                "SELECT id FROM faces WHERE name_id IS NULL", PathPrefix.of(pathPrefix))) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 ids.add(rs.getLong(1));
@@ -470,46 +463,43 @@ public class FaceDao {
      * Builds the SQL fragment that restricts results to images having at least
      * one stored photo path starting with a given prefix, or (for video
      * frames) at least one stored path of the linked video starting with the
-     * prefix. The fragment contains {@link #PATH_FILTER_PLACEHOLDERS} {@code ?}
-     * placeholders, all bound to the same prefix value by
-     * {@link #bindPathFilter(PreparedStatement, String)}.
+     * prefix. A disabled filter yields no fragment at all.
      *
-     * @return the WHERE fragment, always starting with {@code " AND "}
+     * @param filter the path prefix to match
+     * @return the WHERE fragment, empty or starting with {@code " AND "}
      */
-    private static String pathFilterClause() {
-        return " AND (? IS NULL OR EXISTS ("
+    static String pathFilterClause(PathPrefix filter) {
+        if (filter.isDisabled()) {
+            return "";
+        }
+        return " AND (EXISTS ("
                 + "SELECT 1 FROM image_paths p "
                 + "WHERE p.hash = faces.image_hash "
-                + "AND substr(p.path, 1, length(?)) = ?)"
+                + "AND " + filter.condition("p.path") + ")"
                 + " OR EXISTS ("
                 + "SELECT 1 FROM video_frames vf "
                 + "JOIN video_paths vp ON vp.hash = vf.video_hash "
                 + "WHERE vf.frame_hash = faces.image_hash "
-                + "AND substr(vp.path, 1, length(?)) = ?))";
+                + "AND " + filter.condition("vp.path") + "))";
     }
 
     /**
-     * Binds the path-prefix placeholders produced by
-     * {@link #pathFilterClause()} to the given prefix. The prefix is trimmed;
-     * a {@code null} or blank prefix leaves the clause disabled.
+     * Prepares the given statement with the path filter appended, and binds its
+     * placeholders. Fragment and values come from the same {@link PathPrefix},
+     * so a fragment without placeholders is prepared without bound values.
      *
-     * <p>The clause's placeholders live at indexes 1..5; the
-     * {@code IN (...)} lookups that use {@link #placeholders} are built
-     * independently and bind their ids in order.</p>
-     *
-     * @param ps         the prepared statement to bind
-     * @param pathPrefix the trimmed prefix, or {@code null} for no filter
+     * @param sql    the statement, ending before the filter
+     * @param filter the path prefix to match
+     * @return the prepared statement, ready to execute
      * @throws SQLException on database error
      */
-    private static void bindPathFilter(PreparedStatement ps, String pathPrefix) throws SQLException {
-        String prefix = pathPrefix == null ? null : pathPrefix.trim();
-        for (int i = 1; i <= 5; i++) {
-            if (prefix == null || prefix.isEmpty()) {
-                ps.setNull(i, Types.VARCHAR);
-            } else {
-                ps.setString(i, prefix);
-            }
+    private PreparedStatement prepareWithPathFilter(String sql, PathPrefix filter) throws SQLException {
+        PreparedStatement ps = conn.prepareStatement(sql + pathFilterClause(filter));
+        if (!filter.isDisabled()) {
+            // The photo path range comes first in the fragment, the video path range second.
+            filter.bind(ps, filter.bind(ps, 1));
         }
+        return ps;
     }
 
     private FaceRecord mapRow(ResultSet rs) throws SQLException {

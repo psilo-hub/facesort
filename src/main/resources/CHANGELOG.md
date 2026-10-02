@@ -102,6 +102,14 @@ All notable changes to Face Sort will be documented in this file.
 - Tabs renamed (2026-09-19)
 - Changelog shortened (2026-09-19)
 - The UI refreshes immediately when the language is switched (2026-09-19)
+- Filtering by path prefix is now much faster on large libraries: the "Path
+  filter" field in the tagging views and the "Remove by path prefix" preview
+  and deletion match stored paths through an index instead of comparing every
+  stored path one by one. Which paths a prefix matches is unchanged — a plain,
+  case-sensitive prefix, so `/photos/family` still also matches
+  `/photos/family-archive`. The two path columns are indexed the first time an
+  existing database is opened, which builds the index once and can take a
+  moment on a very large library (2026-10-02)
 - Test suite hardened (internal, no visible behavior change): the video-import
   end-to-end tests now run in every environment — a tiny test video is
   generated in pure Java instead of the tests being skipped when the

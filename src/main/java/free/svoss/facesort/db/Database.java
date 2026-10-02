@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     /**
      * Milliseconds SQLite waits for a lock held by another connection before
@@ -148,8 +148,8 @@ public class Database implements AutoCloseable {
      * version. Version 0 means either a brand-new database or an unversioned
      * database created by an older build, so the baseline DDL is applied; as
      * the DDL is written with {@code IF NOT EXISTS} throughout it safely
-     * covers both cases. Future non-additive changes append further versioned
-     * statements here, chained from the version they start at.
+     * covers both cases. Further changes append their own versioned statements
+     * here, chained from the version they start at.
      */
     private static void migrate(Statement stmt, int fromVersion) throws SQLException {
         if (fromVersion <= 0) {
@@ -165,8 +165,24 @@ public class Database implements AutoCloseable {
             dropColumnIfPresent(stmt, "videos", "face_count");
             dropColumnIfPresent(stmt, "video_frames", "face_count");
         }
-        // Future migrations, e.g.:
-        // if (fromVersion < 3) { stmt.execute(...); }
+        if (fromVersion < 3) {
+            // Version 3 indexes the path column of both path tables, which the
+            // path filter of the tagging views and the removal by path prefix
+            // read as a lexicographic range. A brand-new baseline already
+            // declares them, so there the IF NOT EXISTS makes this a no-op.
+            createPathIndexes(stmt);
+        }
+    }
+
+    /**
+     * Creates the indexes that serve the path-prefix filters of the tagging
+     * views and of {@link DataRemovalDao}. Both callers go through this method
+     * so the fresh schema and the migration of an existing library cannot
+     * drift apart.
+     */
+    private static void createPathIndexes(Statement stmt) throws SQLException {
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_image_paths_path ON image_paths(path)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_paths_path ON video_paths(path)");
     }
 
     private static void dropColumnIfPresent(Statement stmt, String table, String column) throws SQLException {
@@ -277,6 +293,7 @@ public class Database implements AutoCloseable {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
+        createPathIndexes(stmt);
     }
 
     @Override
