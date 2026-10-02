@@ -217,7 +217,7 @@ class ImportCoordinatorTest {
         assertFalse(combined.images().wasCancelled(), "image phase must finish first");
         assertTrue(combined.videos().wasCancelled(), "video phase must honor the shared flag");
         assertEquals(0, combined.videos().processed());
-        assertEquals(1, combined.total());
+        assertEquals(2, combined.total());
         assertTrue(combined.wasCancelled());
     }
 

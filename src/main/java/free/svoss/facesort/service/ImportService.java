@@ -43,7 +43,7 @@ import java.util.function.BooleanSupplier;
 public class ImportService implements AutoCloseable {
 
     /** Supported image file extensions (case-insensitive, without the leading dot). */
-    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
+    static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "bmp", "gif", "webp"
     );
 
@@ -122,10 +122,9 @@ public class ImportService implements AutoCloseable {
      * @return a summary of the import operation
      * @throws IOException if the folder cannot be traversed
      */
-    public ImportResult importFolder(Path folder, ProgressListener progress,
-                                     BooleanSupplier cancelled) throws IOException {
-        List<Path> imageFiles = ImportFiles.collect(folder, SUPPORTED_EXTENSIONS, cancelled);
-        if (imageFiles.isEmpty()) {
+    public ImportResult importFiles(List<Path> imageFiles, ProgressListener progress,
+                                    BooleanSupplier cancelled) {
+        if (imageFiles == null || imageFiles.isEmpty()) {
             return new ImportResult(0, 0, 0, 0, 0, 0, 0,
                     cancelled != null && cancelled.getAsBoolean());
         }
@@ -164,6 +163,12 @@ public class ImportService implements AutoCloseable {
                 || (cancelled != null && cancelled.getAsBoolean());
         return new ImportResult(total, newImages.get(), newPaths.get(), newFaces.get(),
                 skipped.get(), worker.errors(), worker.processed(), wasCancelled);
+    }
+
+    public ImportResult importFolder(Path folder, ProgressListener progress,
+                                     BooleanSupplier cancelled) throws IOException {
+        List<Path> imageFiles = ImportFiles.collect(folder, SUPPORTED_EXTENSIONS, cancelled);
+        return importFiles(imageFiles, progress, cancelled);
     }
 
     /**

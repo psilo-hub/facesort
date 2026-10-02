@@ -154,10 +154,9 @@ public class VideoImportService implements AutoCloseable {
      * @return a summary of the import operation
      * @throws IOException if the folder cannot be traversed
      */
-    public VideoImportResult importFolder(Path folder, ImportService.ProgressListener progress,
-                                          BooleanSupplier cancelled) throws IOException {
-        List<Path> videoFiles = ImportFiles.collect(folder, SUPPORTED_EXTENSIONS, cancelled);
-        if (videoFiles.isEmpty()) {
+    public VideoImportResult importFiles(List<Path> videoFiles, ImportService.ProgressListener progress,
+                                         BooleanSupplier cancelled) {
+        if (videoFiles == null || videoFiles.isEmpty()) {
             return new VideoImportResult(0, 0, 0, 0, 0, 0, 0,
                     cancelled != null && cancelled.getAsBoolean());
         }
@@ -196,6 +195,12 @@ public class VideoImportService implements AutoCloseable {
                 || (cancelled != null && cancelled.getAsBoolean());
         return new VideoImportResult(total, newVideos.get(), newFrames.get(), newFaces.get(),
                 skipped.get(), worker.errors(), worker.processed(), wasCancelled);
+    }
+
+    public VideoImportResult importFolder(Path folder, ImportService.ProgressListener progress,
+                                         BooleanSupplier cancelled) throws IOException {
+        List<Path> videoFiles = ImportFiles.collect(folder, SUPPORTED_EXTENSIONS, cancelled);
+        return importFiles(videoFiles, progress, cancelled);
     }
 
     /**

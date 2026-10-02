@@ -67,13 +67,20 @@ public final class ImportCoordinator {
                                            Path folder, ImportService.ProgressListener progress,
                                            BooleanSupplier cancelled, Runnable beforeVideoPhase)
             throws IOException {
+        java.util.Map<java.util.Set<String>, java.util.List<Path>> files =
+                ImportFiles.collectCategorizedSets(folder,
+                        java.util.Set.of(ImportService.SUPPORTED_EXTENSIONS,
+                                VideoImportService.SUPPORTED_EXTENSIONS),
+                        cancelled);
         ImportService.ImportResult images =
-                imageImports.importFolder(folder, progress, cancelled);
+                imageImports.importFiles(files.getOrDefault(ImportService.SUPPORTED_EXTENSIONS,
+                        java.util.List.of()), progress, cancelled);
         if (beforeVideoPhase != null) {
             beforeVideoPhase.run();
         }
         VideoImportService.VideoImportResult videos =
-                videoImports.importFolder(folder, progress, cancelled);
+                videoImports.importFiles(files.getOrDefault(VideoImportService.SUPPORTED_EXTENSIONS,
+                        java.util.List.of()), progress, cancelled);
         return new CombinedImportResult(images, videos);
     }
 }

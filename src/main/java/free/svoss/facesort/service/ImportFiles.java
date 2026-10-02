@@ -45,15 +45,62 @@ final class ImportFiles {
      */
     static List<Path> collect(Path root, Set<String> extensions,
                               BooleanSupplier cancelled) throws IOException {
-        List<Path> files = new ArrayList<>();
+        return collectCategorized(root, extensions, cancelled).getOrDefault(extensions, List.of());
+    }
+
+    /**
+     * Recursively collects all regular files under {@code root} grouped by the
+     * extension set they match. When a file matches more than one set, it is
+     * added to every matching set (extensions are disjoint in practice, but the
+     * API allows it).
+     *
+     * @param root       the root directory to scan
+     * @param extensions supported file extensions (case-insensitive, without the
+     *                   leading dot)
+     * @param cancelled  supplier consulted before each file and directory
+     * @return map from the extension set to the list of matching files
+     * @throws IOException if the folder cannot be traversed
+     */
+    static java.util.Map<Set<String>, List<Path>> collectCategorized(
+            Path root, Set<String> extensions, BooleanSupplier cancelled) throws IOException {
+        java.util.Map<Set<String>, List<Path>> wrapper = new java.util.HashMap<>();
+        wrapper.put(extensions, List.of());
+        java.util.Map<Set<String>, List<Path>> result =
+                collectCategorizedSets(root, java.util.Set.of(extensions), cancelled);
+        return result;
+    }
+
+    /**
+     * Recursively collects all regular files under {@code root} grouped by which
+     * extension set they match. The first set in iteration order that matches
+     * the file's extension determines its primary bucket (if sets overlap, the
+     * first matching set wins).
+     */
+    static java.util.Map<Set<String>, List<Path>> collectCategorizedSets(
+            Path root, java.util.Set<Set<String>> extensionSets,
+            BooleanSupplier cancelled) throws IOException {
+        java.util.Map<Set<String>, List<Path>> result = new java.util.HashMap<>();
+        for (Set<String> set : extensionSets) {
+            result.put(set, new ArrayList<>());
+        }
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 if (cancelled != null && cancelled.getAsBoolean()) {
                     return FileVisitResult.TERMINATE;
                 }
-                if (attrs.isRegularFile() && hasSupportedExtension(file, extensions)) {
-                    files.add(file);
+                if (attrs.isRegularFile()) {
+                    String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+                    int dot = name.lastIndexOf('.');
+                    if (dot >= 0) {
+                        String ext = name.substring(dot + 1);
+                        for (Set<String> set : extensionSets) {
+                            if (set.contains(ext)) {
+                                result.get(set).add(file);
+                                break;
+                            }
+                        }
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -71,7 +118,7 @@ final class ImportFiles {
                 return FileVisitResult.CONTINUE;
             }
         });
-        return files;
+        return result;
     }
 
     /**
