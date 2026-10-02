@@ -19,6 +19,7 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
     private DetectedFace[] faces = new DetectedFace[0];
     private float[] embedding = new float[]{1, 0, 0, 0, 0, 0, 0, 0};
     private boolean failEmbedding = false;
+    private Runnable detectionHook;
     private final AtomicInteger detectCalls = new AtomicInteger();
 
     /** Sets the faces reported for every detected image. */
@@ -44,9 +45,25 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
         return this;
     }
 
+    /**
+     * Runs the given action inside the next {@link #detectFaces} call, i.e.
+     * while the service is between its existence check and its commit — the
+     * window in which a competing worker can change the database underneath it.
+     * The hook is cleared before it runs, so it fires exactly once.
+     */
+    FakeFaceAiEngine withDetectionHook(Runnable hook) {
+        this.detectionHook = hook;
+        return this;
+    }
+
     @Override
     public DetectedFace[] detectFaces(BufferedImage image) {
         detectCalls.incrementAndGet();
+        Runnable hook = detectionHook;
+        if (hook != null) {
+            detectionHook = null;
+            hook.run();
+        }
         return faces;
     }
 

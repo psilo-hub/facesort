@@ -241,6 +241,13 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- A database failure during an import is no longer reported as success. When
+  storing an image failed for any reason other than another worker having
+  imported the very same picture first — a full disk, a damaged or locked
+  database, a refused write — the import silently counted the file as imported
+  and stored its path, even though its faces were never saved. Such a failure
+  is now reported as an error, like any other, and the file is not recorded
+  (2026-10-02)
 - Exporting the same person to the same folder twice no longer fails with a
   "file already exists" error. A second export now refreshes the exported
   originals, and behaves the same as the thumbnail exports that already worked

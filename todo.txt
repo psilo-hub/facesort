@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-02. `mvn test` is green: 424 tests / 46 test classes,
+State as of 2026-10-02. `mvn test` is green: 442 tests / 47 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (30 open items, with the
+The detailed backlog lives in `suggestions.md` (35 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,58 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* §1.6 `ImportService` no longer swallows unrelated database failures. The
+  atomic commit unit (image row + path + faces) was wrapped in
+  `catch (SQLException e)` and treated as "another worker imported this first"
+  on the strength of one `imageDao.exists(hash)` check alone, so *any*
+  failure of that transaction — NOT NULL, FOREIGN KEY, a trigger abort,
+  `SQLITE_FULL`, a disk error — became "new path recorded" and the import
+  reported success for a file whose faces were never stored. The guard is
+  narrow (the hash must appear between the existence check and the catch),
+  but that is precisely the window the branch exists for, so the collision
+  path and the real-failure path were indistinguishable.
+  The backlog proposed catching `SQLIntegrityConstraintViolationException` /
+  `SQLTransactionRollbackException`; that is impossible with sqlite-jdbc
+  3.45.1.0 and would have been dead code. Every failure the driver builds
+  goes through `DB.newSQLException`, so it is always an
+  `org.sqlite.SQLiteException extends SQLException` whose only constructor
+  calls `super(message, null, code & 0xff)`: SQL state always `null`, error
+  code truncated to its low byte, and neither JDBC-standard class is ever
+  instantiated. `getErrorCode()` is 19 (`SQLITE_CONSTRAINT`) for *every*
+  constraint class, so it cannot discriminate either. What survives is the
+  extended result code, read through one predicate —
+  `SqliteErrors.isDuplicateContentConflict`, in the `db` package because a
+  driver detail belongs at the JDBC/SQLite boundary and `ImportService`
+  should stay driver-agnostic.
+  The correction that mattered most is the code list. A duplicate on
+  `images.hash` arrives as `SQLITE_CONSTRAINT_PRIMARYKEY` (1555), **not**
+  `SQLITE_CONSTRAINT_UNIQUE` (2067): SQLite reports the constraint that was
+  *declared*, and even its message text ("UNIQUE constraint failed:
+  images.hash") disagrees with its own code. Only the separate unique index
+  on `faces (image_hash, bbox_x, bbox_y, bbox_w, bbox_h)` raises 2067. So
+  the predicate accepts PRIMARYKEY **and** UNIQUE — accepting UNIQUE alone,
+  as proposed, would have killed the very collision path the branch exists
+  for, silently and without any test complaining, because lines 215-239 had
+  zero coverage. Everything else now propagates: NOT NULL (1299), FOREIGN
+  KEY (787), trigger abort (1811), CHECK (275), `SQLITE_ERROR` (1), FULL,
+  I/O, corruption, and any non-driver `SQLException`. The existence check
+  stays as the second condition of the same one-line guard: the result code
+  names the failure, the existence check is the second line of defence for
+  the unique-index case and for a hash inserted by the video/frame path.
+  Pinned by the new `SqliteErrorsTest` (16 cases — 9 unit cases on the
+  classification, 7 driving a real `Database.inMemory()` to prove the driver
+  really produces each code, incl. one that documents why `getErrorCode()`
+  and the SQL state cannot be used) and 2 new `ImportServiceTest` cases:
+  the collision path, which had no coverage at all and is what a naive
+  narrowing silently kills, and the unrelated-failure case, red against the
+  unmodified service with `expected: <1> but was: <0>` on `errors()` — the
+  swallowed failure, named. Both stage the race from a new one-shot
+  `FakeFaceAiEngine.withDetectionHook` so the competing row lands in the
+  window between the existence check and the commit. Mutation-verified both
+  ways: a predicate that always returns `true` (the original behaviour)
+  fails 11 cases including that one; one that always returns `false` fails 5
+  including the collision case.
 
 * §3 The path-prefix filters can use an index. `substr(path, 1,
   length(?)) = ?` cannot be served from any index, so both the folder
@@ -142,9 +194,8 @@ Queued next (highest payoff first, all still open in suggestions.md)
 --------------------------------------------------------------------
 
 §1 Correctness — the only section that is nearly done, so finishing it
-  closes out the "correctness first" pass:
-  1. §1.6  `ImportService` swallows unrelated database failures (medium)
-  2. §1.10 Null-safety gaps in the seams that face native code (medium)
+  closes out the "correctness first" pass. One item left:
+  1. §1.10 Null-safety gaps in the seams that face native code (medium)
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

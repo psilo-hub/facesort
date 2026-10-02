@@ -3,6 +3,7 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.SqliteErrors;
 import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.util.HashUtils;
@@ -223,9 +224,16 @@ public class ImportService implements AutoCloseable {
                 return null;
             });
         } catch (SQLException e) {
-            // Another worker imported the same content first: record only
-            // the additional path for this file.
-            if (!imageDao.exists(hash)) {
+            // A duplicate-content conflict means another worker imported the
+            // same content first: record only the additional path for this
+            // file. Any other database failure is a real failure and must
+            // propagate, so the file is reported as an error instead of
+            // silently counted as imported. Both conditions are needed: the
+            // result code names the failure, and the existence check is the
+            // second line of defence — it still guards the unique-index case
+            // and a hash inserted by the video/frame path between our
+            // existence check and this commit.
+            if (!SqliteErrors.isDuplicateContentConflict(e) || !imageDao.exists(hash)) {
                 throw e;
             }
             List<String> existingPaths = imageDao.getPaths(hash);

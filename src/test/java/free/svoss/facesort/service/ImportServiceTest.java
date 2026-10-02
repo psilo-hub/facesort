@@ -5,6 +5,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.util.HashUtils;
 import free.svoss.tools.faceai.DetectedFace;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -680,5 +682,106 @@ class ImportServiceTest {
         assertEquals(1, result.errors(), "lost faces are surfaced as a file error");
         assertEquals(0, result.skipped());
         assertEquals(1, result.processed());
+    }
+
+    // ------------------------------------------------------------------
+    // Commit-failure handling (the collision handler)
+    // ------------------------------------------------------------------
+
+    /**
+     * Pins the duplicate-content path the collision handler exists for: a
+     * competing worker commits the same content while this service is still
+     * detecting, so the insert inside the commit unit fails with a duplicate
+     * content conflict. That is not an error — the content is stored, only this
+     * file's path is missing, so the import records the extra path.
+     */
+    @Test
+    void importFolder_raceLostDuringDetectionRecordsOnlyTheExtraPath() throws Exception {
+        Path dir = createPhotos(1);
+        Path file = dir.resolve("photo0.png");
+        String hash = HashUtils.hashFile(file);
+        String competitorPath = "/competitor/photo0.png";
+
+        FakeFaceAiEngine engine = countingEngine()
+                .withDetectionHook(() -> {
+                    // The competing row lands after the service's existence
+                    // check, so only the commit unit below can fail.
+                    insertCompetingImage(hash, competitorPath);
+                });
+
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                new FaceAiService(engine), config(), db.getTransactionRunner())) {
+            ImportService.ImportResult result = service.importFolder(dir, null);
+
+            assertEquals(0, result.errors(), "a duplicate content conflict is not an error");
+            assertEquals(0, result.newImages(), "the content was already stored by the other worker");
+            assertEquals(1, result.newPaths(), "this file's path is the new part");
+            assertEquals(1, result.processed());
+
+            assertEquals(1, imageDao.getAllHashes().size(), "still exactly one image row");
+            List<String> paths = imageDao.getPaths(hash);
+            assertEquals(2, paths.size());
+            assertTrue(paths.contains(competitorPath));
+            assertTrue(paths.contains(file.toAbsolutePath().toString()));
+        }
+    }
+
+    /**
+     * A failure that is *not* a duplicate content conflict must never be
+     * reported as success. Here the same race is staged, but the competing row
+     * is followed by a trigger that refuses every further insert into
+     * {@code images}, so the commit unit fails with a trigger abort while the
+     * hash does exist — exactly the shape that used to be swallowed, because
+     * the existence check alone could not tell it from the collision.
+     */
+    @Test
+    void importFolder_unrelatedWriteFailureIsReportedNotRecordedAsDuplicatePath() throws Exception {
+        Path dir = createPhotos(1);
+        Path file = dir.resolve("photo0.png");
+        String hash = HashUtils.hashFile(file);
+        String absolutePath = file.toAbsolutePath().toString();
+        String competitorPath = "/competitor/photo0.png";
+
+        FakeFaceAiEngine engine = countingEngine()
+                .withDetectionHook(() -> {
+                    // Order matters: the competing row must exist before the
+                    // trigger is created, or the trigger would refuse it too.
+                    insertCompetingImage(hash, competitorPath);
+                    execute("CREATE TRIGGER refuse_image BEFORE INSERT ON images BEGIN "
+                            + "SELECT RAISE(ABORT, 'write refused'); END");
+                });
+
+        try (ImportService service = new ImportService(imageDao, faceDao,
+                new FaceAiService(engine), config(), db.getTransactionRunner())) {
+            ImportService.ImportResult result = service.importFolder(dir, null);
+
+            assertEquals(1, result.errors(), "the failed commit must be surfaced");
+            assertEquals(0, result.newPaths(),
+                    "a file whose commit failed must not be reported as a recorded path");
+            assertEquals(0, result.newImages());
+            assertEquals(1, result.processed());
+
+            assertEquals(1, imageDao.getAllHashes().size(), "only the competing worker's row");
+            assertFalse(imageDao.getPaths(hash).contains(absolutePath),
+                    "the failed import must not have recorded its path");
+        }
+    }
+
+    /** Commits an image row for the given hash the way a competing worker would. */
+    private void insertCompetingImage(String hash, String path) {
+        try {
+            imageDao.insert(hash, System.currentTimeMillis(), "{}", 0);
+            imageDao.addPath(hash, path);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void execute(String sql) {
+        try (Statement stmt = db.getConnection().createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
