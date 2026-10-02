@@ -52,5 +52,8 @@ public interface VideoFrameSource extends AutoCloseable {
      * @param positionSeconds the real position of the frame in the video, in seconds
      */
     record SampledFrame(BufferedImage image, double positionSeconds) {
+        public SampledFrame {
+            java.util.Objects.requireNonNull(image, "image must not be null");
+        }
     }
 }

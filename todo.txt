@@ -195,7 +195,7 @@ Queued next (highest payoff first, all still open in suggestions.md)
 
 §1 Correctness — the only section that is nearly done, so finishing it
   closes out the "correctness first" pass. One item left:
-  1. §1.10 Null-safety gaps in the seams that face native code (medium)
+  1. §1.10 Null-safety gaps in the seams that face native code (medium) — **done**: added requireNonNull checks in FaceDetectionUtils (imageHash, image, service, sourceDescription) and VideoFrameSource.SampledFrame.image; all 442 tests pass.
 
 §2 Concurrency — the largest remaining risk area, all untouched so far:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —

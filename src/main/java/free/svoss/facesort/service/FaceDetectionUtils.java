@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -56,6 +57,10 @@ final class FaceDetectionUtils {
                                         double minConfidence, int maxFacesPerImage,
                                         int faceCropSize, float thumbnailQuality,
                                         FaceAiService service, String sourceDescription) {
+        Objects.requireNonNull(imageHash, "imageHash must not be null");
+        Objects.requireNonNull(image, "image must not be null");
+        Objects.requireNonNull(service, "service must not be null");
+        Objects.requireNonNull(sourceDescription, "sourceDescription must not be null");
         double detectionScale = computeDetectionScale(image, maxDetectionDimension);
         BufferedImage detectionImage = detectionScale < 1.0
                 ? ImageUtils.downsize(image, maxDetectionDimension)
