@@ -15,7 +15,7 @@
 - [x] Cap import log size to prevent unbounded TextArea growth (ImportView.java:288, 284-310) - done: added MAX_LOG_LINES=1000 and truncation logic to keep only last 1000 lines in the log area. All 442 tests pass.
 - [ ] Debounce View tab filtering and add thumbnail Image cache keyed by hash (ViewView.java:111,173-191)
 - [x] Use PATH_FILTER_PLACEHOLDERS constant consistently in bindPathFilter (FaceDao.java:386,419) - obsolete, and both are gone: the placeholder count was the hazard, so `FaceDao.PATH_FILTER_PLACEHOLDERS` and `bindPathFilter` were deleted together with `DataRemovalDao.bindPrefix`. `PathPrefix.bind(ps, firstIndex)` binds one range and returns the next index, so the fragment and the bound values cannot drift apart and there is no count left to keep in sync
-- [ ] Remove dead config field from NamingService (NamingService.java:66,82, FaceSortApp.java:222)
+- [x] Remove dead config field from NamingService (NamingService.java:66,82, FaceSortApp.java:222) - done: removed ConfigModel field and constructor param from NamingService, updated FaceSortApp instantiation and updated NamingServiceTest. All 442 tests pass.
 - [ ] Remove or adopt unused DAO methods (NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes)
 - [ ] Deduplicate face-source bridges and error handlers across five views (NameFaceView.java:414, ViewView.java:398, DedupeView.java:327, RandomNameView.java:362, FaceNameView.java:710)
 - [ ] Consolidate ViewService API and extract MediaFileResolver to eliminate duplication across services (ViewService.java:129,189,213,225,241,289)

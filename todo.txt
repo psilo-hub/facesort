@@ -221,3 +221,6 @@ Queued next (highest payoff first, all still open in suggestions.md)
          depends on it) — highest-leverage process gap in the repo
   * §8   The "Video import" bullet is missing from all five translated
          READMEs — required by the `AGENTS.md` doc-sync rule
+
+3. §3.6 Cap import log size — **done** (ImportView capped to last 1000 lines)
+4. §4.1 Remove dead config field from NamingService — **done** (removed field/param, updated call sites and test)

@@ -1,6 +1,5 @@
 package free.svoss.facesort.service;
 
-import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
@@ -51,7 +50,6 @@ public final class NamingService {
     private final NameDao nameDao;
     private final ImageDao imageDao;
     private final VideoDao videoDao;
-    private final ConfigModel config;
     private final NameService nameService;
 
     /**
@@ -63,23 +61,19 @@ public final class NamingService {
      * @param nameDao           access to the names table
      * @param imageDao          access to the images and image_paths tables
      * @param videoDao          access to the videos, video_paths and video_frames tables
-     * @param config            application settings; reserved for tuning the
-     *                          flow (e.g. similarity thresholds)
      */
     public NamingService(ClusteringService clusteringService,
                          FaceAiService faceAiService,
                          FaceDao faceDao,
                          NameDao nameDao,
                          ImageDao imageDao,
-                         VideoDao videoDao,
-                         ConfigModel config) {
+                         VideoDao videoDao) {
         this.clusteringService = Objects.requireNonNull(clusteringService, "clusteringService");
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
-        this.config = Objects.requireNonNull(config, "config");
         this.nameService = new NameService(nameDao);
     }
 

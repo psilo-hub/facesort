@@ -227,7 +227,7 @@ public class FaceSortApp extends Application {
         videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
                 importAiServices, config, database.getTransactionRunner());
         clusteringService = new ClusteringService(faceAiService, faceDao, config);
-        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao, config);
+        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao);
         faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, config);
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
