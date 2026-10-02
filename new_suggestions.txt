@@ -1,0 +1,5 @@
+Read the codebase and the @suggestions.md . Update the @suggestions.md in the following way: 1. Items that have been done or that are no longer necessary can be removed. 2. Find new items that are not covered yet. These might be about clean code, code maturity, tdd, new features, or performance improvements.
+
+Write the results into suggestions.md in a way that can be used as a todo list. Avoid sub-items.
+
+Once you're done, commit the change.
