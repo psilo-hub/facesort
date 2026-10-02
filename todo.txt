@@ -212,7 +212,7 @@ Queued next (highest payoff first, all still open in suggestions.md)
   * `findSimilarUnnamed` loads and sorts the whole unnamed corpus
   * The random-faces view hydrates embeddings it never uses
   * Query-planner statistics are never refreshed
-  * The import folder is walked twice; the import log grows without bound
+  * The import folder is walked twice; the import log grows without bound — **done** (import log capped to last 1000 lines in ImportView)
   * The View tab re-decodes every JPEG on every keystroke
 
 §4–§9 — clean-up, process, UX, i18n, features. Two easy ones worth

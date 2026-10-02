@@ -285,8 +285,29 @@ public class ImportView extends BorderPane {
      *
      * @param line the message to append
      */
+    private static final int MAX_LOG_LINES = 1000;
+
     private void appendLog(String line) {
         logArea.appendText(line + System.lineSeparator());
+        String text = logArea.getText();
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        long newlineCount = text.chars().filter(c -> c == '\n').count();
+        if (newlineCount <= MAX_LOG_LINES) {
+            return;
+        }
+        int toRemove = (int) (newlineCount - MAX_LOG_LINES);
+        int idx = 0;
+        for (int i = 0; i < toRemove && idx >= 0; i++) {
+            idx = text.indexOf('\n', idx);
+            if (idx >= 0) {
+                idx++;
+            }
+        }
+        if (idx > 0) {
+            logArea.deleteText(0, idx);
+        }
     }
 
     /**
