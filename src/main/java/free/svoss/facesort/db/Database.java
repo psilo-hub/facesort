@@ -130,6 +130,12 @@ public class Database implements AutoCloseable {
                 migrate(stmt, version);
                 stmt.execute("PRAGMA user_version = " + SCHEMA_VERSION);
             }
+            // Refresh query planner statistics after schema changes/open
+            try {
+                stmt.execute("PRAGMA optimize");
+            } catch (SQLException ignored) {
+                // Ignore optimization failures - non-critical
+            }
         }
     }
 

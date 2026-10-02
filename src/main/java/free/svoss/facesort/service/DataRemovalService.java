@@ -1,9 +1,11 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.db.DataRemovalDao;
+import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.TransactionRunner;
 
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Objects;
 
 /**
@@ -27,14 +29,25 @@ public class DataRemovalService {
 
     private final DataRemovalDao dao;
     private final TransactionRunner transactions;
+    private final Database database;
 
     /**
      * @param dao          DAO for the cross-table prefix removal queries
      * @param transactions runner for the atomic estimate/remove units
      */
     public DataRemovalService(DataRemovalDao dao, TransactionRunner transactions) {
+        this(dao, transactions, null);
+    }
+
+    /**
+     * @param dao          DAO for the cross-table prefix removal queries
+     * @param transactions runner for the atomic estimate/remove units
+     * @param database     database instance (optional) to run PRAGMA optimize after mass deletions
+     */
+    public DataRemovalService(DataRemovalDao dao, TransactionRunner transactions, Database database) {
         this.dao = Objects.requireNonNull(dao, "dao");
         this.transactions = Objects.requireNonNull(transactions, "transactions");
+        this.database = database;
     }
 
     /**
@@ -59,7 +72,7 @@ public class DataRemovalService {
      */
     public Removal remove(String prefix) throws SQLException {
         String trimmed = trim(prefix);
-        return transactions.inTransaction(() -> {
+        Removal result = transactions.inTransaction(() -> {
             Estimate estimate = survey(trimmed);
             if (!estimate.hasMatches()) {
                 return estimate.toRemoval();
@@ -71,6 +84,15 @@ public class DataRemovalService {
             dao.deleteAffectedVideos(trimmed);
             return estimate.toRemoval();
         });
+        // Refresh query planner statistics after mass deletions
+        if (database != null) {
+            try (java.sql.Statement stmt = database.getConnection().createStatement()) {
+                stmt.execute("PRAGMA optimize");
+            } catch (SQLException ignored) {
+                // Ignore optimization failures - non-critical
+            }
+        }
+        return result;
     }
 
     private static String trim(String prefix) {
