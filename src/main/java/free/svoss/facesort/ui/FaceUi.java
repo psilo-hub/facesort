@@ -90,6 +90,10 @@ final class FaceUi {
         view.setImage(toImage(face));
     }
 
+    static void setImage(ImageView view, free.svoss.facesort.model.FaceThumb face) {
+        view.setImage(toImage(face));
+    }
+
     /**
      * Decodes a face's JPEG sub-image, or returns {@code null} when no
      * sub-image is available.
@@ -98,6 +102,14 @@ final class FaceUi {
      * @return the decoded image, or {@code null} when unavailable
      */
     static Image toImage(FaceRecord face) {
+        byte[] jpg = face != null ? face.subImageJpg() : null;
+        if (jpg == null || jpg.length == 0) {
+            return null;
+        }
+        return new Image(new ByteArrayInputStream(jpg));
+    }
+
+    static Image toImage(free.svoss.facesort.model.FaceThumb face) {
         byte[] jpg = face != null ? face.subImageJpg() : null;
         if (jpg == null || jpg.length == 0) {
             return null;
@@ -122,6 +134,16 @@ final class FaceUi {
         return view;
     }
 
+    static ImageView thumb(free.svoss.facesort.model.FaceThumb face, double size) {
+        ImageView view = new ImageView();
+        setImage(view, face);
+        view.setFitWidth(size);
+        view.setFitHeight(size);
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        return view;
+    }
+
     /**
      * Builds a candidate card for the given face: a styled {@code VBox}
      * carrying the face id in its user data and prefilled with the face
@@ -132,6 +154,16 @@ final class FaceUi {
      * @return the card node
      */
     static VBox faceCard(FaceRecord face, double thumbSize) {
+        VBox card = new VBox(4);
+        card.setAlignment(Pos.TOP_CENTER);
+        card.setPadding(new Insets(4));
+        card.setUserData(face.id());
+        card.getStyleClass().add("candidate-card");
+        card.getChildren().add(thumb(face, thumbSize));
+        return card;
+    }
+
+    static VBox faceCard(free.svoss.facesort.model.FaceThumb face, double thumbSize) {
         VBox card = new VBox(4);
         card.setAlignment(Pos.TOP_CENTER);
         card.setPadding(new Insets(4));
@@ -168,12 +200,22 @@ final class FaceUi {
      */
     static void installPathTooltip(Node node, FaceRecord face, String threadName,
                                    Lookup<List<String>> lookup) {
+        installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
+    }
+
+    static void installPathTooltip(Node node, free.svoss.facesort.model.FaceThumb face, String threadName,
+                                   Lookup<List<String>> lookup) {
+        installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
+    }
+
+    private static void installPathTooltip(Node node, String imageHash, long faceId, String threadName,
+                                         Lookup<List<String>> lookup) {
         Tooltip tooltip = new Tooltip(I18n.get("common.loadingPath"));
         Tooltip.install(node, tooltip);
         Task<List<String>> paths = new Task<>() {
             @Override
             protected List<String> call() throws SQLException {
-                return lookup.byHash(face.imageHash());
+                return lookup.byHash(imageHash);
             }
         };
         paths.setOnSucceeded(e -> {
@@ -183,7 +225,7 @@ final class FaceUi {
                     : String.join(System.lineSeparator(), result));
         });
         paths.setOnFailed(e -> tooltip.setText(I18n.get("common.pathUnavailable")));
-        Thread thread = new Thread(paths, threadName + face.id());
+        Thread thread = new Thread(paths, threadName + faceId);
         thread.setDaemon(true);
         thread.start();
     }
@@ -378,6 +420,18 @@ final class FaceUi {
                 return;
             }
             installMenu(node, face.imageHash(), extras);
+        }
+
+        void installFaceMenu(Node node, free.svoss.facesort.model.FaceThumb face, MenuItem... extras) {
+            if (face == null) {
+                node.setOnContextMenuRequested(null);
+                return;
+            }
+            installMenu(node, face.imageHash(), extras);
+        }
+
+        void installFaceMenu(Node node, MenuItem... extras) {
+            node.setOnContextMenuRequested(null);
         }
 
         /**

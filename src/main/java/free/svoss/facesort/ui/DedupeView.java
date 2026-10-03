@@ -45,8 +45,18 @@ public class DedupeView extends BorderPane {
 
     private final Label statusLabel = new Label(I18n.get("ui.dedupe.idleHint"));
     private final Label pairLabel = new Label();
-    private final ImageView faceAView = FaceUi.thumb(null, THUMBNAIL_SIZE);
-    private final ImageView faceBView = FaceUi.thumb(null, THUMBNAIL_SIZE);
+    private final ImageView faceAView = new ImageView();
+    private final ImageView faceBView = new ImageView();
+    {
+        faceAView.setFitWidth(THUMBNAIL_SIZE);
+        faceAView.setFitHeight(THUMBNAIL_SIZE);
+        faceAView.setPreserveRatio(true);
+        faceAView.setSmooth(true);
+        faceBView.setFitWidth(THUMBNAIL_SIZE);
+        faceBView.setFitHeight(THUMBNAIL_SIZE);
+        faceBView.setPreserveRatio(true);
+        faceBView.setSmooth(true);
+    }
     private final Label nameALabel = new Label();
     private final Label nameBLabel = new Label();
 
@@ -300,8 +310,8 @@ public class DedupeView extends BorderPane {
         nameBLabel.setText("");
         faceAView.setImage(null);
         faceBView.setImage(null);
-        faceActions.installFaceMenu(faceAView, null);
-        faceActions.installFaceMenu(faceBView, null);
+        faceActions.installFaceMenu(faceAView);
+        faceActions.installFaceMenu(faceBView);
         setDecisionEnabled(false);
         stopButton.setDisable(true);
         startButton.setDisable(false);

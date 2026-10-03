@@ -220,6 +220,17 @@ public final class NamingService {
         return faceDao.findRandomUnnamed(limit, pathPrefix);
     }
 
+    public List<free.svoss.facesort.model.FaceThumb> findRandomUnnamedThumbs(int limit, String pathPrefix)
+            throws SQLException {
+        if (limit < 0) {
+            throw new IllegalArgumentException("limit must not be negative");
+        }
+        if (limit == 0) {
+            return List.of();
+        }
+        return faceDao.findRandomUnnamedThumbs(limit, pathPrefix);
+    }
+
     /**
      * Returns the id of the name, creating it if it does not exist yet.
      *

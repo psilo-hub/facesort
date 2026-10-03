@@ -210,7 +210,7 @@ Queued next (highest payoff first, all still open in suggestions.md)
   reads, SQLite WAL/busy_timeout/synchronous, the path-prefix filters).
   Remaining:
   * `findSimilarUnnamed` loads and sorts the whole unnamed corpus
-  * The random-faces view hydrates embeddings it never uses
+  * The random-faces view hydrates embeddings it never uses — **done** (added FaceThumb projection and use in random faces view to avoid loading embeddings)
   * Query-planner statistics are never refreshed — **done** (PRAGMA optimize runs on Database open and after mass deletions in DataRemovalService)
   * The import folder is walked twice; the import log grows without bound — **done** (import log capped to last 1000 lines in ImportView; also optimized to single traversal via ImportFiles.collectCategorizedSets)
   * The View tab re-decodes every JPEG on every keystroke

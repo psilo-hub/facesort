@@ -1,7 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
-import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.FaceThumb;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.NamingService;
 
@@ -148,15 +148,15 @@ public class RandomNameView extends BorderPane implements Refreshable {
         statusLabel.setText(I18n.get("ui.randomName.loading"));
         facesPane.getChildren().clear();
 
-        Task<List<FaceRecord>> task = new Task<>() {
+        Task<List<FaceThumb>> task = new Task<>() {
             @Override
-            protected List<FaceRecord> call() throws SQLException {
-                return namingService.findRandomUnnamed(BATCH_SIZE, pathPrefix);
+            protected List<FaceThumb> call() throws SQLException {
+                return namingService.findRandomUnnamedThumbs(BATCH_SIZE, pathPrefix);
             }
         };
 
         task.setOnSucceeded(e -> {
-            List<FaceRecord> faces = task.getValue();
+            List<FaceThumb> faces = task.getValue();
             showFaces(faces);
             setBusy(false);
             statusLabel.setText(faces.isEmpty()
@@ -200,9 +200,9 @@ public class RandomNameView extends BorderPane implements Refreshable {
      *
      * @param faces the faces in the sample
      */
-    private void showFaces(List<FaceRecord> faces) {
+    private void showFaces(List<FaceThumb> faces) {
         facesPane.getChildren().clear();
-        for (FaceRecord face : faces) {
+        for (FaceThumb face : faces) {
             VBox card = FaceUi.faceCard(face, THUMBNAIL_SIZE);
 
             FaceUi.installPathTooltip(card, face, "randomname-path-tooltip-",
@@ -231,7 +231,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * @param card the card to attach the menu to
      * @param face the face whose source image should be openable
      */
-    private void installContextMenu(VBox card, FaceRecord face) {
+    private void installContextMenu(VBox card, FaceThumb face) {
         MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
         Optional<Path> filterFolder = filterFolderFor(face);
         pasteFilterItem.setDisable(filterFolder.isEmpty());
@@ -246,7 +246,7 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * @param face the face whose media file folder to resolve
      * @return the folder to filter by, or empty when unavailable
      */
-    private Optional<Path> filterFolderFor(FaceRecord face) {
+    private Optional<Path> filterFolderFor(FaceThumb face) {
         try {
             return namingService.resolveFilterFolder(face.imageHash());
         } catch (SQLException ex) {

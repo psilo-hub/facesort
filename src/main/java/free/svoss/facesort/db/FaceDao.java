@@ -182,6 +182,23 @@ public class FaceDao {
         return findByIds(sampled);
     }
 
+    public List<free.svoss.facesort.model.FaceThumb> findRandomUnnamedThumbs(int limit, String pathPrefix)
+            throws SQLException {
+        if (limit <= 0) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        try (PreparedStatement ps = prepareWithPathFilter(
+                "SELECT id FROM faces WHERE name_id IS NULL", PathPrefix.of(pathPrefix))) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getLong(1));
+            }
+        }
+        List<Long> sampled = sampleRandom(ids, limit, new Random());
+        return findThumbsByIds(sampled);
+    }
+
     /**
      * Picks up to {@code limit} distinct ids from {@code candidates}, chosen
      * uniformly at random. The selection is a partial Fisher–Yates shuffle:
@@ -256,6 +273,38 @@ public class FaceDao {
         List<FaceRecord> faces = new ArrayList<>(ids.size());
         for (Long id : ids) {
             FaceRecord face = byId.get(id);
+            if (face != null) {
+                faces.add(face);
+            }
+        }
+        return faces;
+    }
+
+    /**
+     * Loads face thumbnails with the given ids by primary key (no embeddings).
+     */
+    private List<free.svoss.facesort.model.FaceThumb> findThumbsByIds(List<Long> ids) throws SQLException {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, free.svoss.facesort.model.FaceThumb> byId = new LinkedHashMap<>();
+        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
+            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, sub_image_jpg, name_id"
+                            + " FROM faces WHERE id IN (" + placeholders(chunk.size()) + ") AND name_id IS NULL")) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setLong(i + 1, chunk.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    byId.put(rs.getLong("id"), mapThumbRow(rs));
+                }
+            }
+        }
+        List<free.svoss.facesort.model.FaceThumb> faces = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            free.svoss.facesort.model.FaceThumb face = byId.get(id);
             if (face != null) {
                 faces.add(face);
             }
@@ -516,5 +565,21 @@ public class FaceDao {
         Long nameId = rs.wasNull() ? null : nameIdRaw;
 
         return new FaceRecord(id, imageHash, bboxX, bboxY, bboxW, bboxH, confidence, embedding, subImageJpg, nameId);
+    }
+
+    private free.svoss.facesort.model.FaceThumb mapThumbRow(ResultSet rs) throws SQLException {
+        long id = rs.getLong("id");
+        String imageHash = rs.getString("image_hash");
+        int bboxX = rs.getInt("bbox_x");
+        int bboxY = rs.getInt("bbox_y");
+        int bboxW = rs.getInt("bbox_w");
+        int bboxH = rs.getInt("bbox_h");
+        double confidence = rs.getDouble("confidence");
+        byte[] subImageJpg = rs.getBytes("sub_image_jpg");
+        long nameIdRaw = rs.getLong("name_id");
+        Long nameId = rs.wasNull() ? null : nameIdRaw;
+
+        return new free.svoss.facesort.model.FaceThumb(id, imageHash, bboxX, bboxY, bboxW, bboxH,
+                confidence, subImageJpg, nameId);
     }
 }
