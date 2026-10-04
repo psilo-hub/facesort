@@ -247,14 +247,30 @@ public class DedupeView extends BorderPane {
     }
 
     /**
-     * Handles "These are not dupes": persists a not-dupes marker.
+     * Handles "These are not dupes": persists a not-dupes marker on a background
+     * thread.
      */
     private void onNotDupes() {
         if (current == null) {
             return;
         }
         DeduplicationService.DupeCandidate pair = current;
-        runDecision(() -> dedupService.markNotDupes(pair.nameIdA(), pair.nameIdB()));
+        setDecisionEnabled(false);
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                dedupService.markNotDupes(pair.nameIdA(), pair.nameIdB());
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> loadNextPair());
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
+            LOG.log(Level.WARNING, "Deduplication decision failed", error);
+            handleFailure(I18n.get("ui.dedupe.operationFailed"), error);
+            setDecisionEnabled(true);
+        });
+        taskRunner.start(task, "dedupe-mark-not-dupes");
     }
 
     /**
@@ -276,14 +292,21 @@ public class DedupeView extends BorderPane {
      */
     private void runDecision(Decision action) {
         setDecisionEnabled(false);
-        try {
-            action.run();
-            loadNextPair();
-        } catch (SQLException ex) {
-            LOG.log(Level.WARNING, "Deduplication decision failed", ex);
-            handleFailure(I18n.get("ui.dedupe.operationFailed"), ex);
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                action.run();
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> loadNextPair());
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
+            LOG.log(Level.WARNING, "Deduplication decision failed", error);
+            handleFailure(I18n.get("ui.dedupe.operationFailed"), error);
             setDecisionEnabled(true);
-        }
+        });
+        taskRunner.start(task, "dedupe-decision");
     }
 
     /**

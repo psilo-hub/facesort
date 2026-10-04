@@ -13,6 +13,14 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* §2.2 DB and filesystem I/O moved off the JavaFX application thread (high).
+  `FaceUi.FaceActions.openOriginal`/`openContainingFolder` now run on
+  background threads via the new `FaceUi.runAsync` helper. `RandomNameView`
+  and `FaceNameView` install their context menus lazily, resolving the
+  "Paste path to filter" folder on a background thread when the user
+  right-clicks. `DedupeView.onNotDupes` and `runDecision` use `TaskRunner`
+  to run the database operations asynchronously. All 442 tests pass.
+
 * §1.6 `ImportService` no longer swallows unrelated database failures. The
   atomic commit unit (image row + path + faces) was wrapped in
   `catch (SQLException e)` and treated as "another worker imported this first"
@@ -197,10 +205,9 @@ Queued next (highest payoff first, all still open in suggestions.md)
   closes out the "correctness first" pass. One item left:
   1. §1.10 Null-safety gaps in the seams that face native code (medium) — **done**: added requireNonNull checks in FaceDetectionUtils (imageHash, image, service, sourceDescription) and VideoFrameSource.SampledFrame.image; all 442 tests pass.
 
-§2 Concurrency — the largest remaining risk area, all untouched so far:
+§2 Concurrency — the largest remaining risk area:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —
     make it an immutable record and swap the reference atomically
-  * DB and filesystem I/O on the JavaFX application thread (high)
   * `TaskRunner`'s single-slot policy cancels unrelated user actions
   * Untracked raw threads and a leaked `HttpClient` on language change
   * Import progress starves the FX thread

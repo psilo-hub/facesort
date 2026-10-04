@@ -384,17 +384,31 @@ public class FaceNameView extends BorderPane implements Refreshable {
      *                             candidate faces)
      */
     private void installContextMenu(VBox card, FaceRecord face, boolean tagWithDifferentName) {
-        MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
-        Optional<Path> filterFolder = filterFolderFor(face);
-        pasteFilterItem.setDisable(filterFolder.isEmpty());
-        pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
-        if (tagWithDifferentName) {
-            MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
-            differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
-            faceActions.installFaceMenu(card, face, pasteFilterItem, differentNameItem);
-        } else {
-            faceActions.installFaceMenu(card, face, pasteFilterItem);
-        }
+        card.setOnContextMenuRequested(e -> {
+            String hash = face.imageHash();
+            MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
+            pasteFilterItem.setDisable(true); // disabled until resolved
+            // Resolve the filter folder on a background thread
+            FaceUi.runAsync(new Task<Optional<Path>>() {
+                @Override
+                protected Optional<Path> call() throws SQLException {
+                    return faceToNameService.resolveFilterFolder(hash);
+                }
+            },
+                    folder -> {
+                        pasteFilterItem.setDisable(folder.isEmpty());
+                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterFolder(p)));
+                    },
+                    ex -> pasteFilterItem.setDisable(true),
+                    "facename-filter-folder-" + hash);
+            if (tagWithDifferentName) {
+                MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
+                differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
+                faceActions.installFaceMenu(card, face, pasteFilterItem, differentNameItem);
+            } else {
+                faceActions.installFaceMenu(card, face, pasteFilterItem);
+            }
+        });
     }
 
     /**

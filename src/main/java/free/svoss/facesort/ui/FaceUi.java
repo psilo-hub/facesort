@@ -231,6 +231,29 @@ final class FaceUi {
     }
 
     /**
+     * Runs a database/filesystem operation on a background thread and invokes
+     * the given callback on the JavaFX application thread with the result.
+     * Errors are reported via the optional error handler.
+     *
+     * @param task         the background task to run
+     * @param onSuccess    called on FX thread with the result
+     * @param onFailure    called on FX thread with the exception, may be {@code null}
+     * @param threadName   name for the daemon thread
+     * @param <T>          result type
+     */
+    static <T> void runAsync(Task<T> task, Consumer<T> onSuccess,
+                             java.util.function.Consumer<Throwable> onFailure,
+                             String threadName) {
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        if (onFailure != null) {
+            task.setOnFailed(e -> onFailure.accept(task.getException()));
+        }
+        Thread thread = new Thread(task, threadName);
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
      * Checks the name typed into a field against existing names and shows the
      * outcome in the adjacent label. Runs on a background task and ignores
      * stale results once the field changes again.
@@ -378,32 +401,42 @@ final class FaceUi {
         }
 
         /**
-         * Opens the original file of an image in the default viewer.
+         * Opens the original file of an image in the default viewer on a background
+         * thread to avoid blocking the JavaFX application thread.
          *
          * @param hash content hash of the image
          */
         void openOriginal(String hash) {
-            try {
-                boolean opened = source.openOriginal(hash);
-                status.accept(opened ? "" : I18n.get("common.originalNotFound"));
-            } catch (IOException | SQLException ex) {
-                openFailure.fail(I18n.get("common.openOriginalFailed"), ex);
-            }
+            Task<Boolean> task = new Task<>() {
+                @Override
+                protected Boolean call() throws IOException, SQLException {
+                    return source.openOriginal(hash);
+                }
+            };
+            runAsync(task,
+                    opened -> status.accept(opened ? "" : I18n.get("common.originalNotFound")),
+                    ex -> openFailure.fail(I18n.get("common.openOriginalFailed"), ex),
+                    "faceui-open-original-" + hash);
         }
 
         /**
          * Opens the folder containing the original file of an image in the file
-         * manager.
+         * manager on a background thread to avoid blocking the JavaFX application
+         * thread.
          *
          * @param hash content hash of the image
          */
         void openContainingFolder(String hash) {
-            try {
-                boolean opened = source.openContainingFolder(hash);
-                status.accept(opened ? "" : I18n.get("common.originalNotFound"));
-            } catch (IOException | SQLException ex) {
-                openFailure.fail(I18n.get("common.openContainingFolderFailed"), ex);
-            }
+            Task<Boolean> task = new Task<>() {
+                @Override
+                protected Boolean call() throws IOException, SQLException {
+                    return source.openContainingFolder(hash);
+                }
+            };
+            runAsync(task,
+                    opened -> status.accept(opened ? "" : I18n.get("common.originalNotFound")),
+                    ex -> openFailure.fail(I18n.get("common.openContainingFolderFailed"), ex),
+                    "faceui-open-folder-" + hash);
         }
 
         /**

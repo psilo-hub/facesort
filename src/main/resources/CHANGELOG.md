@@ -241,6 +241,12 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Database and filesystem I/O no longer runs on the JavaFX application thread.
+  "Open Original" and "Open containing folder" in face context menus now execute on
+  background threads; the "Paste path to path filter" menu item resolves its target
+  folder asynchronously when the menu is opened; and the Deduplicate tab's "These
+  are not dupes" and "Merge" actions run their database writes on background tasks.
+  The UI stays responsive during these operations (2026-10-03)
 - A database failure during an import is no longer reported as success. When
   storing an image failed for any reason other than another worker having
   imported the very same picture first — a full disk, a damaged or locked

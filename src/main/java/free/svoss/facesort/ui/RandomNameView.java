@@ -232,27 +232,25 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * @param face the face whose source image should be openable
      */
     private void installContextMenu(VBox card, FaceThumb face) {
-        MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
-        Optional<Path> filterFolder = filterFolderFor(face);
-        pasteFilterItem.setDisable(filterFolder.isEmpty());
-        pasteFilterItem.setOnAction(ev -> filterFolder.ifPresent(this::applyFilterFolder));
-        faceActions.installFaceMenu(card, face, pasteFilterItem);
-    }
-
-    /**
-     * Resolves the folder to paste into the path filter for a face, or empty
-     * when the media file has no stored path.
-     *
-     * @param face the face whose media file folder to resolve
-     * @return the folder to filter by, or empty when unavailable
-     */
-    private Optional<Path> filterFolderFor(FaceThumb face) {
-        try {
-            return namingService.resolveFilterFolder(face.imageHash());
-        } catch (SQLException ex) {
-            statusLabel.setText(I18n.get("common.pathUnavailable"));
-            return Optional.empty();
-        }
+        card.setOnContextMenuRequested(e -> {
+            String hash = face.imageHash();
+            MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
+            pasteFilterItem.setDisable(true); // disabled until resolved
+            // Resolve the filter folder on a background thread
+            FaceUi.runAsync(new Task<Optional<Path>>() {
+                @Override
+                protected Optional<Path> call() throws SQLException {
+                    return namingService.resolveFilterFolder(hash);
+                }
+            },
+                    folder -> {
+                        pasteFilterItem.setDisable(folder.isEmpty());
+                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterFolder(p)));
+                    },
+                    ex -> pasteFilterItem.setDisable(true),
+                    "randomname-filter-folder-" + hash);
+            faceActions.installFaceMenu(card, face, pasteFilterItem);
+        });
     }
 
     /**
