@@ -110,6 +110,12 @@ All notable changes to Face Sort will be documented in this file.
   `/photos/family-archive`. The two path columns are indexed the first time an
   existing database is opened, which builds the index once and can take a
   moment on a very large library (2026-10-02)
+- The View tab is lighter to use on large collections: the name grid is no
+  longer rebuilt on every keystroke — filtering waits until you stop typing
+  for a moment — and the thumbnails it shows are decoded once and kept in a
+  small bounded cache, so re-filtering, going back to the names or reopening
+  a person re-uses the already decoded picture instead of decoding the same
+  JPEG again. What is listed and shown is unchanged (2026-10-06)
 - Test suite hardened (internal, no visible behavior change): the video-import
   end-to-end tests now run in every environment — a tiny test video is
   generated in pure Java instead of the tests being skipped when the

@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-02. `mvn test` is green: 442 tests / 47 test classes,
+State as of 2026-10-06. `mvn test` is green: 457 tests / 49 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (35 open items, with the
+The detailed backlog lives in `suggestions.md` (27 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,34 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* §3 The View tab no longer rebuilds and re-decodes on every keystroke. The
+  filter field called `applyFilter()` straight from its text listener, so
+  each character cleared the name grid and rebuilt every card — and every
+  card decodes its representative face JPEG — while going back to a name's
+  images re-decoded all of those thumbnails again. Filtering is now
+  debounced: the new package-private `Debouncer` re-arms a single
+  `PauseTransition` on every keystroke (300 ms quiet period) and runs the
+  action once the burst goes quiet; a direct
+  `applyFilter()` — after a name or image load — drops the pending trigger,
+  so a stale keystroke cannot rebuild the grid a second time. Thumbnails are
+  decoded once and kept in a bounded `LruCache` (256 entries, least-recently
+  read evicted) keyed by content identity: `image:<hash>` for the images
+  grid, `face:<id>` for name cards, neither of which can go stale, so the
+  cache needs no invalidation. `FaceUi` gained a `thumb(Image, size)`
+  overload that the existing `thumb(FaceRecord/FaceThumb, size)` methods and
+  both ViewView grids now share, so the fit/preserve/smooth wiring exists
+  once. Both seams are toolkit-free by construction — `Debouncer` takes its
+  timing through a `Scheduler` interface and the cache takes its value type
+  as a parameter — which is what makes them pinnable headlessly:
+  `DebouncerTest` (8 cases) and `LruCacheTest` (7 cases). Mutation-verified
+  both ways: dropping the cancel-before-schedule in `Debouncer.trigger`
+  fails `repeatedTriggersCoalesceIntoASingleRun` with `expected: <1> but
+  was: <5>` pending runs, and insertion order instead of access order fails
+  `aHitRefreshesTheEntrySoItSurvivesTheNextEviction` with `expected: <0> but
+  was: <1>`. All 457 tests pass (442 -> 457, 47 -> 49 test classes). The
+  README needed no change in any language: its "filters the cards by name as
+  you type" still describes what the search box does.
 
 * §2.2 DB and filesystem I/O moved off the JavaFX application thread (high).
   `FaceUi.FaceActions.openOriginal`/`openContainingFolder` now run on
@@ -212,15 +240,16 @@ Queued next (highest payoff first, all still open in suggestions.md)
   * Untracked raw threads and a leaked `HttpClient` on language change
   * Import progress starves the FX thread
 
-§3 Performance — 6 of 10 done (clustering O(n²·k)→O(n·k), dedupe
+§3 Performance — 7 of 10 done (clustering O(n²·k)→O(n·k), dedupe
   candidates, per-name BLOB hydration, the N+1 average-of-other-names
-  reads, SQLite WAL/busy_timeout/synchronous, the path-prefix filters).
+  reads, SQLite WAL/busy_timeout/synchronous, the path-prefix filters,
+  View-tab filter debounce + thumbnail cache).
   Remaining:
   * `findSimilarUnnamed` loads and sorts the whole unnamed corpus
   * The random-faces view hydrates embeddings it never uses — **done** (added FaceThumb projection and use in random faces view to avoid loading embeddings)
   * Query-planner statistics are never refreshed — **done** (PRAGMA optimize runs on Database open and after mass deletions in DataRemovalService)
   * The import folder is walked twice; the import log grows without bound — **done** (import log capped to last 1000 lines in ImportView; also optimized to single traversal via ImportFiles.collectCategorizedSets)
-  * The View tab re-decodes every JPEG on every keystroke
+  * The View tab re-decodes every JPEG on every keystroke — **done** (filtering debounced via Debouncer, thumbnails kept in a bounded LruCache)
 
 §4–§9 — clean-up, process, UX, i18n, features. Two easy ones worth
   pulling forward because they are nearly free:

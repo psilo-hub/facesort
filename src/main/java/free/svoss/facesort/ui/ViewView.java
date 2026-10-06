@@ -1,8 +1,10 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
+import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.ViewService;
+import javafx.animation.PauseTransition;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,6 +22,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import javafx.util.Duration;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -36,12 +39,21 @@ import java.util.Objects;
  *
  * <p>The view owns no business logic; all queries are delegated to
  * {@link ViewService}. Queries run on background {@link Task}s so the UI
- * stays responsive, and database errors are surfaced in an error dialog.</p>
+ * stays responsive, and database errors are surfaced in an error dialog.
+ * Typing in the filter field does not rebuild the grid per keystroke: the
+ * filtering is debounced, and the decoded thumbnails are kept in a bounded
+ * cache so a rebuild re-uses them instead of decoding the JPEGs again.</p>
  */
 public class ViewView extends BorderPane implements Refreshable {
 
     private static final double NAME_THUMBNAIL_SIZE = 120.0;
     private static final double IMAGE_THUMBNAIL_SIZE = 150.0;
+
+    /** Quiet period after the last keystroke before the name grid is filtered. */
+    private static final long FILTER_DEBOUNCE_MS = 300;
+
+    /** Thumbnails kept across grid rebuilds, keyed by image hash or face id. */
+    private static final int THUMBNAIL_CACHE_CAPACITY = 256;
 
     private final ViewService viewService;
 
@@ -57,6 +69,9 @@ public class ViewView extends BorderPane implements Refreshable {
 
     private final TaskRunner taskRunner = new TaskRunner();
     private final FaceUi.FaceActions faceActions;
+    private final LruCache<String, Image> thumbnails = new LruCache<>(THUMBNAIL_CACHE_CAPACITY);
+    private final Debouncer filterDebounce =
+            new Debouncer(FILTER_DEBOUNCE_MS, new PauseTransitionScheduler(), this::applyFilter);
     private boolean imagesMode;
     private long activeNameId;
     private String activeNameText = "";
@@ -110,7 +125,7 @@ public class ViewView extends BorderPane implements Refreshable {
         filterField.setPromptText(I18n.get("ui.view.filterNames"));
         filterField.setPrefWidth(200);
         filterField.setMaxWidth(200);
-        filterField.textProperty().addListener((obs, oldValue, newValue) -> applyFilter());
+        filterField.textProperty().addListener((obs, oldValue, newValue) -> filterDebounce.trigger());
         HBox.setHgrow(filterField, Priority.NEVER);
 
         HBox topBar = new HBox(10, backButton, titleLabel, filterField);
@@ -171,8 +186,13 @@ public class ViewView extends BorderPane implements Refreshable {
      * kept only for names whose (case-insensitive) name contains the trimmed
      * filter, and the title shows the matching count when a filter is active.
      * Does nothing while the images grid of a name is shown.
+     *
+     * <p>Any keystroke-triggered run still pending is dropped: the grid is
+     * built from the current text, so a stale trigger must not rebuild it a
+     * second time.</p>
      */
     private void applyFilter() {
+        filterDebounce.cancel();
         if (imagesMode) {
             return;
         }
@@ -295,7 +315,7 @@ public class ViewView extends BorderPane implements Refreshable {
         countLabel.getStyleClass().add("count-label");
 
         card.getChildren().addAll(
-                FaceUi.thumb(summary.representative(), NAME_THUMBNAIL_SIZE),
+                FaceUi.thumb(representativeThumbnail(summary.representative()), NAME_THUMBNAIL_SIZE),
                 nameLabel, countLabel);
         card.setOnMouseClicked(e -> openNameImages(summary.name().id(), name));
         return card;
@@ -314,18 +334,13 @@ public class ViewView extends BorderPane implements Refreshable {
         box.setPrefWidth(IMAGE_THUMBNAIL_SIZE + 16);
         box.getStyleClass().add("image-thumbnail");
 
-        ImageView view = new ImageView();
-        byte[] jpg = image.thumbnailJpg();
-        if (jpg != null && jpg.length > 0) {
-            view.setImage(new Image(new ByteArrayInputStream(jpg)));
-        }
-        view.setFitWidth(IMAGE_THUMBNAIL_SIZE);
-        view.setFitHeight(IMAGE_THUMBNAIL_SIZE);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
+        ImageView view = FaceUi.thumb(cachedThumbnail("image:" + image.hash(), image.thumbnailJpg()),
+                IMAGE_THUMBNAIL_SIZE);
 
         String hash = image.hash();
-        Label caption = new Label(jpg != null ? hash.substring(0, Math.min(8, hash.length())) : I18n.get("ui.view.noPreview"));
+        Label caption = new Label(view.getImage() != null
+                ? hash.substring(0, Math.min(8, hash.length()))
+                : I18n.get("ui.view.noPreview"));
         caption.getStyleClass().add("caption-label");
 
         box.getChildren().addAll(view, caption);
@@ -349,6 +364,37 @@ public class ViewView extends BorderPane implements Refreshable {
         MenuItem untagItem = new MenuItem(I18n.format("ui.view.untagFrom", activeNameText));
         untagItem.setOnAction(ev -> untagFaces(image.hash()));
         faceActions.installMenu(box, image.hash(), untagItem);
+    }
+
+    /**
+     * Returns the decoded thumbnail of a representative face, or {@code null}
+     * when there is no face or no sub-image to show.
+     *
+     * @param face the representative face, possibly null
+     * @return the decoded thumbnail, or {@code null}
+     */
+    private Image representativeThumbnail(FaceRecord face) {
+        if (face == null) {
+            return null;
+        }
+        return cachedThumbnail("face:" + face.id(), face.subImageJpg());
+    }
+
+    /**
+     * Returns the decoded thumbnail stored under the given key, decoding
+     * {@code jpg} on the first read and re-using the cached image afterwards.
+     * The keys are content identities (an image hash, a face id), so a cached
+     * entry cannot go stale.
+     *
+     * @param key stable identity of the picture
+     * @param jpg the encoded thumbnail, possibly null or empty
+     * @return the decoded image, or {@code null} when there is nothing to show
+     */
+    private Image cachedThumbnail(String key, byte[] jpg) {
+        if (jpg == null || jpg.length == 0) {
+            return null;
+        }
+        return thumbnails.get(key, () -> new Image(new ByteArrayInputStream(jpg)));
     }
 
     /**
@@ -415,5 +461,27 @@ public class ViewView extends BorderPane implements Refreshable {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;
         FaceUi.showError(window, "ui.view.alertTitle", message, error);
+    }
+
+    /**
+     * The FX backend of {@link #filterDebounce}: one pause transition that is
+     * re-armed on every keystroke and runs the deferred action once the field
+     * has been quiet for the debounce delay.
+     */
+    private final class PauseTransitionScheduler implements Debouncer.Scheduler {
+
+        private final PauseTransition transition = new PauseTransition();
+
+        @Override
+        public void schedule(Runnable action, long delayMs) {
+            transition.setDuration(Duration.millis(delayMs));
+            transition.setOnFinished(event -> action.run());
+            transition.playFromStart();
+        }
+
+        @Override
+        public void cancel() {
+            transition.stop();
+        }
     }
 }

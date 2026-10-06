@@ -118,15 +118,16 @@ final class FaceUi {
     }
 
     /**
-     * Builds a face thumbnail of the given display size.
+     * Builds a thumbnail of the given display size from an already decoded
+     * image, or an empty view when the image is unavailable.
      *
-     * @param face the face whose sub-image should be shown
+     * @param image the decoded image, or {@code null}
      * @param size the display size (width and height)
      * @return the configured image view
      */
-    static ImageView thumb(FaceRecord face, double size) {
+    static ImageView thumb(Image image, double size) {
         ImageView view = new ImageView();
-        setImage(view, face);
+        view.setImage(image);
         view.setFitWidth(size);
         view.setFitHeight(size);
         view.setPreserveRatio(true);
@@ -134,14 +135,19 @@ final class FaceUi {
         return view;
     }
 
+    /**
+     * Builds a face thumbnail of the given display size.
+     *
+     * @param face the face whose sub-image should be shown
+     * @param size the display size (width and height)
+     * @return the configured image view
+     */
+    static ImageView thumb(FaceRecord face, double size) {
+        return thumb(toImage(face), size);
+    }
+
     static ImageView thumb(free.svoss.facesort.model.FaceThumb face, double size) {
-        ImageView view = new ImageView();
-        setImage(view, face);
-        view.setFitWidth(size);
-        view.setFitHeight(size);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
-        return view;
+        return thumb(toImage(face), size);
     }
 
     /**
