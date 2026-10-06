@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
@@ -39,7 +40,7 @@ public class FaceToNameService {
     private final NameDao nameDao;
     private final ImageDao imageDao;
     private final VideoDao videoDao;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
     private final NameService nameService;
 
     /**
@@ -50,17 +51,17 @@ public class FaceToNameService {
      * @param nameDao       data access for names; must not be null
      * @param imageDao      data access for images and image_paths; must not be null
      * @param videoDao      data access for videos, video_paths and video_frames; must not be null
-     * @param config        application settings; must not be null
+     * @param configStore   application settings; must not be null
      */
     public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
-                             ImageDao imageDao, VideoDao videoDao, ConfigModel config) {
+                             ImageDao imageDao, VideoDao videoDao, ConfigStore configStore) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
-        this.config = Objects.requireNonNull(config, "config");
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
         this.nameService = new NameService(nameDao);
     }
 
@@ -119,7 +120,7 @@ public class FaceToNameService {
      * <p>The average embedding is computed over all faces currently tagged with
      * {@code nameId}. If the name has no faces (or none with embeddings), the
      * result is empty and no average is computed. Candidates whose similarity
-     * falls below {@link ConfigModel#getMinNameSimilarity()} never qualify, so
+     * falls below {@link ConfigModel#minNameSimilarity()} never qualify, so
      * faces that are not similar enough cannot be added to an existing name.</p>
      *
      * <p>When {@code pathPrefix} is non-blank, only candidates whose images
@@ -158,7 +159,7 @@ public class FaceToNameService {
         }
 
         float[] average = faceSelector.averageOf(namedFaces);
-        double cutoff = config.getMinNameSimilarity();
+        double cutoff = configStore.get().minNameSimilarity();
 
         Map<Long, float[]> otherAverages = excludeCloserToOtherNames
                 ? averageOfOtherNames(nameId) : Map.of();

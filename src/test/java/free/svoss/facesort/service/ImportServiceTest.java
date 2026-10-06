@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -59,11 +60,11 @@ class ImportServiceTest {
     }
 
     private ConfigModel config() {
-        ConfigModel config = new ConfigModel();
-        config.setMinBoundingBoxSize(80);
-        config.setMinConfidence(0.8);
-        config.setMaxFacesPerImage(10);
-        config.setThumbnailSize(256);
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withMinBoundingBoxSize(80);
+        config = config.withMinConfidence(0.8);
+        config = config.withMaxFacesPerImage(10);
+        config = config.withThumbnailSize(256);
         return config;
     }
 
@@ -71,7 +72,7 @@ class ImportServiceTest {
         FakeFaceAiEngine engine = new FakeFaceAiEngine()
                 .withFaces(new DetectedFace(10, 10, 100, 100, 0.95f))
                 .withEmbedding(new float[]{1, 0, 0, 0, 0, 0, 0, 0});
-        return new ImportService(imageDao, faceDao, new FaceAiService(engine), config(),
+        return new ImportService(imageDao, faceDao, new FaceAiService(engine), new ConfigStore(config()),
                 db.getTransactionRunner());
     }
 
@@ -285,8 +286,8 @@ class ImportServiceTest {
             services.add(new FaceAiService(engine));
         }
         ConfigModel config = config();
-        config.setMaxImportThreads(threads);
-        return new ImportService(imageDao, faceDao, services, config, db.getTransactionRunner());
+        config = config.withMaxImportThreads(threads);
+        return new ImportService(imageDao, faceDao, services, new ConfigStore(config), db.getTransactionRunner());
     }
 
     private static FakeFaceAiEngine countingEngine() {
@@ -556,7 +557,7 @@ class ImportServiceTest {
 
     @Test
     void defaultConfig_hasFourImportThreads() {
-        assertEquals(4, new ConfigModel().getMaxImportThreads());
+        assertEquals(4, ConfigModel.defaults().maxImportThreads());
         assertEquals(4, ConfigModel.DEFAULT_MAX_IMPORT_THREADS);
     }
 
@@ -568,10 +569,10 @@ class ImportServiceTest {
         SleepEngine e1 = new SleepEngine(40, sharedActive, sharedMaxActive);
         SleepEngine e2 = new SleepEngine(40, sharedActive, sharedMaxActive);
         ConfigModel c = config();
-        c.setMaxImportThreads(2);
+        c = c.withMaxImportThreads(2);
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                List.of(new FaceAiService(e1), new FaceAiService(e2)), c,
+                List.of(new FaceAiService(e1), new FaceAiService(e2)), new ConfigStore(c),
                 db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
@@ -597,7 +598,7 @@ class ImportServiceTest {
 
     @Test
     void importFolder_defaultMaxDetectionDimensionIsSane() {
-        assertEquals(1600, new ConfigModel().getMaxDetectionDimension());
+        assertEquals(1600, ConfigModel.defaults().maxDetectionDimension());
         assertEquals(1600, ConfigModel.DEFAULT_MAX_DETECTION_DIMENSION);
     }
 
@@ -611,10 +612,10 @@ class ImportServiceTest {
                 new DetectedFace[]{new DetectedFace(100, 100, 200, 200, 0.95f)},
                 TEST_EMBEDDING);
         ConfigModel config = config();
-        config.setMaxDetectionDimension(500);
+        config = config.withMaxDetectionDimension(500);
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config, db.getTransactionRunner())) {
+                new FaceAiService(engine), new ConfigStore(config), db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
 
@@ -650,7 +651,7 @@ class ImportServiceTest {
         RecordingEngine engine = new RecordingEngine(testFaces(), TEST_EMBEDDING);
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config(), db.getTransactionRunner())) {
+                new FaceAiService(engine), new ConfigStore(config()), db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
 
@@ -673,7 +674,7 @@ class ImportServiceTest {
                 .withFailingEmbedding());
         ImportService.ImportResult result;
         try (ImportService service = new ImportService(imageDao, faceDao,
-                failingService, config(), db.getTransactionRunner())) {
+                failingService, new ConfigStore(config()), db.getTransactionRunner())) {
             result = service.importFolder(dir, null);
         }
 
@@ -710,7 +711,7 @@ class ImportServiceTest {
                 });
 
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config(), db.getTransactionRunner())) {
+                new FaceAiService(engine), new ConfigStore(config()), db.getTransactionRunner())) {
             ImportService.ImportResult result = service.importFolder(dir, null);
 
             assertEquals(0, result.errors(), "a duplicate content conflict is not an error");
@@ -752,7 +753,7 @@ class ImportServiceTest {
                 });
 
         try (ImportService service = new ImportService(imageDao, faceDao,
-                new FaceAiService(engine), config(), db.getTransactionRunner())) {
+                new FaceAiService(engine), new ConfigStore(config()), db.getTransactionRunner())) {
             ImportService.ImportResult result = service.importFolder(dir, null);
 
             assertEquals(1, result.errors(), "the failed commit must be surfaced");

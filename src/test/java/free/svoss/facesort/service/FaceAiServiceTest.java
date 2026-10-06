@@ -22,9 +22,9 @@ class FaceAiServiceTest {
 
     @Test
     void toFaceAIConfig_mapsSettings() {
-        ConfigModel config = new ConfigModel();
-        config.setMinConfidence(0.72);
-        config.setFaceaiCacheDir("/tmp/facesort/cache");
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withMinConfidence(0.72);
+        config = config.withFaceaiCacheDir("/tmp/facesort/cache");
 
         FaceAIConfig faceAIConfig = FaceAiService.toFaceAIConfig(config);
 
@@ -37,8 +37,8 @@ class FaceAiServiceTest {
 
     @Test
     void toFaceAIConfig_blankCacheDirFallsBackToFaceAiDefault() {
-        ConfigModel config = new ConfigModel();
-        config.setFaceaiCacheDir("  ");
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withFaceaiCacheDir("  ");
 
         FaceAIConfig faceAIConfig = FaceAiService.toFaceAIConfig(config);
 

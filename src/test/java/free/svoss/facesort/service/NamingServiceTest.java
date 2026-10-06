@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -36,15 +37,16 @@ class NamingServiceTest {
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
 
-        ConfigModel config = new ConfigModel();
-        config.setClusteringThreshold(0.5);
-        config.setHnswM(16);
-        config.setHnswEfConstruction(200);
-        config.setHnswEfSearch(100);
-        config.setKnnK(20);
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withClusteringThreshold(0.5);
+        config = config.withHnswM(16);
+        config = config.withHnswEfConstruction(200);
+        config = config.withHnswEfSearch(100);
+        config = config.withKnnK(20);
 
         service = new NamingService(
-                new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao, config),
+                new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao,
+                        new ConfigStore(config)),
                 new FaceAiService(new FakeFaceAiEngine()),
                 faceDao, nameDao, new ImageDao(db.getConnection()),
                 new VideoDao(db.getConnection()));

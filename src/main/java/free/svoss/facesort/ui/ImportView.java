@@ -2,6 +2,7 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.DataRemovalService;
 import free.svoss.facesort.service.ImportCoordinator;
@@ -47,7 +48,7 @@ public class ImportView extends BorderPane {
     private final ImportService importService;
     private final VideoImportService videoImportService;
     private final DataRemovalService dataRemovalService;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
 
     private final TextField folderField = new TextField();
     private final Button browseButton = new Button(I18n.get("ui.import.browse"));
@@ -66,15 +67,15 @@ public class ImportView extends BorderPane {
      * @param importService      the photo import pipeline; must not be null
      * @param videoImportService the video import pipeline; must not be null
      * @param dataRemovalService service for removing imported rows by path prefix; must not be null
-     * @param config             application configuration used to remember the last
+     * @param configStore        application configuration used to remember the last
      *                           import folder; must not be null
      */
     public ImportView(ImportService importService, VideoImportService videoImportService,
-                      DataRemovalService dataRemovalService, ConfigModel config) {
+                      DataRemovalService dataRemovalService, ConfigStore configStore) {
         this.importService = importService;
         this.videoImportService = videoImportService;
         this.dataRemovalService = dataRemovalService;
-        this.config = config;
+        this.configStore = configStore;
         buildUi();
         restoreLastFolder();
     }
@@ -125,8 +126,8 @@ public class ImportView extends BorderPane {
      * Restores the last import folder from the configuration, if any.
      */
     private void restoreLastFolder() {
-        String last = config.getLastImportFolder();
-        if (last != null && !last.isBlank()) {
+        String last = configStore.get().lastImportFolder();
+        if (!last.isBlank()) {
             folderField.setText(last);
         }
     }
@@ -271,9 +272,10 @@ public class ImportView extends BorderPane {
      * @param folder the folder being imported
      */
     private void rememberFolder(Path folder) {
-        config.setLastImportFolder(folder.toAbsolutePath().toString());
+        ConfigModel updated = configStore.updateAndGet(
+                config -> config.withLastImportFolder(folder.toAbsolutePath().toString()));
         try {
-            AppConfig.save(Path.of(AppConfig.DEFAULT_CONFIG_FILE), config);
+            AppConfig.save(Path.of(AppConfig.DEFAULT_CONFIG_FILE), updated);
         } catch (IOException e) {
             // Remembering the folder is best-effort; do not fail the import.
             appendLog(I18n.format("ui.import.configSaveFailed", e.getMessage()));

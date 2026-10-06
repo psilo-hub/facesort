@@ -2,6 +2,7 @@ package free.svoss.facesort;
 
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -77,7 +78,7 @@ public class FaceSortApp extends Application {
     private static final double DOWNLOAD_SCENE_WIDTH = 680;
     private static final double DOWNLOAD_SCENE_HEIGHT = 520;
 
-    private ConfigModel config;
+    private ConfigStore configStore;
     private Path configPath;
     private Stage primaryStage;
     private int lastSelectedTabIndex;
@@ -103,18 +104,18 @@ public class FaceSortApp extends Application {
 
             // 0a. Load configuration (falls back to defaults when the file is absent).
             configPath = Path.of(AppConfig.DEFAULT_CONFIG_FILE);
-            config = AppConfig.load(configPath);
-            I18n.setLocale(I18n.localeFor(config.getLanguage()));
+            configStore = new ConfigStore(AppConfig.load(configPath));
+            I18n.setLocale(I18n.localeFor(configStore.get().language()));
 
             // 1. Background update check on a daemon thread; never blocks startup.
             //    Skipped when the user disabled it in the settings.
-            if (config.isUpdateCheckEnabled()) {
+            if (configStore.get().updateCheckEnabled()) {
                 new UpdateChecker(Path.of(AppConfig.DEFAULT_CONFIG_DIR)).startInBackground();
             }
 
             // 2. On the very first start the FaceAI models are not cached yet.
             //    Download them first and show a frame so the user can watch progress.
-            if (FaceAiService.modelsDownloaded(config)) {
+            if (FaceAiService.modelsDownloaded(configStore.get())) {
                 showMainWindow(primaryStage);
             } else {
                 startModelDownload(primaryStage);
@@ -133,7 +134,7 @@ public class FaceSortApp extends Application {
      * @param primaryStage the primary stage to display the frame in
      */
     private void startModelDownload(Stage primaryStage) {
-        String destination = FaceAiService.toFaceAIConfig(config)
+        String destination = FaceAiService.toFaceAIConfig(configStore.get())
                 .resolvedCacheDir().getAbsolutePath();
         ModelDownloadView downloadView = new ModelDownloadView(destination);
 
@@ -150,7 +151,7 @@ public class FaceSortApp extends Application {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                FaceAiService.downloadModelsIfNecessary(config, downloadView.listener());
+                FaceAiService.downloadModelsIfNecessary(configStore.get(), downloadView.listener());
                 return null;
             }
         };
@@ -181,10 +182,12 @@ public class FaceSortApp extends Application {
      * @param primaryStage the primary stage to display the main window in
      */
     private void showMainWindow(Stage primaryStage) throws Exception {
+        ConfigModel config = configStore.get();
+
         // 2. Open the database under config/, creating the directory if needed.
         Path configDir = Path.of(AppConfig.DEFAULT_CONFIG_DIR);
         Files.createDirectories(configDir);
-        Path dbPath = configDir.resolve(Path.of(config.getDbName()));
+        Path dbPath = configDir.resolve(Path.of(config.dbName()));
         database = new Database(dbPath);
         Connection connection = database.getConnection();
 
@@ -222,13 +225,13 @@ public class FaceSortApp extends Application {
             closeAll(importAiServices.toArray(new AutoCloseable[0]));
             throw e;
         }
-        importService = new ImportService(imageDao, faceDao, importAiServices, config,
+        importService = new ImportService(imageDao, faceDao, importAiServices, configStore,
                 database.getTransactionRunner());
         videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
-                importAiServices, config, database.getTransactionRunner());
-        clusteringService = new ClusteringService(faceAiService, faceDao, config);
+                importAiServices, configStore, database.getTransactionRunner());
+        clusteringService = new ClusteringService(faceAiService, faceDao, configStore);
         namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao);
-        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, config);
+        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, configStore);
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
@@ -246,13 +249,13 @@ public class FaceSortApp extends Application {
     private SettingsView buildMainWindowUi() {
         // 6. Views.
         ImportView importView = new ImportView(importService, videoImportService,
-                dataRemovalService, config);
+                dataRemovalService, configStore);
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
-        FaceNameView faceNameView = new FaceNameView(faceToNameService, config);
+        FaceNameView faceNameView = new FaceNameView(faceToNameService, configStore);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
-        SettingsView settingsView = new SettingsView(config, configPath, this::changeLanguage);
+        SettingsView settingsView = new SettingsView(configStore, configPath, this::changeLanguage);
         FeedbackView feedbackView = new FeedbackView();
 
         // 7. Main window with the eight tabs.

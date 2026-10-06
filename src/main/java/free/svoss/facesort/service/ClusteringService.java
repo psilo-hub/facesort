@@ -5,6 +5,7 @@ import com.github.jelmerk.hnswlib.core.Item;
 import com.github.jelmerk.hnswlib.core.SearchResult;
 import com.github.jelmerk.hnswlib.core.hnsw.HnswIndex;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.model.FaceRecord;
 
@@ -15,6 +16,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -49,20 +51,21 @@ public class ClusteringService {
 
     private final FaceSelector faceSelector;
     private final FaceDao faceDao;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
 
     /**
      * Creates a clustering service.
      *
      * @param faceAiService provides centroid averaging and similarity scoring
      * @param faceDao       data access for the faces table
-     * @param config        application settings (clustering threshold and HNSW
-     *                      parameters; see {@link ConfigModel})
+     * @param configStore   application settings (clustering threshold and HNSW
+     *                      parameters; see {@link ConfigModel}); read once per
+     *                      clustering run so one run uses one consistent config
      */
-    public ClusteringService(FaceAiService faceAiService, FaceDao faceDao, ConfigModel config) {
+    public ClusteringService(FaceAiService faceAiService, FaceDao faceDao, ConfigStore configStore) {
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = faceDao;
-        this.config = config;
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
     }
 
     /** One cluster of unnamed faces plus its representative face. */
@@ -82,7 +85,7 @@ public class ClusteringService {
             return List.of();
         }
 
-        double threshold = config.getClusteringThreshold();
+        double threshold = configStore.get().clusteringThreshold();
         HnswIndex<Long, float[], EmbeddingItem, Float> index = buildIndex(faces);
         List<Set<Integer>> adjacency = buildAdjacency(faces, index, threshold);
         List<List<Integer>> components = findConnectedComponents(adjacency);
@@ -127,12 +130,13 @@ public class ClusteringService {
      * directly instead of scanning for the matching id.
      */
     HnswIndex<Long, float[], EmbeddingItem, Float> buildIndex(List<FaceRecord> faces) {
+        ConfigModel config = configStore.get();
         int dimensions = faces.get(0).embedding().length;
         HnswIndex<Long, float[], EmbeddingItem, Float> index = HnswIndex
                 .<float[], Float>newBuilder(dimensions, DistanceFunctions.FLOAT_COSINE_DISTANCE, faces.size())
-                .withM(config.getHnswM())
-                .withEfConstruction(config.getHnswEfConstruction())
-                .withEf(config.getHnswEfSearch())
+                .withM(config.hnswM())
+                .withEfConstruction(config.hnswEfConstruction())
+                .withEf(config.hnswEfSearch())
                 .build();
         for (int position = 0; position < faces.size(); position++) {
             FaceRecord face = faces.get(position);
@@ -153,7 +157,7 @@ public class ClusteringService {
                                               HnswIndex<Long, float[], EmbeddingItem, Float> index,
                                               double threshold) {
         int n = faces.size();
-        int k = Math.max(1, Math.min(config.getKnnK(), n));
+        int k = Math.max(1, Math.min(configStore.get().knnK(), n));
         List<Set<Integer>> adjacency = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             adjacency.add(new HashSet<>());

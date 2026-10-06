@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -45,7 +46,8 @@ class FaceToNameServiceExportTest {
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
         service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), new ConfigModel());
+                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()),
+                new ConfigStore(ConfigModel.defaults()));
     }
 
     @AfterEach

@@ -2,6 +2,7 @@ package free.svoss.facesort.service;
 
 import com.github.jelmerk.hnswlib.core.hnsw.HnswIndex;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -35,14 +36,15 @@ class ClusteringServiceTest {
         db = Database.inMemory();
         faceDao = new FaceDao(db.getConnection());
 
-        ConfigModel config = new ConfigModel();
-        config.setClusteringThreshold(0.5);
-        config.setHnswM(16);
-        config.setHnswEfConstruction(200);
-        config.setHnswEfSearch(100);
-        config.setKnnK(20);
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withClusteringThreshold(0.5);
+        config = config.withHnswM(16);
+        config = config.withHnswEfConstruction(200);
+        config = config.withHnswEfSearch(100);
+        config = config.withKnnK(20);
 
-        service = new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao, config);
+        service = new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao,
+                new ConfigStore(config));
     }
 
     @AfterEach

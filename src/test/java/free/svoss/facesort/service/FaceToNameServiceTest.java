@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -32,7 +33,7 @@ class FaceToNameServiceTest {
     private NameDao nameDao;
     private ImageDao imageDao;
     private FaceToNameService service;
-    private ConfigModel config;
+    private ConfigStore configStore;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -40,10 +41,10 @@ class FaceToNameServiceTest {
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
-        config = new ConfigModel();
-        config.setMinNameSimilarity(0.0); // no cutoff by default in these tests
+        configStore = new ConfigStore(ConfigModel.defaults());
+        configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0)); // no cutoff by default in these tests
         service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), config);
+                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), configStore);
     }
 
     @AfterEach
@@ -82,7 +83,7 @@ class FaceToNameServiceTest {
         QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
         FaceToNameService countingService = new FaceToNameService(
                 new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
-                nameDao, imageDao, new VideoDao(db.getConnection()), config);
+                nameDao, imageDao, new VideoDao(db.getConnection()), configStore);
         countingService.findUnnamedForName(nameId, limit, true, null);
         return counting.queriesMatching("FROM faces");
     }
@@ -131,7 +132,7 @@ class FaceToNameServiceTest {
         long close = addImageAndFace("imgU1", new float[]{0.9f, 0.1f, 0, 0, 0, 0, 0, 0}, null);
         addImageAndFace("imgU2", yLike(), null);
 
-        config.setMinNameSimilarity(0.75);
+        configStore.updateAndGet(config -> config.withMinNameSimilarity(0.75));
         List<SimilarityResult> results = service.findUnnamedForName(alice, 10);
 
         assertEquals(1, results.size());

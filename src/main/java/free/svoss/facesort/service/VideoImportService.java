@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.TransactionRunner;
@@ -66,7 +67,7 @@ public class VideoImportService implements AutoCloseable {
     private final FaceDao faceDao;
     private final VideoDao videoDao;
     private final List<FaceAiService> faceAiServices;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
     private final VideoFrameSourceOpener sourceOpener;
     private final TransactionRunner transactionRunner;
 
@@ -78,13 +79,13 @@ public class VideoImportService implements AutoCloseable {
      * @param faceDao           DAO for the faces table
      * @param videoDao          DAO for the videos, video_paths and video_frames tables
      * @param faceAiService     face detection and embedding service
-     * @param config            application configuration (detection thresholds, etc.)
+     * @param configStore       shared configuration store (detection thresholds, etc.)
      * @param transactionRunner runner for atomic multi-statement write units
      */
     public VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
-                              FaceAiService faceAiService, ConfigModel config,
+                              FaceAiService faceAiService, ConfigStore configStore,
                               TransactionRunner transactionRunner) {
-        this(imageDao, faceDao, videoDao, List.of(faceAiService), config, transactionRunner);
+        this(imageDao, faceDao, videoDao, List.of(faceAiService), configStore, transactionRunner);
     }
 
     /**
@@ -97,13 +98,13 @@ public class VideoImportService implements AutoCloseable {
      * @param faceDao           DAO for the faces table
      * @param videoDao          DAO for the videos, video_paths and video_frames tables
      * @param faceAiServices    one face service per parallel worker (must not be empty)
-     * @param config            application configuration (detection thresholds, etc.)
+     * @param configStore       shared configuration store (detection thresholds, etc.)
      * @param transactionRunner runner for atomic multi-statement write units
      */
     public VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
-                              List<FaceAiService> faceAiServices, ConfigModel config,
+                              List<FaceAiService> faceAiServices, ConfigStore configStore,
                               TransactionRunner transactionRunner) {
-        this(imageDao, faceDao, videoDao, faceAiServices, config,
+        this(imageDao, faceDao, videoDao, faceAiServices, configStore,
                 FfmpegVideoFrameSource::new, transactionRunner);
     }
 
@@ -113,7 +114,7 @@ public class VideoImportService implements AutoCloseable {
      * library.
      */
     VideoImportService(ImageDao imageDao, FaceDao faceDao, VideoDao videoDao,
-                       List<FaceAiService> faceAiServices, ConfigModel config,
+                       List<FaceAiService> faceAiServices, ConfigStore configStore,
                        VideoFrameSourceOpener sourceOpener,
                        TransactionRunner transactionRunner) {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
@@ -123,7 +124,7 @@ public class VideoImportService implements AutoCloseable {
             throw new IllegalArgumentException("faceAiServices must not be empty");
         }
         this.faceAiServices = List.copyOf(faceAiServices);
-        this.config = Objects.requireNonNull(config, "config");
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
         this.sourceOpener = Objects.requireNonNull(sourceOpener, "sourceOpener");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
@@ -162,10 +163,11 @@ public class VideoImportService implements AutoCloseable {
         }
         int total = videoFiles.size();
 
-        int minBbox = config.getMinBoundingBoxSize();
-        double minConfidence = config.getMinConfidence();
-        int maxFacesPerImage = config.getMaxFacesPerImage();
-        int maxDetectionDimension = config.getMaxDetectionDimension();
+        ConfigModel config = configStore.get();
+        int minBbox = config.minBoundingBoxSize();
+        double minConfidence = config.minConfidence();
+        int maxFacesPerImage = config.maxFacesPerImage();
+        int maxDetectionDimension = config.maxDetectionDimension();
         String criteriaJson = FaceDetectionUtils.buildCriteriaJson(minBbox, minConfidence,
                 maxFacesPerImage);
 
@@ -175,10 +177,10 @@ public class VideoImportService implements AutoCloseable {
         AtomicInteger skipped = new AtomicInteger();
 
         ImportWorkerPool.Result worker = ImportWorkerPool.run(
-                config.getMaxImportThreads(), faceAiServices, "video-import-worker-",
+                config.maxImportThreads(), faceAiServices, "video-import-worker-",
                 videoFiles, progress, cancelled,
                 (service, file) -> {
-                    VideoFileResult result = processVideo(file, criteriaJson, minBbox,
+                    VideoFileResult result = processVideo(file, config, criteriaJson, minBbox,
                             minConfidence, maxFacesPerImage, maxDetectionDimension, service);
                     if (result.newVideo) {
                         newVideos.incrementAndGet();
@@ -207,7 +209,7 @@ public class VideoImportService implements AutoCloseable {
      * Processes a single video file: register the video, extract every sampled
      * frame, store the frame + thumbnail + faces, and link the frames.
      */
-    private VideoFileResult processVideo(Path file, String criteriaJson,
+    private VideoFileResult processVideo(Path file, ConfigModel config, String criteriaJson,
                                          int minBbox, double minConfidence,
                                          int maxFacesPerImage, int maxDetectionDimension,
                                          FaceAiService service) throws Exception {
@@ -230,7 +232,7 @@ public class VideoImportService implements AutoCloseable {
         int droppedFaces = 0;
         try (VideoFrameSource source = sourceOpener.open(file)) {
             double duration = source.getDuration();
-            List<Double> targets = FrameSampler.sampleTargets(duration, config.getMaxFramesPerVideo());
+            List<Double> targets = FrameSampler.sampleTargets(duration, config.maxFramesPerVideo());
             long detectionTs = System.currentTimeMillis();
 
             // The video row is registered before extracting any frames so the
@@ -253,7 +255,7 @@ public class VideoImportService implements AutoCloseable {
                     }
                     BufferedImage frame = sampled.image();
                     long timestampMs = Math.round(sampled.positionSeconds() * 1000);
-                    byte[] frameJpg = ImageUtils.toJpegBytes(frame, config.getThumbnailQuality());
+                    byte[] frameJpg = ImageUtils.toJpegBytes(frame, config.thumbnailQuality());
                     String frameHash = HashUtils.hashBytes(frameJpg);
 
                     // Frame content already known (identical frame, or a photo
@@ -265,8 +267,8 @@ public class VideoImportService implements AutoCloseable {
                             ? new FaceDetectionUtils.DetectionResult(List.of(), 0)
                             : FaceDetectionUtils.detectFaces(frameHash, frame,
                                     maxDetectionDimension, minBbox, minConfidence,
-                                    maxFacesPerImage, config.getFaceCropSize(),
-                                    config.getThumbnailQuality(), service,
+                                    maxFacesPerImage, config.faceCropSize(),
+                                    config.thumbnailQuality(), service,
                                     file + " @ " + timestampMs + " ms");
                     List<FaceRecord> faceRecords = detection.faces();
 
@@ -274,8 +276,8 @@ public class VideoImportService implements AutoCloseable {
                     // JPEG encoding must never run while holding the
                     // connection monitor.
                     byte[] thumbJpg = knownFrame ? null
-                        : Thumbnailer.encode(frame, config.getThumbnailSize(),
-                                config.getThumbnailQuality());
+                        : Thumbnailer.encode(frame, config.thumbnailSize(),
+                                config.thumbnailQuality());
 
                     // ---- One atomic unit per frame (insert + thumbnail + faces
                     //      + link) ----

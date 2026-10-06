@@ -159,13 +159,13 @@ public class FaceAiService implements AutoCloseable {
      * @return the FaceAI configuration
      */
     public static FaceAIConfig toFaceAIConfig(ConfigModel config) {
-        String cacheDir = config.getFaceaiCacheDir();
+        String cacheDir = config.faceaiCacheDir();
         if (cacheDir == null || cacheDir.isBlank()) {
             cacheDir = "";
         }
         return FaceAIConfig.builder()
                 .cacheDir(cacheDir)
-                .detectionThreshold((float) config.getMinConfidence())
+                .detectionThreshold((float) config.minConfidence())
                 .embeddingDimension(EMBEDDING_DIMENSION)
                 .device(DEVICE)
                 .l2NormalizeEmbeddings(true)

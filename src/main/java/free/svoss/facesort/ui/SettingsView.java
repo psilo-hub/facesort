@@ -2,6 +2,7 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.config.AppConfig;
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.i18n.I18n;
 
 import javafx.geometry.Insets;
@@ -21,21 +22,26 @@ import javafx.scene.layout.Region;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
  * The Settings tab: edit detection, clustering, and HNSW parameters.
  *
- * <p>This is a pure form bound to a {@link ConfigModel} — no database access.
- * "Save" copies the current control values into the configuration and persists
- * it via {@link AppConfig#save(Path, ConfigModel)}. Every label shows a hover
- * tooltip explaining the setting, its default value and the effect of higher or
- * lower values. "Reset to defaults" restores the configuration to the built-in
- * defaults from {@link AppConfig#getDefault()} and persists them.</p>
+ * <p>This is a pure form over a {@link ConfigStore} — no database access.
+ * "Save" builds a new immutable configuration from the control values,
+ * publishes it in the store and persists it via
+ * {@link AppConfig#save(Path, ConfigModel)}, so every other component picks
+ * the change up on its next read. Every label shows a hover tooltip explaining
+ * the setting, its default value and the effect of higher or lower values.
+ * "Reset to defaults" restores the configuration to the built-in defaults from
+ * {@link AppConfig#getDefault()} — apart from the database name, the language
+ * and the remembered import folder, which the form does not own — and
+ * persists them.</p>
  */
 public class SettingsView extends BorderPane {
 
-    private final ConfigModel config;
+    private final ConfigStore configStore;
     private final Path configPath;
     private final Supplier<SettingsView> onLanguageChanged;
 
@@ -64,14 +70,16 @@ public class SettingsView extends BorderPane {
     /**
      * Creates the Settings tab.
      *
-     * @param config           the configuration object to edit and persist; must not be null
+     * @param configStore      the configuration to edit, and the channel through
+     *                         which a saved form reaches the rest of the
+     *                         application; must not be null
      * @param configPath       path of the JSON config file to write on save; must not be null
      * @param onLanguageChanged supplies the newly rebuilt settings view after the user
      *                          picked a new UI language; the language selection has been
      *                          applied and saved by then (may be {@code null})
      */
-    public SettingsView(ConfigModel config, Path configPath, Supplier<SettingsView> onLanguageChanged) {
-        this.config = config;
+    public SettingsView(ConfigStore configStore, Path configPath, Supplier<SettingsView> onLanguageChanged) {
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
         this.configPath = configPath;
         this.onLanguageChanged = onLanguageChanged;
         buildUi();
@@ -102,32 +110,32 @@ public class SettingsView extends BorderPane {
         int row = 1;
         addRow(grid, row++, I18n.get("settings.minBoundingBoxSize"), minBoundingBoxSize,
                 I18n.format("settings.tooltip.minBoundingBoxSize",
-                        defaults.getMinBoundingBoxSize()));
+                        defaults.minBoundingBoxSize()));
 
         addRow(grid, row++, I18n.get("settings.minConfidence"), minConfidence,
                 I18n.format("settings.tooltip.minConfidence",
-                        format(defaults.getMinConfidence())));
+                        format(defaults.minConfidence())));
 
         addRow(grid, row++, I18n.get("settings.maxFacesPerImage"), maxFacesPerImage,
                 I18n.format("settings.tooltip.maxFacesPerImage",
-                        defaults.getMaxFacesPerImage()));
+                        defaults.maxFacesPerImage()));
 
         addRow(grid, row++, I18n.get("settings.clusteringThreshold"), clusteringThreshold,
                 I18n.format("settings.tooltip.clusteringThreshold",
-                        format(defaults.getClusteringThreshold())));
+                        format(defaults.clusteringThreshold())));
 
         addRow(grid, row++, I18n.get("settings.hnswM"), hnswM,
-                I18n.format("settings.tooltip.hnswM", defaults.getHnswM()));
+                I18n.format("settings.tooltip.hnswM", defaults.hnswM()));
 
         addRow(grid, row++, I18n.get("settings.hnswEfConstruction"), hnswEfConstruction,
                 I18n.format("settings.tooltip.hnswEfConstruction",
-                        defaults.getHnswEfConstruction()));
+                        defaults.hnswEfConstruction()));
 
         addRow(grid, row++, I18n.get("settings.hnswEfSearch"), hnswEfSearch,
-                I18n.format("settings.tooltip.hnswEfSearch", defaults.getHnswEfSearch()));
+                I18n.format("settings.tooltip.hnswEfSearch", defaults.hnswEfSearch()));
 
         addRow(grid, row++, I18n.get("settings.knnK"), knnK,
-                I18n.format("settings.tooltip.knnK", defaults.getKnnK()));
+                I18n.format("settings.tooltip.knnK", defaults.knnK()));
 
         addRow(grid, row++, I18n.get("settings.faceaiCacheDir"), faceaiCacheDir,
                 I18n.get("settings.tooltip.faceaiCacheDir"));
@@ -135,38 +143,38 @@ public class SettingsView extends BorderPane {
 
         addRow(grid, row++, I18n.get("settings.maxDetectionDimension"), maxDetectionDimension,
                 I18n.format("settings.tooltip.maxDetectionDimension",
-                        defaults.getMaxDetectionDimension()));
+                        defaults.maxDetectionDimension()));
 
         addRow(grid, row++, I18n.get("settings.thumbnailSize"), thumbnailSize,
-                I18n.format("settings.tooltip.thumbnailSize", defaults.getThumbnailSize()));
+                I18n.format("settings.tooltip.thumbnailSize", defaults.thumbnailSize()));
 
         addRow(grid, row++, I18n.get("settings.thumbnailQuality"), thumbnailQuality,
                 I18n.format("settings.tooltip.thumbnailQuality",
-                        format(defaults.getThumbnailQuality())));
+                        format(defaults.thumbnailQuality())));
 
         addRow(grid, row++, I18n.get("settings.maxFramesPerVideo"), maxFramesPerVideo,
                 I18n.format("settings.tooltip.maxFramesPerVideo",
-                        defaults.getMaxFramesPerVideo()));
+                        defaults.maxFramesPerVideo()));
 
         addRow(grid, row++, I18n.get("settings.faceCropSize"), faceCropSize,
                 I18n.format("settings.tooltip.faceCropSize",
-                        defaults.getFaceCropSize()));
+                        defaults.faceCropSize()));
 
         addRow(grid, row++, I18n.get("settings.maxImportThreads"), maxImportThreads,
                 I18n.format("settings.tooltip.maxImportThreads",
-                        defaults.getMaxImportThreads()));
+                        defaults.maxImportThreads()));
 
         addRow(grid, row++, I18n.get("settings.minNameSimilarity"), minNameSimilarity,
                 I18n.format("settings.tooltip.minNameSimilarity",
-                        format(defaults.getMinNameSimilarity())));
+                        format(defaults.minNameSimilarity())));
 
         addRow(grid, row++, I18n.get("settings.faceNameMaxImages"), faceNameMaxImages,
                 I18n.format("settings.tooltip.faceNameMaxImages",
-                        defaults.getFaceNameMaxImages()));
+                        defaults.faceNameMaxImages()));
 
         addRow(grid, row++, I18n.get("settings.updateCheckEnabled"), updateCheckEnabled,
                 I18n.format("settings.tooltip.updateCheckEnabled",
-                        defaults.isUpdateCheckEnabled()
+                        defaults.updateCheckEnabled()
                                 ? I18n.get("settings.enabled")
                                 : I18n.get("settings.disabled")));
 
@@ -235,30 +243,30 @@ public class SettingsView extends BorderPane {
      * Copies the current configuration values into the form controls.
      */
     private void populateFromConfig() {
-        String current = config.getLanguage() == null
-                ? ConfigModel.DEFAULT_LANGUAGE : config.getLanguage();
+        ConfigModel config = configStore.get();
+        String current = config.language();
         I18n.supportedLanguages().stream()
                 .filter(lang -> lang.code().equals(current))
                 .findFirst()
                 .ifPresent(lang -> languageBox.setValue(lang.displayName()));
-        minBoundingBoxSize.getValueFactory().setValue(config.getMinBoundingBoxSize());
-        minConfidence.getValueFactory().setValue(config.getMinConfidence());
-        maxFacesPerImage.getValueFactory().setValue(config.getMaxFacesPerImage());
-        maxDetectionDimension.getValueFactory().setValue(config.getMaxDetectionDimension());
-        clusteringThreshold.getValueFactory().setValue(config.getClusteringThreshold());
-        hnswM.getValueFactory().setValue(config.getHnswM());
-        hnswEfConstruction.getValueFactory().setValue(config.getHnswEfConstruction());
-        hnswEfSearch.getValueFactory().setValue(config.getHnswEfSearch());
-        knnK.getValueFactory().setValue(config.getKnnK());
-        faceaiCacheDir.setText(config.getFaceaiCacheDir() == null ? "" : config.getFaceaiCacheDir());
-        thumbnailSize.getValueFactory().setValue(config.getThumbnailSize());
-        thumbnailQuality.getValueFactory().setValue((double) config.getThumbnailQuality());
-        maxFramesPerVideo.getValueFactory().setValue(config.getMaxFramesPerVideo());
-        faceCropSize.getValueFactory().setValue(config.getFaceCropSize());
-        maxImportThreads.getValueFactory().setValue(config.getMaxImportThreads());
-        minNameSimilarity.setText(String.valueOf(config.getMinNameSimilarity()));
-        faceNameMaxImages.setText(String.valueOf(config.getFaceNameMaxImages()));
-        updateCheckEnabled.setSelected(config.isUpdateCheckEnabled());
+        minBoundingBoxSize.getValueFactory().setValue(config.minBoundingBoxSize());
+        minConfidence.getValueFactory().setValue(config.minConfidence());
+        maxFacesPerImage.getValueFactory().setValue(config.maxFacesPerImage());
+        maxDetectionDimension.getValueFactory().setValue(config.maxDetectionDimension());
+        clusteringThreshold.getValueFactory().setValue(config.clusteringThreshold());
+        hnswM.getValueFactory().setValue(config.hnswM());
+        hnswEfConstruction.getValueFactory().setValue(config.hnswEfConstruction());
+        hnswEfSearch.getValueFactory().setValue(config.hnswEfSearch());
+        knnK.getValueFactory().setValue(config.knnK());
+        faceaiCacheDir.setText(config.faceaiCacheDir() == null ? "" : config.faceaiCacheDir());
+        thumbnailSize.getValueFactory().setValue(config.thumbnailSize());
+        thumbnailQuality.getValueFactory().setValue((double) config.thumbnailQuality());
+        maxFramesPerVideo.getValueFactory().setValue(config.maxFramesPerVideo());
+        faceCropSize.getValueFactory().setValue(config.faceCropSize());
+        maxImportThreads.getValueFactory().setValue(config.maxImportThreads());
+        minNameSimilarity.setText(String.valueOf(config.minNameSimilarity()));
+        faceNameMaxImages.setText(String.valueOf(config.faceNameMaxImages()));
+        updateCheckEnabled.setSelected(config.updateCheckEnabled());
     }
 
     /**
@@ -272,16 +280,15 @@ public class SettingsView extends BorderPane {
                 .map(I18n.Language::code)
                 .findFirst()
                 .orElse(ConfigModel.DEFAULT_LANGUAGE);
-        String current = config.getLanguage() == null
-                ? ConfigModel.DEFAULT_LANGUAGE : config.getLanguage();
+        String current = configStore.get().language();
         if (code.equals(current)) {
             return;
         }
-        config.setLanguage(code);
+        ConfigModel updated = configStore.updateAndGet(config -> config.withLanguage(code));
         I18n.setLocale(I18n.localeFor(code));
         String message;
         try {
-            AppConfig.save(configPath, config);
+            AppConfig.save(configPath, updated);
             message = I18n.get("settings.saved");
         } catch (IOException e) {
             message = I18n.format("settings.saveFailed", e.getMessage());
@@ -322,28 +329,30 @@ public class SettingsView extends BorderPane {
             return;
         }
 
-        config.setMinBoundingBoxSize(minBoundingBoxSize.getValue());
-        config.setMinConfidence(minConfidence.getValue());
-        config.setMaxFacesPerImage(maxFacesPerImage.getValue());
-        config.setMaxDetectionDimension(maxDetectionDimension.getValue());
-        config.setClusteringThreshold(clusteringThreshold.getValue());
-        config.setHnswM(hnswM.getValue());
-        config.setHnswEfConstruction(hnswEfConstruction.getValue());
-        config.setHnswEfSearch(hnswEfSearch.getValue());
-        config.setKnnK(knnK.getValue());
         String cacheDir = faceaiCacheDir.getText().trim();
-        config.setFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir);
-        config.setThumbnailSize(thumbnailSize.getValue());
-        config.setThumbnailQuality(thumbnailQuality.getValue().floatValue());
-        config.setMaxFramesPerVideo(maxFramesPerVideo.getValue());
-        config.setFaceCropSize(faceCropSize.getValue());
-        config.setMaxImportThreads(maxImportThreads.getValue());
-        config.setMinNameSimilarity(minSimilarity);
-        config.setFaceNameMaxImages(maxImages);
-        config.setUpdateCheckEnabled(updateCheckEnabled.isSelected());
+        ConfigModel updated = configStore.get()
+                .withMinBoundingBoxSize(minBoundingBoxSize.getValue())
+                .withMinConfidence(minConfidence.getValue())
+                .withMaxFacesPerImage(maxFacesPerImage.getValue())
+                .withMaxDetectionDimension(maxDetectionDimension.getValue())
+                .withClusteringThreshold(clusteringThreshold.getValue())
+                .withHnswM(hnswM.getValue())
+                .withHnswEfConstruction(hnswEfConstruction.getValue())
+                .withHnswEfSearch(hnswEfSearch.getValue())
+                .withKnnK(knnK.getValue())
+                .withFaceaiCacheDir(cacheDir.isEmpty() ? null : cacheDir)
+                .withThumbnailSize(thumbnailSize.getValue())
+                .withThumbnailQuality(thumbnailQuality.getValue().floatValue())
+                .withMaxFramesPerVideo(maxFramesPerVideo.getValue())
+                .withFaceCropSize(faceCropSize.getValue())
+                .withMaxImportThreads(maxImportThreads.getValue())
+                .withMinNameSimilarity(minSimilarity)
+                .withFaceNameMaxImages(maxImages)
+                .withUpdateCheckEnabled(updateCheckEnabled.isSelected());
+        configStore.set(updated);
 
         try {
-            AppConfig.save(configPath, config);
+            AppConfig.save(configPath, updated);
             statusLabel.setText(I18n.get("settings.saved"));
         } catch (IOException e) {
             statusLabel.setText(I18n.format("settings.saveFailed", e.getMessage()));
@@ -352,31 +361,21 @@ public class SettingsView extends BorderPane {
 
     /**
      * Restores the configuration to the built-in defaults and persists them.
+     *
+     * <p>The database name, the language and the remembered import folder are
+     * not owned by this form and survive the reset.</p>
      */
     private void onReset() {
-        ConfigModel defaults = AppConfig.getDefault();
-        config.setMinBoundingBoxSize(defaults.getMinBoundingBoxSize());
-        config.setMinConfidence(defaults.getMinConfidence());
-        config.setMaxFacesPerImage(defaults.getMaxFacesPerImage());
-        config.setMaxDetectionDimension(defaults.getMaxDetectionDimension());
-        config.setClusteringThreshold(defaults.getClusteringThreshold());
-        config.setHnswM(defaults.getHnswM());
-        config.setHnswEfConstruction(defaults.getHnswEfConstruction());
-        config.setHnswEfSearch(defaults.getHnswEfSearch());
-        config.setKnnK(defaults.getKnnK());
-        config.setFaceaiCacheDir(defaults.getFaceaiCacheDir());
-        config.setThumbnailSize(defaults.getThumbnailSize());
-        config.setThumbnailQuality(defaults.getThumbnailQuality());
-        config.setMaxFramesPerVideo(defaults.getMaxFramesPerVideo());
-        config.setFaceCropSize(defaults.getFaceCropSize());
-        config.setMaxImportThreads(defaults.getMaxImportThreads());
-        config.setMinNameSimilarity(defaults.getMinNameSimilarity());
-        config.setFaceNameMaxImages(defaults.getFaceNameMaxImages());
-        config.setUpdateCheckEnabled(defaults.isUpdateCheckEnabled());
+        ConfigModel current = configStore.get();
+        ConfigModel reset = AppConfig.getDefault()
+                .withDbName(current.dbName())
+                .withLanguage(current.language())
+                .withLastImportFolder(current.lastImportFolder());
+        configStore.set(reset);
         populateFromConfig();
 
         try {
-            AppConfig.save(configPath, config);
+            AppConfig.save(configPath, reset);
             statusLabel.setText(I18n.get("settings.resetDone"));
         } catch (IOException e) {
             statusLabel.setText(I18n.format("settings.resetFailed", e.getMessage()));

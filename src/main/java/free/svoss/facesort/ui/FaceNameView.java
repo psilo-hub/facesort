@@ -1,6 +1,6 @@
 package free.svoss.facesort.ui;
 
-import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
@@ -55,7 +55,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
     private static final int NAMED_LIMIT = 5;
 
     private final FaceToNameService faceToNameService;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
 
     private final Label statusLabel = new Label("");
     private final ListView<NameRecord> nameList = new ListView<>();
@@ -80,11 +80,11 @@ public class FaceNameView extends BorderPane implements Refreshable {
      * Creates the face-to-name tab.
      *
      * @param faceToNameService the face-to-name service; must not be null
-     * @param config            the application settings; must not be null
+     * @param configStore       the application settings; must not be null
      */
-    public FaceNameView(FaceToNameService faceToNameService, ConfigModel config) {
+    public FaceNameView(FaceToNameService faceToNameService, ConfigStore configStore) {
         this.faceToNameService = faceToNameService;
-        this.config = config;
+        this.configStore = configStore;
         this.faceActions = new FaceUi.FaceActions(
                 new FaceUi.FaceActions.Source() {
                     @Override
@@ -279,7 +279,7 @@ public class FaceNameView extends BorderPane implements Refreshable {
                         faceToNameService.findMostSimilarNamed(name.id(), NAMED_LIMIT);
                 List<SimilarityResult> candidates =
                         faceToNameService.findUnnamedForName(
-                                name.id(), config.getFaceNameMaxImages(),
+                                name.id(), configStore.get().faceNameMaxImages(),
                                 excludeOtherNamesBox.isSelected(), pathPrefix);
                 return new NameContent(named, candidates);
             }

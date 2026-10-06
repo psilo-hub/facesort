@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -71,17 +72,17 @@ class VideoImportServiceTest {
             {new DetectedFace(10, 10, 100, 100, 0.95f)};
 
     private ConfigModel config() {
-        ConfigModel config = new ConfigModel();
-        config.setMinBoundingBoxSize(80);
-        config.setMinConfidence(0.8);
-        config.setMaxFacesPerImage(10);
-        config.setThumbnailSize(256);
+        ConfigModel config = ConfigModel.defaults();
+        config = config.withMinBoundingBoxSize(80);
+        config = config.withMinConfidence(0.8);
+        config = config.withMaxFacesPerImage(10);
+        config = config.withThumbnailSize(256);
         return config;
     }
 
     private VideoImportService newService(FaceAiService service) {
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(service),
-                config(), VideoImportServiceTest::openSource, db.getTransactionRunner());
+                new ConfigStore(config()), VideoImportServiceTest::openSource, db.getTransactionRunner());
     }
 
     /**
@@ -95,7 +96,7 @@ class VideoImportServiceTest {
      */
     private VideoImportService newService(FaceAiService service, int failAtFrame) {
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(service),
-                config(), file -> failingSource(file, failAtFrame), db.getTransactionRunner());
+                new ConfigStore(config()), file -> failingSource(file, failAtFrame), db.getTransactionRunner());
     }
 
     /** Wraps {@link #openSource} so the Nth served frame throws. */
@@ -141,9 +142,9 @@ class VideoImportServiceTest {
 
     private VideoImportService parallelService(int threads, FaceAiService... services) {
         ConfigModel config = config();
-        config.setMaxImportThreads(threads);
+        config = config.withMaxImportThreads(threads);
         return new VideoImportService(imageDao, faceDao, videoDao, List.of(services),
-                config, VideoImportServiceTest::openSource, db.getTransactionRunner());
+                new ConfigStore(config), VideoImportServiceTest::openSource, db.getTransactionRunner());
     }
 
     /**

@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.SqliteErrors;
@@ -50,7 +51,7 @@ public class ImportService implements AutoCloseable {
     private final ImageDao imageDao;
     private final FaceDao faceDao;
     private final List<FaceAiService> faceAiServices;
-    private final ConfigModel config;
+    private final ConfigStore configStore;
     private final TransactionRunner transactionRunner;
 
     /**
@@ -60,13 +61,13 @@ public class ImportService implements AutoCloseable {
      * @param imageDao          DAO for the images and image_paths tables
      * @param faceDao           DAO for the faces table
      * @param faceAiService     face detection and embedding service
-     * @param config            application configuration (detection thresholds, etc.)
+     * @param configStore       application configuration (detection thresholds, etc.)
      * @param transactionRunner runner for atomic multi-statement write units
      */
     public ImportService(ImageDao imageDao, FaceDao faceDao,
-                         FaceAiService faceAiService, ConfigModel config,
+                         FaceAiService faceAiService, ConfigStore configStore,
                          TransactionRunner transactionRunner) {
-        this(imageDao, faceDao, List.of(faceAiService), config, transactionRunner);
+        this(imageDao, faceDao, List.of(faceAiService), configStore, transactionRunner);
     }
 
     /**
@@ -78,11 +79,13 @@ public class ImportService implements AutoCloseable {
      * @param imageDao          DAO for the images and image_paths tables
      * @param faceDao           DAO for the faces table
      * @param faceAiServices    one face service per parallel worker (must not be empty)
-     * @param config            application configuration (detection thresholds, etc.)
+     * @param configStore       application configuration (detection thresholds, etc.);
+     *                          read once per import run so one run detects with
+     *                          one consistent set of thresholds
      * @param transactionRunner runner for atomic multi-statement write units
      */
     public ImportService(ImageDao imageDao, FaceDao faceDao,
-                         List<FaceAiService> faceAiServices, ConfigModel config,
+                         List<FaceAiService> faceAiServices, ConfigStore configStore,
                          TransactionRunner transactionRunner) {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
@@ -90,7 +93,7 @@ public class ImportService implements AutoCloseable {
             throw new IllegalArgumentException("faceAiServices must not be empty");
         }
         this.faceAiServices = List.copyOf(faceAiServices);
-        this.config = Objects.requireNonNull(config, "config");
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
 
@@ -130,10 +133,9 @@ public class ImportService implements AutoCloseable {
         }
         int total = imageFiles.size();
 
-        int minBbox = config.getMinBoundingBoxSize();
-        double minConfidence = config.getMinConfidence();
-        int maxFacesPerImage = config.getMaxFacesPerImage();
-        String criteriaJson = FaceDetectionUtils.buildCriteriaJson(minBbox, minConfidence, maxFacesPerImage);
+        ConfigModel config = configStore.get();
+        String criteriaJson = FaceDetectionUtils.buildCriteriaJson(
+                config.minBoundingBoxSize(), config.minConfidence(), config.maxFacesPerImage());
 
         AtomicInteger newImages = new AtomicInteger();
         AtomicInteger newPaths = new AtomicInteger();
@@ -141,11 +143,10 @@ public class ImportService implements AutoCloseable {
         AtomicInteger skipped = new AtomicInteger();
 
         ImportWorkerPool.Result worker = ImportWorkerPool.run(
-                config.getMaxImportThreads(), faceAiServices, "import-worker-",
+                config.maxImportThreads(), faceAiServices, "import-worker-",
                 imageFiles, progress, cancelled,
                 (service, file) -> {
-                    FileResult result = processFile(file, criteriaJson, minBbox,
-                            minConfidence, maxFacesPerImage, service);
+                    FileResult result = processFile(file, config, criteriaJson, service);
                     if (result.newImage) {
                         newImages.incrementAndGet();
                     }
@@ -174,8 +175,7 @@ public class ImportService implements AutoCloseable {
     /**
      * Processes a single image file: detect faces, store new records, record paths.
      */
-    private FileResult processFile(Path file, String criteriaJson,
-                                   int minBbox, double minConfidence, int maxFacesPerImage,
+    private FileResult processFile(Path file, ConfigModel config, String criteriaJson,
                                    FaceAiService service) throws Exception {
 
         String hash = HashUtils.hashFile(file);
@@ -198,7 +198,7 @@ public class ImportService implements AutoCloseable {
         }
         if (knownImage) {
             if (needThumbnail) {
-                generateThumbnailIfAbsent(hash, file);
+                generateThumbnailIfAbsent(hash, file, config);
             }
             return FileResult.newPath();
         }
@@ -211,8 +211,8 @@ public class ImportService implements AutoCloseable {
         // original coordinates, and each qualifying face is cropped, downscaled,
         // embedded and encoded exactly like video frames are.
         FaceDetectionUtils.DetectionResult detection = FaceDetectionUtils.detectFaces(hash, image,
-                config.getMaxDetectionDimension(), minBbox, minConfidence,
-                maxFacesPerImage, config.getFaceCropSize(), config.getThumbnailQuality(),
+                config.maxDetectionDimension(), config.minBoundingBoxSize(), config.minConfidence(),
+                config.maxFacesPerImage(), config.faceCropSize(), config.thumbnailQuality(),
                 service, file.toString());
         List<FaceRecord> faceRecords = detection.faces();
         int facesAdded = faceRecords.size();
@@ -246,13 +246,13 @@ public class ImportService implements AutoCloseable {
                 imageDao.addPath(hash, absolutePath);
             }
             if (!imageDao.hasThumbnail(hash)) {
-                generateThumbnailIfAbsent(hash, file);
+                generateThumbnailIfAbsent(hash, file, config);
             }
             return FileResult.newPath();
         }
 
         // Generate thumbnail for the full image (reusing the loaded image)
-        generateThumbnailIfAbsent(hash, image);
+        generateThumbnailIfAbsent(hash, image, config);
 
         return FileResult.newImage(facesAdded, detection.droppedFaces());
     }
@@ -262,15 +262,17 @@ public class ImportService implements AutoCloseable {
      * Database lookups and writes are serialized by the synchronized
      * connection; image encoding happens outside the DB.
      *
-     * @param hash  content hash of the image
-     * @param image already-loaded image to derive the thumbnail from
+     * @param hash   content hash of the image
+     * @param image  already-loaded image to derive the thumbnail from
+     * @param config the settings of the running import
      */
-    private void generateThumbnailIfAbsent(String hash, BufferedImage image) throws Exception {
+    private void generateThumbnailIfAbsent(String hash, BufferedImage image,
+                                           ConfigModel config) throws Exception {
         if (thumbnailPresent(hash)) {
             return;
         }
-        byte[] thumbJpg = Thumbnailer.encode(image, config.getThumbnailSize(),
-                config.getThumbnailQuality());
+        byte[] thumbJpg = Thumbnailer.encode(image, config.thumbnailSize(),
+                config.thumbnailQuality());
         saveThumbnailIfAbsent(hash, thumbJpg);
     }
 
@@ -280,16 +282,17 @@ public class ImportService implements AutoCloseable {
      * connection; decoding the image and encoding the thumbnail happen
      * outside the DB.
      *
-     * @param hash content hash of the image
-     * @param file path to the image file on disk
+     * @param hash   content hash of the image
+     * @param file   path to the image file on disk
+     * @param config the settings of the running import
      */
-    private void generateThumbnailIfAbsent(String hash, Path file) throws Exception {
+    private void generateThumbnailIfAbsent(String hash, Path file, ConfigModel config) throws Exception {
         if (thumbnailPresent(hash)) {
             return;
         }
         BufferedImage image = ImageUtils.readImage(file);
-        saveThumbnailIfAbsent(hash, Thumbnailer.encode(image, config.getThumbnailSize(),
-                config.getThumbnailQuality()));
+        saveThumbnailIfAbsent(hash, Thumbnailer.encode(image, config.thumbnailSize(),
+                config.thumbnailQuality()));
     }
 
     private boolean thumbnailPresent(String hash) throws SQLException {

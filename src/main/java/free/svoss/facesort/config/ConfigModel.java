@@ -1,19 +1,45 @@
 package free.svoss.facesort.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Serializable settings model for the Face Sort application.
+ * Immutable settings model for the Face Sort application.
  *
- * <p>The field names match the keys written to {@code config/facesort-config.json}.
- * All fields have defaults so the application works out of the box when the
+ * <p>The component names match the keys written to {@code config/facesort-config.json}.
+ * All components have defaults so the application works out of the box when the
  * config file is absent or partially filled in. Unknown keys are ignored on
  * load, so a config written by a different build still starts the application
  * instead of aborting it.</p>
+ *
+ * <p>The record is immutable and shared across threads: a changed setting is a
+ * new instance swapped in through a {@link ConfigStore}, so a reader either
+ * sees the whole previous configuration or the whole new one and never a
+ * half-applied mixture of both.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ConfigModel {
+public record ConfigModel(
+        String lastImportFolder,
+        int minBoundingBoxSize,
+        double minConfidence,
+        int maxFacesPerImage,
+        int maxDetectionDimension,
+        float thumbnailQuality,
+        int maxFramesPerVideo,
+        int faceCropSize,
+        double clusteringThreshold,
+        int hnswM,
+        int hnswEfConstruction,
+        int hnswEfSearch,
+        int knnK,
+        String faceaiCacheDir,
+        int thumbnailSize,
+        int maxImportThreads,
+        String dbName,
+        double minNameSimilarity,
+        int faceNameMaxImages,
+        boolean updateCheckEnabled,
+        String language
+) {
 
     public static final int DEFAULT_THUMBNAIL_SIZE = 256;
     public static final int DEFAULT_MAX_DETECTION_DIMENSION = 1600;
@@ -35,8 +61,19 @@ public class ConfigModel {
     public static final boolean DEFAULT_UPDATE_CHECK_ENABLED = true;
     /** Language code for the UI, one of the codes shipped in {@code i18n/messages*.properties}. */
     public static final String DEFAULT_LANGUAGE = "en";
+    /** No remembered import folder yet. */
+    public static final String DEFAULT_LAST_IMPORT_FOLDER = "";
 
-    // Lower bounds enforced by normalize() on load so hand-edited config files
+    public static final int DEFAULT_MIN_BOUNDING_BOX_SIZE = 80;
+    public static final double DEFAULT_MIN_CONFIDENCE = 0.8;
+    public static final int DEFAULT_MAX_FACES_PER_IMAGE = 10;
+    public static final double DEFAULT_CLUSTERING_THRESHOLD = 0.5;
+    public static final int DEFAULT_HNSW_M = 16;
+    public static final int DEFAULT_HNSW_EF_CONSTRUCTION = 200;
+    public static final int DEFAULT_HNSW_EF_SEARCH = 100;
+    public static final int DEFAULT_KNN_K = 20;
+
+    // Lower bounds enforced by normalized() on load so hand-edited config files
     // cannot produce degenerate values that surface as runtime errors later.
     private static final int MIN_BOUNDING_BOX_SIZE = 1;
     private static final int MIN_MAX_FACES_PER_IMAGE = 1;
@@ -50,96 +87,94 @@ public class ConfigModel {
     private static final int MIN_KNN_K = 1;
     private static final int MIN_FACE_NAME_MAX_IMAGES = 1;
 
-    private String lastImportFolder = "";
-
-    // Face detection criteria
-    @JsonProperty("minBoundingBoxSize")
-    private int minBoundingBoxSize = 80;
-    @JsonProperty("minConfidence")
-    private double minConfidence = 0.8;
-    @JsonProperty("maxFacesPerImage")
-    private int maxFacesPerImage = 10;
-
-    // Import performance
-    @JsonProperty("maxDetectionDimension")
-    private int maxDetectionDimension = DEFAULT_MAX_DETECTION_DIMENSION;
-    @JsonProperty("thumbnailQuality")
-    private float thumbnailQuality = DEFAULT_THUMBNAIL_QUALITY;
-    @JsonProperty("maxFramesPerVideo")
-    private int maxFramesPerVideo = DEFAULT_MAX_FRAMES_PER_VIDEO;
-    @JsonProperty("faceCropSize")
-    private int faceCropSize = DEFAULT_FACE_CROP_SIZE;
-
-    // Clustering
-    @JsonProperty("clusteringThreshold")
-    private double clusteringThreshold = 0.5;
-    @JsonProperty("hnswM")
-    private int hnswM = 16;
-    @JsonProperty("hnswEfConstruction")
-    private int hnswEfConstruction = 200;
-    @JsonProperty("hnswEfSearch")
-    private int hnswEfSearch = 100;
-    @JsonProperty("knnK")
-    private int knnK = 20;
-
-    // FaceAI model cache
-    @JsonProperty("faceaiCacheDir")
-    private String faceaiCacheDir;
-
-    // App settings
-    @JsonProperty("thumbnailSize")
-    private int thumbnailSize = DEFAULT_THUMBNAIL_SIZE;
-    @JsonProperty("maxImportThreads")
-    private int maxImportThreads = DEFAULT_MAX_IMPORT_THREADS;
-    @JsonProperty("dbName")
-    private String dbName = DEFAULT_DB_NAME;
-    @JsonProperty("minNameSimilarity")
-    private double minNameSimilarity = DEFAULT_MIN_NAME_SIMILARITY;
-    @JsonProperty("faceNameMaxImages")
-    private int faceNameMaxImages = DEFAULT_FACE_NAME_MAX_IMAGES;
-
-    // Startup behaviour
-    @JsonProperty("updateCheckEnabled")
-    private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK_ENABLED;
-
-    // Internationalization
-    @JsonProperty("language")
-    private String language = DEFAULT_LANGUAGE;
-
-    public ConfigModel() {
-        // No-arg constructor required by Jackson for deserialization.
+    /**
+     * Guards the components a config file may legitimately leave out or write
+     * as {@code null}. A null would otherwise surface as a
+     * {@link NullPointerException} far from the config file, for example when
+     * the database path is resolved from {@code dbName}.
+     */
+    public ConfigModel {
+        if (lastImportFolder == null) {
+            lastImportFolder = DEFAULT_LAST_IMPORT_FOLDER;
+        }
+        if (dbName == null) {
+            dbName = DEFAULT_DB_NAME;
+        }
+        if (language == null) {
+            language = DEFAULT_LANGUAGE;
+        }
     }
 
     /**
-     * Normalizes the values of a deserialized config (or a hand-edited one)
-     * into ranges the rest of the application can rely on. Counts, dimensions
-     * and HNSW parameters are clamped to sensible lower bounds, ratios and
-     * similarities are clamped to [0, 1], and the import thread pool is capped
-     * at {@link #MAX_IMPORT_THREADS}. The defaults are already in range, so a
-     * fresh {@code ConfigModel} is left untouched.
+     * Returns the configuration the application starts with when no config file
+     * is present: every component at its documented default.
+     *
+     * @return a config populated with the built-in defaults
+     */
+    public static ConfigModel defaults() {
+        return new ConfigModel(
+                DEFAULT_LAST_IMPORT_FOLDER,
+                DEFAULT_MIN_BOUNDING_BOX_SIZE,
+                DEFAULT_MIN_CONFIDENCE,
+                DEFAULT_MAX_FACES_PER_IMAGE,
+                DEFAULT_MAX_DETECTION_DIMENSION,
+                DEFAULT_THUMBNAIL_QUALITY,
+                DEFAULT_MAX_FRAMES_PER_VIDEO,
+                DEFAULT_FACE_CROP_SIZE,
+                DEFAULT_CLUSTERING_THRESHOLD,
+                DEFAULT_HNSW_M,
+                DEFAULT_HNSW_EF_CONSTRUCTION,
+                DEFAULT_HNSW_EF_SEARCH,
+                DEFAULT_KNN_K,
+                null, // faceaiCacheDir: derived from the platform cache dir when unset
+                DEFAULT_THUMBNAIL_SIZE,
+                DEFAULT_MAX_IMPORT_THREADS,
+                DEFAULT_DB_NAME,
+                DEFAULT_MIN_NAME_SIMILARITY,
+                DEFAULT_FACE_NAME_MAX_IMAGES,
+                DEFAULT_UPDATE_CHECK_ENABLED,
+                DEFAULT_LANGUAGE);
+    }
+
+    /**
+     * Returns a copy of this config with the values of a deserialized config
+     * (or a hand-edited one) clamped into ranges the rest of the application
+     * can rely on. Counts, dimensions and HNSW parameters are clamped to
+     * sensible lower bounds, ratios and similarities are clamped to [0, 1],
+     * and the import thread pool is capped at {@link #MAX_IMPORT_THREADS}. The
+     * defaults are already in range, so normalizing a fresh {@code ConfigModel}
+     * returns an equal copy.
      *
      * <p>The application's config file is only produced by this application and
      * its UI constrains every field, so the main concern is a config file that
      * was hand-edited (or written by a newer/or older build). Loading must not
      * let such values surface later as FaceAI library or HNSW index errors.</p>
+     *
+     * @return this config with every component clamped into its valid range
      */
-    public void normalize() {
-        minBoundingBoxSize = clamp(minBoundingBoxSize, MIN_BOUNDING_BOX_SIZE, Integer.MAX_VALUE);
-        minConfidence = clamp(minConfidence, 0.0, 1.0);
-        maxFacesPerImage = clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE);
-        maxDetectionDimension = clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE);
-        thumbnailQuality = (float) clamp(thumbnailQuality, MIN_THUMBNAIL_QUALITY, 1.0);
-        maxFramesPerVideo = clamp(maxFramesPerVideo, MIN_MAX_FRAMES_PER_VIDEO, Integer.MAX_VALUE);
-        faceCropSize = clamp(faceCropSize, MIN_FACE_CROP_SIZE, Integer.MAX_VALUE);
-        clusteringThreshold = clamp(clusteringThreshold, 0.0, 1.0);
-        hnswM = clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE);
-        hnswEfConstruction = clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE);
-        hnswEfSearch = clamp(hnswEfSearch, MIN_HNSW_EF, Integer.MAX_VALUE);
-        knnK = clamp(knnK, MIN_KNN_K, Integer.MAX_VALUE);
-        thumbnailSize = clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE);
-        maxImportThreads = clamp(maxImportThreads, 1, MAX_IMPORT_THREADS);
-        minNameSimilarity = clamp(minNameSimilarity, 0.0, 1.0);
-        faceNameMaxImages = clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE);
+    public ConfigModel normalized() {
+        return new ConfigModel(
+                lastImportFolder,
+                clamp(minBoundingBoxSize, MIN_BOUNDING_BOX_SIZE, Integer.MAX_VALUE),
+                clamp(minConfidence, 0.0, 1.0),
+                clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE),
+                clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE),
+                (float) clamp(thumbnailQuality, MIN_THUMBNAIL_QUALITY, 1.0),
+                clamp(maxFramesPerVideo, MIN_MAX_FRAMES_PER_VIDEO, Integer.MAX_VALUE),
+                clamp(faceCropSize, MIN_FACE_CROP_SIZE, Integer.MAX_VALUE),
+                clamp(clusteringThreshold, 0.0, 1.0),
+                clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE),
+                clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE),
+                clamp(hnswEfSearch, MIN_HNSW_EF, Integer.MAX_VALUE),
+                clamp(knnK, MIN_KNN_K, Integer.MAX_VALUE),
+                faceaiCacheDir,
+                clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE),
+                clamp(maxImportThreads, 1, MAX_IMPORT_THREADS),
+                dbName,
+                clamp(minNameSimilarity, 0.0, 1.0),
+                clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE),
+                updateCheckEnabled,
+                language);
     }
 
     private static int clamp(int value, int min, int max) {
@@ -150,171 +185,171 @@ public class ConfigModel {
         return Math.max(min, Math.min(max, value));
     }
 
-    public String getLastImportFolder() {
-        return lastImportFolder;
+    public ConfigModel withLastImportFolder(String lastImportFolder) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setLastImportFolder(String lastImportFolder) {
-        this.lastImportFolder = lastImportFolder;
+    public ConfigModel withMinBoundingBoxSize(int minBoundingBoxSize) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getMinBoundingBoxSize() {
-        return minBoundingBoxSize;
+    public ConfigModel withMinConfidence(double minConfidence) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setMinBoundingBoxSize(int minBoundingBoxSize) {
-        this.minBoundingBoxSize = minBoundingBoxSize;
+    public ConfigModel withMaxFacesPerImage(int maxFacesPerImage) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public double getMinConfidence() {
-        return minConfidence;
+    public ConfigModel withMaxDetectionDimension(int maxDetectionDimension) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setMinConfidence(double minConfidence) {
-        this.minConfidence = minConfidence;
+    public ConfigModel withThumbnailQuality(float thumbnailQuality) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getMaxFacesPerImage() {
-        return maxFacesPerImage;
+    public ConfigModel withMaxFramesPerVideo(int maxFramesPerVideo) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setMaxFacesPerImage(int maxFacesPerImage) {
-        this.maxFacesPerImage = maxFacesPerImage;
+    public ConfigModel withFaceCropSize(int faceCropSize) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getMaxDetectionDimension() {
-        return maxDetectionDimension;
+    public ConfigModel withClusteringThreshold(double clusteringThreshold) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setMaxDetectionDimension(int maxDetectionDimension) {
-        this.maxDetectionDimension = maxDetectionDimension;
+    public ConfigModel withHnswM(int hnswM) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public float getThumbnailQuality() {
-        return thumbnailQuality;
+    public ConfigModel withHnswEfConstruction(int hnswEfConstruction) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setThumbnailQuality(float thumbnailQuality) {
-        this.thumbnailQuality = thumbnailQuality;
+    public ConfigModel withHnswEfSearch(int hnswEfSearch) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getMaxFramesPerVideo() {
-        return maxFramesPerVideo;
+    public ConfigModel withKnnK(int knnK) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setMaxFramesPerVideo(int maxFramesPerVideo) {
-        this.maxFramesPerVideo = maxFramesPerVideo;
+    public ConfigModel withFaceaiCacheDir(String faceaiCacheDir) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getFaceCropSize() {
-        return faceCropSize;
+    public ConfigModel withThumbnailSize(int thumbnailSize) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setFaceCropSize(int faceCropSize) {
-        this.faceCropSize = faceCropSize;
+    public ConfigModel withMaxImportThreads(int maxImportThreads) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public double getClusteringThreshold() {
-        return clusteringThreshold;
+    public ConfigModel withDbName(String dbName) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setClusteringThreshold(double clusteringThreshold) {
-        this.clusteringThreshold = clusteringThreshold;
+    public ConfigModel withMinNameSimilarity(double minNameSimilarity) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getHnswM() {
-        return hnswM;
+    public ConfigModel withFaceNameMaxImages(int faceNameMaxImages) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public void setHnswM(int hnswM) {
-        this.hnswM = hnswM;
+    public ConfigModel withUpdateCheckEnabled(boolean updateCheckEnabled) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 
-    public int getHnswEfConstruction() {
-        return hnswEfConstruction;
-    }
-
-    public void setHnswEfConstruction(int hnswEfConstruction) {
-        this.hnswEfConstruction = hnswEfConstruction;
-    }
-
-    public int getHnswEfSearch() {
-        return hnswEfSearch;
-    }
-
-    public void setHnswEfSearch(int hnswEfSearch) {
-        this.hnswEfSearch = hnswEfSearch;
-    }
-
-    public int getKnnK() {
-        return knnK;
-    }
-
-    public void setKnnK(int knnK) {
-        this.knnK = knnK;
-    }
-
-    public String getFaceaiCacheDir() {
-        return faceaiCacheDir;
-    }
-
-    public void setFaceaiCacheDir(String faceaiCacheDir) {
-        this.faceaiCacheDir = faceaiCacheDir;
-    }
-
-    public int getThumbnailSize() {
-        return thumbnailSize;
-    }
-
-    public void setThumbnailSize(int thumbnailSize) {
-        this.thumbnailSize = thumbnailSize;
-    }
-
-    public int getMaxImportThreads() {
-        return maxImportThreads;
-    }
-
-    public void setMaxImportThreads(int maxImportThreads) {
-        this.maxImportThreads = maxImportThreads;
-    }
-
-    public String getDbName() {
-        return dbName;
-    }
-
-    public void setDbName(String dbName) {
-        this.dbName = dbName;
-    }
-
-    public double getMinNameSimilarity() {
-        return minNameSimilarity;
-    }
-
-    public void setMinNameSimilarity(double minNameSimilarity) {
-        this.minNameSimilarity = minNameSimilarity;
-    }
-
-    public int getFaceNameMaxImages() {
-        return faceNameMaxImages;
-    }
-
-    public void setFaceNameMaxImages(int faceNameMaxImages) {
-        this.faceNameMaxImages = faceNameMaxImages;
-    }
-
-    public boolean isUpdateCheckEnabled() {
-        return updateCheckEnabled;
-    }
-
-    public void setUpdateCheckEnabled(boolean updateCheckEnabled) {
-        this.updateCheckEnabled = updateCheckEnabled;
-    }
-
-    public String getLanguage() {
-        return language;
-    }
-
-    public void setLanguage(String language) {
-        this.language = language;
+    public ConfigModel withLanguage(String language) {
+        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
+                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
+                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
+                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
+                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
     }
 }

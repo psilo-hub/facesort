@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.config.ConfigModel;
+import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
@@ -40,11 +41,11 @@ class FfmpegEndToEndImportTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        config = new ConfigModel();
-        config.setMinBoundingBoxSize(80);
-        config.setMinConfidence(0.8);
-        config.setMaxFacesPerImage(10);
-        config.setThumbnailSize(256);
+        config = ConfigModel.defaults();
+        config = config.withMinBoundingBoxSize(80);
+        config = config.withMinConfidence(0.8);
+        config = config.withMaxFacesPerImage(10);
+        config = config.withThumbnailSize(256);
         faceAiService = new FaceAiService(new FakeFaceAiEngine()
                 .withFaces(new DetectedFace(10, 10, 100, 100, 0.95f))
                 .withEmbedding(new float[]{1, 0, 0, 0, 0, 0, 0, 0}));
@@ -91,7 +92,7 @@ class FfmpegEndToEndImportTest {
                     new ImageDao(db.getConnection()),
                     new FaceDao(db.getConnection()),
                     new VideoDao(db.getConnection()),
-                    List.of(faceAiService), config, db.getTransactionRunner());
+                    List.of(faceAiService), new ConfigStore(config), db.getTransactionRunner());
             return service.importFolder(folder, null, () -> false);
         } finally {
             db.close();

@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-06. `mvn test` is green: 457 tests / 49 test classes,
+State as of 2026-10-06. `mvn test` is green: 469 tests / 50 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (27 open items, with the
+The detailed backlog lives in `suggestions.md` (26 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,40 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* §2.1 `ConfigModel` is now an immutable record, published atomically through
+  the new `ConfigStore`. The old bean was shared with every service and view,
+  and the settings view mutated its fields in place
+  (SettingsView.java:356-375), so a reader on another thread could observe a
+  half-updated configuration — the unsafe-publication hazard the item named.
+  The record's 21 components are read through record accessors
+  (`minBoundingBoxSize()`, …), and every change goes through one of the 21
+  `withX(...)` copy methods that returns a new instance while the old one
+  stays valid for whoever still holds it. `ConfigStore` (an `AtomicReference`
+  wrapper) owns the current value; the settings view builds one complete
+  replacement and publishes it with a single `configStore.set(...)`, and all
+  runtime readers — `ImportService`, `VideoImportService`,
+  `ClusteringService`, `FaceToNameService`, the Import/name-adding/settings
+  views — take the shared store instead of the model. Saved settings still
+  apply immediately (that behavior is unchanged), but each import or
+  clustering run snapshots the config once per run and threads that snapshot
+  through the run, so one run sees one consistent configuration. Loading kept
+  the old defaults: because a record yields the type's zero value for a key
+  the file omits, `AppConfig.load` merges the file over
+  `ConfigModel.defaults()` (treating explicit `null` as absent) before
+  mapping to the record, then clamps via `normalized()`. JSON keys and the
+  config file format are byte-for-byte unchanged; `AppConfig.getDefault()`
+  delegates to `ConfigModel.defaults()`. `FaceToNameServiceTest`'s
+  post-construction mutation became a store update, and the anonymous
+  subclass seam `AppConfigTest` used to break the save became a
+  package-private `AppConfig.saveContent(Path, ContentWriter)`.
+  Pinned by the rewritten `ConfigModelTest` (defaults, immutability,
+  clamping, null guards on the three string fields), the new
+  `ConfigStoreTest` (get/set/updateAndGet + null guards) and the rewritten
+  `AppConfigTest` (merge-over-defaults load incl. explicit-null keys, save
+  through the seam keeps the previous config on failure). All 469 tests pass
+  (457 -> 469, 49 -> 50 test classes). No README or CHANGELOG change: the
+  user-visible behavior is unchanged.
 
 * §3 The View tab no longer rebuilds and re-decodes on every keystroke. The
   filter field called `applyFilter()` straight from its text listener, so
@@ -235,7 +269,13 @@ Queued next (highest payoff first, all still open in suggestions.md)
 
 §2 Concurrency — the largest remaining risk area:
   * `ConfigModel` is an unsafe-publication hazard (high, medium effort) —
-    make it an immutable record and swap the reference atomically
+    make it an immutable record and swap the reference atomically — **done**:
+    `ConfigModel` is an immutable record read through record accessors, all
+    changes go through `with*` copy methods, and the shared
+    `ConfigStore` (an `AtomicReference` wrapper with `get`/`set`/
+    `updateAndGet`) replaces the reference atomically; saved settings still
+    apply immediately while each import/clustering run snapshots one config
+    (469 tests green)
   * `TaskRunner`'s single-slot policy cancels unrelated user actions
   * Untracked raw threads and a leaked `HttpClient` on language change
   * Import progress starves the FX thread
