@@ -40,7 +40,12 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
   Ein erneuter Import desselben Ordners ist daher wirkungslos, und dasselbe Foto
   wird nie doppelt gespeichert.
 - **Pfadfilter** – beschränke das Benennen auf einen bestimmten Ordner oder
-  Dateinamen.
+  Dateinamen. Video-Gesichter werden über den Pfad ihrer Videodatei abgeglichen.
+  In *Zufälliges Gesicht benennen* und *Gesichter einem Namen hinzufügen* klicke
+  mit Rechtsklick auf ein Gesicht und wähle **Pfad in den Pfadfilter einfügen**,
+  um das Feld mit der Quelle dieses Gesichts zu füllen: dem Ordner des Bildes
+  bzw. dem vollständigen Pfad (einschließlich Dateiname) des Videos, aus dem ein
+  Frame stammt.
 - **Nach Pfad-Präfix entfernen** – lösche im Tab *Import* alle importierten Fotos
   und Videos, deren gespeicherter Pfad mit einem eingegebenen Präfix beginnt. Ein
   Dialog zeigt zuerst, wie viele Bilder, Videos, Vorschaubilder und
@@ -113,7 +118,11 @@ Reihenfolge ab:
 3. **Zufälliges Gesicht benennen** – eine zufällige Stichprobe unbenannter
    Gesichter. Klicke Gesichter an, um sie auszuwählen, gib einen Namen ein und
    drücke **Ausgewählte benennen**. Nutze das Feld *Pfadpräfix*, um die Stichprobe
-   auf einen bestimmten Ordner oder eine Datei zu beschränken.
+   auf einen bestimmten Ordner oder eine Datei zu beschränken (Video-Frames
+   werden über den Pfad ihrer Videodatei abgeglichen). Klicke mit Rechtsklick auf
+   ein Gesicht und wähle *Pfad in den Pfadfilter einfügen*, um das Feld mit dem
+   Ordner dieses Gesichts oder – bei einem Video-Frame – dem vollständigen Pfad
+   seines Quellvideos zu füllen.
 
 4. **Gesichter einem Namen hinzufügen** – Wähle links eine Person; die App reiht
    jedes unbenannte Gesicht nach Ähnlichkeit zum durchschnittlichen Embedding der
@@ -123,7 +132,10 @@ Reihenfolge ab:
    den gesamten Bereich dazwischen auszuwählen. Aktiviere das Kontrollkästchen
    *„Gesichter ausschließen, die eher einem anderen Namen entsprechen"*, um nur
    Gesichter anzubieten, deren beste Übereinstimmung die ausgewählte Person ist,
-   und nutze das Feld *Pfadpräfix* zum Filtern nach Ordnern. Du kannst hier auch
+   und nutze das Feld *Pfadpräfix* zum Filtern nach Ordnern (klicke mit
+   Rechtsklick auf ein Gesicht und wähle *Pfad in den Pfadfilter einfügen*, um
+   das Feld mit dem Ordner dieses Gesichts oder – bei einem Video-Frame – dem
+   vollständigen Pfad seines Quellvideos zu füllen). Du kannst hier auch
    jede Person **Umbenennen…** oder mit **Bilder exportieren…** alle Fotos der
    ausgewählten Person in einen Ordner deiner Wahl kopieren (fehlende Originale
    werden als Vorschaubilder exportiert).

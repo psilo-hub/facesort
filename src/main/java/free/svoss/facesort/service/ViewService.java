@@ -140,8 +140,8 @@ public class ViewService {
     }
 
     /**
-     * Resolves the folder of the media file behind an image for use as a path
-     * filter prefix: for a video frame the folder of its source video,
+     * Resolves the path to filter by for the media file behind an image: for a
+     * video frame the full path of its source video (including the file name),
      * otherwise the folder of the image itself. When several paths are stored
      * the first one that still exists on disk is preferred, otherwise the first
      * recorded path is used.
@@ -149,10 +149,10 @@ public class ViewService {
      * @param imageDao  DAO for the images and image_paths tables
      * @param videoDao  DAO for the videos, video_paths and video_frames tables
      * @param imageHash content hash of the image
-     * @return the folder to filter by, or empty when no path is stored at all
+     * @return the path to filter by, or empty when no path is stored at all
      * @throws SQLException on database access failure
      */
-    public static Optional<Path> resolveFilterFolder(
+    public static Optional<Path> resolveFilterPath(
             ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
         Objects.requireNonNull(imageDao, "imageDao");
         Objects.requireNonNull(videoDao, "videoDao");
@@ -164,10 +164,10 @@ public class ViewService {
         if (paths.isEmpty()) {
             return Optional.empty();
         }
-        String chosen = firstExistingPath(paths)
-                .map(Path::toString)
-                .orElse(paths.get(0));
-        return Optional.ofNullable(Path.of(chosen).getParent());
+        Path chosen = firstExistingPath(paths).orElseGet(() -> Path.of(paths.get(0)));
+        return videoHash.isPresent()
+                ? Optional.of(chosen)
+                : Optional.ofNullable(chosen.getParent());
     }
 
     /**

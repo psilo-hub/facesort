@@ -41,7 +41,12 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
   même dossier est donc sans effet, et une même photo n'est jamais stockée deux
   fois.
 - **Filtre de chemin** — limitez le nommage à un dossier ou un nom de fichier
-  précis.
+  précis. Les visages issus de vidéos sont mis en correspondance via le chemin de
+  leur fichier vidéo. Dans *Nommer un visage au hasard* et *Ajouter des visages à
+  un nom*, faites un clic droit sur un visage et choisissez **Coller le chemin
+  dans le filtre de chemin** pour remplir le champ avec la source de ce visage :
+  le dossier de l'image, ou le chemin complet (nom de fichier inclus) de la vidéo
+  d'où provient une image.
 - **Suppression par préfixe de chemin** — dans l'onglet *Importer*, supprimez
   toutes les images et vidéos importées dont le chemin stocké commence par un
   préfixe que vous saisissez. Une fenêtre affiche d'abord combien d'images, de
@@ -116,7 +121,11 @@ ordre :
 3. **Nommer un visage au hasard** — un échantillon aléatoire de visages non
    nommés. Cliquez sur des visages pour les sélectionner, saisissez un nom et
    appuyez sur **Nommer la sélection**. Utilisez le champ *préfixe de chemin*
-   pour limiter l'échantillon à un dossier ou un fichier particulier.
+   pour limiter l'échantillon à un dossier ou un fichier particulier (les images
+   de vidéo sont mises en correspondance via le chemin de leur fichier vidéo).
+   Faites un clic droit sur un visage et choisissez *Coller le chemin dans le
+   filtre de chemin* pour remplir le champ avec le dossier de ce visage ou, pour
+   une image de vidéo, le chemin complet de sa vidéo source.
 
 4. **Ajouter des visages à un nom** — Sélectionnez une personne à gauche ;
    l'application classe chaque visage non nommé selon sa similitude avec
@@ -126,7 +135,10 @@ ordre :
    et le dernier visage pour sélectionner toute la plage entre les deux. Utilisez
    la case *« Exclure les visages plus proches d'un autre nom »* pour ne proposer
    que les visages dont la meilleure correspondance est la personne sélectionnée,
-   et le champ *préfixe de chemin* pour filtrer par dossier. Vous pouvez aussi
+   et le champ *préfixe de chemin* pour filtrer par dossier (faites un clic droit
+   sur un visage et choisissez *Coller le chemin dans le filtre de chemin* pour
+   remplir le champ avec le dossier de ce visage ou, pour une image de vidéo, le
+   chemin complet de sa vidéo source). Vous pouvez aussi
    **Renommer…** n'importe quelle personne ici, ou appuyer sur
    **Exporter les images…** pour copier chaque photo de la personne sélectionnée
    dans un dossier de votre choix (les originaux manquants sont exportés comme

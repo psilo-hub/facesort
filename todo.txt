@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-06. `mvn test` is green: 469 tests / 50 test classes,
+State as of 2026-10-14. `mvn test` is green: 469 tests / 50 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,27 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 1): "Paste Path to Path Filter" now pastes
+  the source video's full path — including the file name — when the face comes
+  from a video frame, while photo faces still paste their folder.
+  `ViewService.resolveFilterFolder` returned `Path.of(chosen).getParent()` for
+  both branches, so a video frame pasted only the video's folder; the video
+  branch now returns the stored path itself (existing-first, else the first
+  recorded path) and only the photo branch takes `.getParent()`. Because the
+  result is a folder for photos but a full file path for videos, the method was
+  renamed to `resolveFilterPath` — with the delegating wrappers
+  `NamingService.resolveFilterPath` / `FaceToNameService.resolveFilterPath`
+  and the view helpers `applyFilterFolder` → `applyFilterPath` (and the unused
+  `filterFolderFor` → `filterPathFor`) following — so the name matches what it
+  returns. TDD: the video `ViewServiceTest` case was flipped to assert the full
+  path and failed with `expected: <...mp4> but was: <...\Temp>` before the
+  change. All 469 tests pass. Docs: `new_features_todo.txt` item 1 ticked,
+  `CHANGELOG.md` (### Added), and the README path-filter passages in
+  `README.md` and all five translations. The translations had never described
+  the Paste Path action at all (the pre-existing §8 drift), so the missing
+  sentences were added there together with the new video behaviour, leaving all
+  six languages in sync for this feature.
 
 * §2.1 `ConfigModel` is now an immutable record, published atomically through
   the new `ConfigStore`. The old bean was shared with every service and view,

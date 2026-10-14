@@ -236,16 +236,16 @@ public class RandomNameView extends BorderPane implements Refreshable {
             String hash = face.imageHash();
             MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
             pasteFilterItem.setDisable(true); // disabled until resolved
-            // Resolve the filter folder on a background thread
+            // Resolve the filter path on a background thread
             FaceUi.runAsync(new Task<Optional<Path>>() {
                 @Override
                 protected Optional<Path> call() throws SQLException {
-                    return namingService.resolveFilterFolder(hash);
+                    return namingService.resolveFilterPath(hash);
                 }
             },
                     folder -> {
                         pasteFilterItem.setDisable(folder.isEmpty());
-                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterFolder(p)));
+                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterPath(p)));
                     },
                     ex -> pasteFilterItem.setDisable(true),
                     "randomname-filter-folder-" + hash);
@@ -254,12 +254,12 @@ public class RandomNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Drops a folder into the path filter field and reloads the sample.
+     * Drops a path into the path filter field and reloads the sample.
      *
-     * @param folder the folder to filter by
+     * @param path the path to filter by
      */
-    private void applyFilterFolder(Path folder) {
-        pathFilterField.setText(folder.toString());
+    private void applyFilterPath(Path path) {
+        pathFilterField.setText(path.toString());
         pathFilterField.positionCaret(pathFilterField.getLength());
         loadSample();
     }

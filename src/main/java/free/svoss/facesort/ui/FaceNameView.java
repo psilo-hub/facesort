@@ -388,16 +388,16 @@ public class FaceNameView extends BorderPane implements Refreshable {
             String hash = face.imageHash();
             MenuItem pasteFilterItem = new MenuItem(I18n.get("common.pastePathToFilter"));
             pasteFilterItem.setDisable(true); // disabled until resolved
-            // Resolve the filter folder on a background thread
+            // Resolve the filter path on a background thread
             FaceUi.runAsync(new Task<Optional<Path>>() {
                 @Override
                 protected Optional<Path> call() throws SQLException {
-                    return faceToNameService.resolveFilterFolder(hash);
+                    return faceToNameService.resolveFilterPath(hash);
                 }
             },
                     folder -> {
                         pasteFilterItem.setDisable(folder.isEmpty());
-                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterFolder(p)));
+                        folder.ifPresent(p -> pasteFilterItem.setOnAction(ev -> applyFilterPath(p)));
                     },
                     ex -> pasteFilterItem.setDisable(true),
                     "facename-filter-folder-" + hash);
@@ -458,15 +458,15 @@ public class FaceNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Resolves the folder to paste into the path filter for a face, or empty
-     * when the media file has no stored path.
+     * Resolves the path to paste into the path filter for a face, or empty when
+     * the media file has no stored path.
      *
-     * @param face the face whose media file folder to resolve
-     * @return the folder to filter by, or empty when unavailable
+     * @param face the face whose media file path to resolve
+     * @return the path to filter by, or empty when unavailable
      */
-    private Optional<Path> filterFolderFor(FaceRecord face) {
+    private Optional<Path> filterPathFor(FaceRecord face) {
         try {
-            return faceToNameService.resolveFilterFolder(face.imageHash());
+            return faceToNameService.resolveFilterPath(face.imageHash());
         } catch (SQLException ex) {
             statusLabel.setText(I18n.get("common.pathUnavailable"));
             return Optional.empty();
@@ -474,13 +474,13 @@ public class FaceNameView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Drops a folder into the path filter field and reloads the candidates for
-     * the active name.
+     * Drops a path into the path filter field and reloads the candidates for the
+     * active name.
      *
-     * @param folder the folder to filter by
+     * @param path the path to filter by
      */
-    private void applyFilterFolder(Path folder) {
-        pathFilterField.setText(folder.toString());
+    private void applyFilterPath(Path path) {
+        pathFilterField.setText(path.toString());
         pathFilterField.positionCaret(pathFilterField.getLength());
         if (activeName != null) {
             selectName(activeName);

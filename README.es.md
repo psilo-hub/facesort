@@ -39,7 +39,11 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
   fotos ya importadas (por contenido, no por nombre de archivo). Reimportar una
   misma carpeta es un no-op y la misma foto nunca se almacena dos veces.
 - **Filtro de ruta**: limita el etiquetado a una carpeta o nombre de archivo
-  específico.
+  específico. Las caras de vídeos se comparan por la ruta de su archivo de vídeo.
+  En *Etiquetar cara al azar* y *Añadir caras a un nombre*, haz clic derecho en
+  una cara y elige **Pegar ruta en el filtro de ruta** para rellenar el campo con
+  el origen de esa cara: la carpeta de la imagen o la ruta completa (incluido el
+  nombre de archivo) del vídeo del que proviene un fotograma.
 - **Eliminar por prefijo de ruta**: en la pestaña *Importar*, elimina todos los
   fotos y vídeos importados cuya ruta almacenada comience por el prefijo que
   introduzcas. Un diálogo muestra primero cuántas imágenes, vídeos, miniaturas y
@@ -110,7 +114,10 @@ este orden:
 3. **Etiquetar cara al azar**: una muestra aleatoria de caras sin nombre. Haz clic
    en las caras para seleccionarlas, escribe un nombre y pulsa **Etiquetar
    selección**. Usa el campo *prefijo de ruta* para limitar la muestra a una
-   carpeta o archivo concretos.
+   carpeta o archivo concretos (los fotogramas de vídeo se comparan por la ruta de
+   su archivo de vídeo). Haz clic derecho en una cara y elige *Pegar ruta en el
+   filtro de ruta* para rellenar el campo con la carpeta de esa cara o, si es un
+   fotograma de vídeo, con la ruta completa de su vídeo de origen.
 
 4. **Añadir caras a un nombre**: selecciona a una persona a la izquierda; la
    aplicación ordena cada cara sin nombre por su similitud con el embedding medio
@@ -119,7 +126,10 @@ este orden:
    tecla **Mayús** y haz clic en la primera y la última cara para seleccionar todo
    el rango entre ellas. Usa la casilla *«Excluir caras más cercanas a otro
    nombre»* para ofrecer solo caras cuya mejor coincidencia es la persona
-   seleccionada, y el campo *prefijo de ruta* para filtrar por carpeta. También
+   seleccionada, y el campo *prefijo de ruta* para filtrar por carpeta (haz clic
+   derecho en una cara y elige *Pegar ruta en el filtro de ruta* para rellenar el
+   campo con la carpeta de esa cara o, si es un fotograma de vídeo, con la ruta
+   completa de su vídeo de origen). También
    puedes **Renombrar…** a cualquier persona aquí, o pulsar **Exportar
    imágenes…** para copiar todas las fotos de la persona seleccionada a una
    carpeta de tu elección (los originales que falten se exportan como

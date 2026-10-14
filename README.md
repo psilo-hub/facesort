@@ -42,7 +42,8 @@ runs locally on your own computer: **your photos never leave your machine.**
 - **Path filter** — restrict tagging to a specific folder or file name. Video
   faces are matched through their video file's path. In *Tag random face* and
   *Add faces to a name*, right-click any face and choose **Paste Path to Path
-  Filter** to fill the field with that face's folder.
+  Filter** to fill the field with that face's source: the folder of the image,
+  or the full path (including the file name) of the video a frame came from.
 - **Remove by path prefix** — in the *Import* tab, delete every imported photo
   and video whose stored path starts with a prefix you enter. A dialog first
   shows how many images, videos, thumbnails and face sub-images would be
@@ -110,7 +111,8 @@ The main window is a set of tabs. Work through them roughly in this order:
    them, type a name and press **Tag selected**. Use the *path prefix* field to
    restrict the sample to a particular folder or file (video frames are matched
    through their video file's path). Right-click a face and choose *Paste Path
-   to Path Filter* to fill the field with that face's folder.
+   to Path Filter* to fill the field with that face's folder, or — for a video
+   frame — the full path of its source video.
 
 4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
@@ -120,7 +122,8 @@ The main window is a set of tabs. Work through them roughly in this order:
    *"Exclude faces closer to another name"* checkbox to only offer faces whose
    best match is the selected person, and the *path prefix* field to filter by
    folder (right-click any face and choose *Paste Path to Path Filter* to fill
-   the field with that face's folder). You can also **Rename...** any person
+   the field with that face's folder, or — for a video frame — the full path of
+   its source video). You can also **Rename...** any person
    here, or press
    **Export images...** to copy every photo of the selected person to a folder
    of your choice (missing originals are exported as thumbnails). Right-click an

@@ -4,6 +4,9 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- "Paste Path to Path Filter" now fills the path filter with the full path of
+  the source video — including the file name — when you right-click a face from
+  a video. Photo faces still fill the field with their folder (2026-10-14)
 - Remove imported media by path prefix: the Import tab has a "Remove by path
   prefix..." button that lets you delete every image and video whose stored
   file path starts with a prefix you enter. Before removing anything, a dialog

@@ -19,7 +19,7 @@
 - [ ] Remove or adopt unused DAO methods (NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes)
 - [ ] Deduplicate face-source bridges and error handlers across five views (NameFaceView.java:414, ViewView.java:398, DedupeView.java:327, RandomNameView.java:362, FaceNameView.java:710)
 - [ ] Consolidate ViewService API and extract MediaFileResolver to eliminate duplication across services (ViewService.java:129,189,213,225,241,289)
-- [ ] Extract shared UI helpers to eliminate duplication (TagWithNameDialog.toImage, SettingsView.tooltip, bare Tooltip, filterFolderFor)
+- [ ] Extract shared UI helpers to eliminate duplication (TagWithNameDialog.toImage, SettingsView.tooltip, bare Tooltip, filterPathFor)
 - [ ] Clean up small code smells - unused CSS selectors, duplicate Javadoc, misleading null checks, hardcoded paths, constants, inconsistent constructor null checks
 - [ ] Add CI test job running mvn test on pull requests and make release depend on it (.github/workflows/build.yml)
 - [ ] Add static analysis and coverage gates with JaCoCo floor and maven-enforcer-plugin
