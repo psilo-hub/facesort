@@ -1,6 +1,6 @@
 [x] 1. Clicking on a thumbnail and selecting "Paste Path to Path Filter" should stay unchanged if the source is an image file. But if the source is a video file, then the path including the file name should be pasted to the path filter.
 
-[ ] 2. In the "Add faces to a name" tab, if the user selects "Tag with a different name" and enters a name that is new, the list of names on the left should be updated to include the new name.
+[x] 2. In the "Add faces to a name" tab, if the user selects "Tag with a different name" and enters a name that is new, the list of names on the left should be updated to include the new name.
 
 [ ] 3. The context menu that appears when right-clicking on an untagged face should also include the option "Not a face"
 

@@ -49,7 +49,7 @@ import java.util.Optional;
  * {@link FaceToNameService}. Queries run on background {@link Task}s so the
  * UI stays responsive.</p>
  */
-public class FaceNameView extends BorderPane implements Refreshable {
+public class FaceNameView extends BorderPane implements Refreshable, TaggedFacePresenter {
 
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int NAMED_LIMIT = 5;
@@ -429,7 +429,8 @@ public class FaceNameView extends BorderPane implements Refreshable {
 
     /**
      * Tags a single face with the given name (creating the name when it does
-     * not exist yet) and reloads the candidates so the tagged face disappears.
+     * not exist yet) and reloads the names so the entered name shows up on the
+     * left even when it was new.
      *
      * @param face the face to tag
      * @param name the name to tag it with
@@ -445,16 +446,44 @@ public class FaceNameView extends BorderPane implements Refreshable {
             }
         };
 
-        task.setOnSucceeded(e -> {
-            statusLabel.setText(I18n.format("ui.faceName.differentName.tagged", name));
-            selectName(activeName); // refresh: the tagged face disappears
-        });
+        task.setOnSucceeded(e -> applyDifferentNameTagResult(name, this));
 
         task.setOnFailed(e ->
                 handleFailure(I18n.get("ui.faceName.differentName.tagFailed"),
                         task.getException()));
 
         taskRunner.start(task, "facename-different-name-tagger");
+    }
+
+    /**
+     * Applies a finished "tag with a different name" to the view: announces the
+     * tagged name and reloads the name list.
+     *
+     * <p>The list is reloaded rather than only the active name's candidates,
+     * because the entered name may have been created by this very tag and must
+     * then appear on the left. Reloading keeps the currently selected name
+     * selected.</p>
+     *
+     * <p>Package-private static with an injected presenter so a headless test
+     * can pin that the name list is reloaded, which is otherwise unreachable
+     * without a JavaFX toolkit.</p>
+     *
+     * @param name      the name the face was tagged with
+     * @param presenter the view, or a test double
+     */
+    static void applyDifferentNameTagResult(String name, TaggedFacePresenter presenter) {
+        presenter.showStatus(I18n.format("ui.faceName.differentName.tagged", name));
+        presenter.reloadNameList();
+    }
+
+    @Override
+    public void showStatus(String message) {
+        statusLabel.setText(message);
+    }
+
+    @Override
+    public void reloadNameList() {
+        loadNames(true);
     }
 
     /**

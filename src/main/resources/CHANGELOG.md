@@ -250,6 +250,11 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Tagging a face with a name it was not offered under ("Tag with a different
+  name" in the "Add faces to a name" tab) now adds a newly typed name to the
+  list of names on the left straight away, instead of only refreshing the
+  candidates of the currently selected name. The currently selected name stays
+  selected (2026-10-14)
 - Database and filesystem I/O no longer runs on the JavaFX application thread.
   "Open Original" and "Open containing folder" in face context menus now execute on
   background threads; the "Paste path to path filter" menu item resolves its target

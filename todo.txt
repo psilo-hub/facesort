@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-14. `mvn test` is green: 469 tests / 50 test classes,
+State as of 2026-10-14. `mvn test` is green: 471 tests / 50 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,25 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 2): in the "Add faces to a name" tab,
+  "Tag with a different name" now reloads the list of names on the left after a
+  successful tag, so a name the user just typed appears there immediately. The
+  success handler used to call `selectName(activeName)`, which only re-fetched
+  the active name's candidates and never touched the list — a brand-new name was
+  written to the database but stayed invisible until the next tab switch or
+  rename. It now calls `loadNames(true)`, matching the rename path
+  (`FaceNameView` line 665), which rebuilds the list and re-selects the
+  currently active name, so the selection does not jump to the new name. TDD:
+  the handler body was extracted into the package-private static
+  `FaceNameView.applyDifferentNameTagResult(String, TaggedFacePresenter)` — a
+  headless seam like `RemoveByPrefixDialog.applyScanResult`/`ScanPresenter`
+  (`TaggedFacePresenter` mirrors `ScanPresenter` and is implemented by
+  `FaceNameView`) — and two new `FaceNameViewTest` cases pin that the entered
+  name is announced and that the name list is reloaded. All 471 tests pass
+  (469 before). Docs: `new_features_todo.txt` item 2 ticked, `CHANGELOG.md`
+  (### Fixed). No README change: this fixes a bug, it does not alter how the
+  feature is described or used, so the six language variants stay in sync.
 
 * New feature (new_features_todo item 1): "Paste Path to Path Filter" now pastes
   the source video's full path — including the file name — when the face comes
