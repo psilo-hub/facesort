@@ -6,6 +6,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.NotMatchDao;
 import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
@@ -44,7 +45,8 @@ class FaceToNameServiceTest {
         configStore = new ConfigStore(ConfigModel.defaults());
         configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0)); // no cutoff by default in these tests
         service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()), configStore);
+                faceDao, nameDao, new NotMatchDao(db.getConnection()), imageDao,
+                new VideoDao(db.getConnection()), configStore);
     }
 
     @AfterEach
@@ -83,7 +85,8 @@ class FaceToNameServiceTest {
         QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
         FaceToNameService countingService = new FaceToNameService(
                 new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
-                nameDao, imageDao, new VideoDao(db.getConnection()), configStore);
+                nameDao, new NotMatchDao(db.getConnection()), imageDao,
+                new VideoDao(db.getConnection()), configStore);
         countingService.findUnnamedForName(nameId, limit, true, null);
         return counting.queriesMatching("FROM faces");
     }
@@ -162,6 +165,26 @@ class FaceToNameServiceTest {
 
         assertEquals(1, results.size(), "a dismissed detection must not be offered to a name");
         assertEquals(kept, results.get(0).faceRecord().id());
+    }
+
+    @Test
+    void findUnnamedForName_leavesOutFacesRejectedForThatName() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        long rejected = addImageAndFace("imgU1", xLike(), null);
+        long kept = addImageAndFace("imgU2", xLike(), null);
+        new NotMatchDao(db.getConnection()).insert(rejected, alice);
+
+        List<SimilarityResult> forAlice = service.findUnnamedForName(alice, 10);
+        List<SimilarityResult> forBob = service.findUnnamedForName(bob, 10);
+
+        assertEquals(1, forAlice.size(),
+                "a face rejected as 'not Alice' must no longer be offered for Alice");
+        assertEquals(kept, forAlice.get(0).faceRecord().id());
+        assertTrue(forBob.stream().anyMatch(r -> r.faceRecord().id() == rejected),
+                "saying 'not Alice' must leave the face a candidate for other names");
     }
 
     @Test

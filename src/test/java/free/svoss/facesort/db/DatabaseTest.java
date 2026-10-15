@@ -75,6 +75,37 @@ class DatabaseTest {
     }
 
     @Test
+    void freshDatabase_createsTheNotMatchesTable() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'not_matches'"),
+                        "face/name combinations the user rejected as 'not the same person' are recorded in their own table");
+            }
+        }
+    }
+
+    @Test
+    void databaseFromVersionFive_gainsTheNotMatchesTable() throws Exception {
+        Path dbFile = tempDir.resolve("v5.db");
+        try (Database db = new Database(dbFile)) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                // Recreate the version-5 schema: the same tables, no not_matches table.
+                stmt.execute("DROP TABLE not_matches");
+                stmt.execute("PRAGMA user_version = 5");
+            }
+        }
+
+        try (Database migrated = new Database(dbFile)) {
+            assertEquals(Database.SCHEMA_VERSION, userVersion(migrated),
+                    "a version-5 database must be migrated to the current schema version");
+            try (Statement stmt = migrated.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'not_matches'"),
+                        "an existing library must gain the not_matches table on the next open");
+            }
+        }
+    }
+
+    @Test
     void databaseFromVersionThree_gainsTheNotFacesTable() throws Exception {
         Path dbFile = tempDir.resolve("v3.db");
         try (Database db = new Database(dbFile)) {

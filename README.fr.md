@@ -24,13 +24,15 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
 - **Regroupement automatique des visages non nommés** — les visages similaires
   sont regroupés en clusters, pour que vous puissiez nommer toutes les photos
   d'une même personne en une fois.
-- **Trois façons simples de nommer des visages :**
+- **Quatre façons simples de nommer des visages :**
   - **Associer un visage à un nom** — avancez dans les groupes de visages non
     nommés, les plus grands d'abord.
   - **Nommer un visage au hasard** — parcourez des visages non nommés au hasard
     et nommez ceux que vous sélectionnez.
   - **Ajouter des visages à un nom** — choisissez une personne et nommez les
     visages non nommés qui lui ressemblent le plus.
+  - **Le plus similaire** — affiche le visage non nommé qui correspond le mieux à
+    l'un de vos noms, une paire à la fois.
 - **Détection des doublons** — compare vos personnes nommées et vous permet de
   fusionner des noms qui s'avèrent être la même personne.
 - **Parcourir et réviser** — voyez chaque personne d'un coup d'œil, explorez les
@@ -159,12 +161,20 @@ ordre :
    d'écarter une détection qui n'est pas vraiment un visage, afin qu'elle ne soit
    plus proposée à aucun nom.
 
-5. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
+5. **Le plus similaire** — l'application affiche le visage non nommé qui
+   correspond le mieux à l'un de vos noms à côté d'un visage déjà nommé avec ce
+   nom, avec les deux valeurs de similarité. Décidez *La même personne* (le
+   visage non nommé est nommé avec ce nom), *Pas la même personne* (la
+   combinaison est mémorisée et n'est plus proposée, dans aucun onglet) ou
+   *Passer* (la paire est mise de côté pour cette session et revient au prochain
+   démarrage). La paire suivante apparaît juste après chaque décision.
+
+6. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
    de noms par similitude. Pour chaque paire, décidez : *Ce sont des doublons*
    (choisissez alors quel nom survit — tous les visages sont fusionnés),
    *Ce ne sont pas des doublons* (mémorisé définitivement), ou *Ignorer*.
 
-6. **Voir** — parcourez votre collection nommée. Chaque personne est une carte
+7. **Voir** — parcourez votre collection nommée. Chaque personne est une carte
    avec un visage représentatif et le nombre de visages nommés. Une zone de
    recherche filtre les cartes par nom pendant la saisie, pour que la liste reste
    gérable même avec des centaines de personnes. Cliquez sur une
@@ -172,12 +182,12 @@ ordre :
    pour ouvrir l'original, ou utilisez le menu contextuel pour *Retirer le nom* de
    cette personne.
 
-7. **Paramètres** — réglez la détection des visages, le regroupement, l'import et
+8. **Paramètres** — réglez la détection des visages, le regroupement, l'import et
    les modèles ; consultez l'info-bulle de chaque contrôle pour les détails.
    Les modifications sont appliquées avec **Enregistrer** ou réinitialisées avec
    **Rétablir les valeurs par défaut**.
 
-8. **Feedback** — envoyez un rapport de bug ou une demande de fonctionnalité aux
+9. **Feedback** — envoyez un rapport de bug ou une demande de fonctionnalité aux
    développeurs.
 
 Dans toute l'application, vous pouvez faire un clic droit sur un visage ou une

@@ -4,7 +4,7 @@
 
 [x] 3. The context menu that appears when right-clicking on an untagged face should also include the option "Not a face"
 
-[ ] 4. New tab "Most similar": There should be a new tab that shows two faces and let's the user decide if it's the same person. The first face is a tagged face (The one most similar to the average embedding for that name), the second is the one most similar to the average embedding for that name. The pair with the highest similarity is shown. The user also gets to see the similarity. If the user decides that it's the same person, then the untagged face gets tagged with that name. If the user decides that it's not the same person, then this is stored, so that this combination isn't shown again.
+[x] 4. New tab "Most similar": There should be a new tab that shows two faces and let's the user decide if it's the same person. The first face is a tagged face (The one most similar to the average embedding for that name), the second is the one most similar to the average embedding for that name. The pair with the highest similarity is shown. The user also gets to see the similarity. If the user decides that it's the same person, then the untagged face gets tagged with that name. If the user decides that it's not the same person, then this is stored, so that this combination isn't shown again.
 
 [ ] 5. Add support for a new image file format: Windows icon files (.ico). First explore the options for how to do that. Which library to use?
 

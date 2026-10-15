@@ -24,13 +24,15 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
 - **Automatische Gruppierung unbenannter Gesichter** – ähnliche Gesichter werden
   zu Clustern zusammengefasst, sodass du alle Fotos derselben Person in einem
   Durchgang benennen kannst.
-- **Drei einfache Wege, Gesichter zu benennen:**
+- **Vier einfache Wege, Gesichter zu benennen:**
   - **Gesicht benennen** – arbeite Gruppen von unbenannten Gesichtern ab,
     die größten zuerst.
   - **Zufälliges Gesicht benennen** – durchstöbere zufällige unbenannte Gesichter
     und benenne die ausgewählten.
   - **Gesichter einem Namen hinzufügen** – wähle eine Person und benenne die
     unbenannten Gesichter, die ihr am ähnlichsten sind.
+  - **Ähnlichste** – zeige das unbenannte Gesicht, das einem deiner Namen am
+    besten entspricht, Paar für Paar.
 - **Duplikaterkennung** – vergleicht deine benannten Personen und erlaubt dir,
   Namen zusammenzuführen, die sich als dieselbe Person herausstellen.
 - **Durchsuchen & prüfen** – sieh jede Person auf einen Blick, bohre dich zu den
@@ -152,24 +154,33 @@ Reihenfolge ab:
    unbenanntes Kandidatengesicht und wähle *Kein Gesicht*, um eine Erkennung zu
    verwerfen, die kein Gesicht ist; sie wird dann keinem Namen mehr angeboten.
 
-5. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
+5. **Ähnlichste** – die App zeigt das unbenannte Gesicht, das einem deiner
+   Namen am besten entspricht, neben einem Gesicht, das bereits mit diesem
+   Namen benannt ist, zusammen mit beiden Ähnlichkeitswerten. Entscheide
+   *Dieselbe Person* (das unbenannte Gesicht wird mit dem Namen benannt),
+   *Nicht dieselbe Person* (die Kombination wird gemerkt und in keinem Tab mehr
+   angeboten) oder *Überspringen* (das Paar wird für diese Sitzung
+   zurückgestellt und erscheint beim nächsten Start wieder). Nach jeder
+   Entscheidung erscheint sofort das nächste Paar.
+
+6. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
    vergleichen. Entscheide bei jedem Paar: *Das sind Duplikate* (wähle dann,
    welcher Name überlebt – alle Gesichter werden zusammengeführt), *Das sind keine
    Duplikate* (bleibt dauerhaft gespeichert) oder *Überspringen*.
 
-6. **Anzeigen** – durchstöbere deine benannte Sammlung. Jede Person ist eine Karte
+7. **Anzeigen** – durchstöbere deine benannte Sammlung. Jede Person ist eine Karte
    mit einem Vertretergesicht und der Anzahl benannter Gesichter. Ein Suchfeld
    filtert die Karten beim Tippen nach Namen, sodass die Liste auch bei hunderten
    von Personen übersichtlich bleibt. Klicke eine Karte,
    um die Fotos mit dieser Person zu sehen; klicke ein Foto, um das Original zu
    öffnen, oder nutze das Kontextmenü, um es von der Person zu *entfernen*.
 
-7. **Einstellungen** – passe Gesichtserkennung, Gruppierung, Import und
+8. **Einstellungen** – passe Gesichtserkennung, Gruppierung, Import und
    Modellparameter an; Details stehen in den Tooltips der Bedienelemente. Änderungen
    werden mit **Speichern** übernommen oder mit **Auf Standard zurücksetzen**
    zurückgesetzt.
 
-8. **Feedback** – sende einen Fehlerbericht oder Feature-Wunsch an die
+9. **Feedback** – sende einen Fehlerbericht oder Feature-Wunsch an die
    Entwickler.
 
 In der gesamten App kannst du jedes Gesicht per Rechtsklick **Original öffnen**;
@@ -178,7 +189,7 @@ balgt auf ein Gesicht zeigt den Pfad seines Quellbildes.
 ### Empfohlener Arbeitsablauf
 
 ```
-Ordner importieren  →  Gesicht benennen / Zufälliges Gesicht benennen / Gesichter einem Namen hinzufügen (Personen benennen)
+Ordner importieren  →  Gesicht benennen / Zufälliges Gesicht benennen / Gesichter einem Namen hinzufügen / Ähnlichste (Personen benennen)
                     →  Duplikate entfernen (doppelte Personennamen zusammenführen)
                     →  Anzeigen (prüfen, Originale öffnen, Fehler entfernen)
 ```

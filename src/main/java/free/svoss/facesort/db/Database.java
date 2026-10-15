@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
 
     /**
      * Milliseconds SQLite waits for a lock held by another connection before
@@ -193,6 +193,14 @@ public class Database implements AutoCloseable {
             // makes this a no-op.
             createMetaTable(stmt);
         }
+        if (fromVersion < 6) {
+            // Version 6 records the face/name combinations the user rejected
+            // as "not the same person" in the "Most similar" tab, so both that
+            // tab and the "Add faces to a name" tab stop offering them. A
+            // brand-new baseline already declares the table, so there the
+            // IF NOT EXISTS makes this a no-op.
+            createNotMatchesTable(stmt);
+        }
     }
 
     /**
@@ -222,6 +230,27 @@ public class Database implements AutoCloseable {
                 CREATE TABLE IF NOT EXISTS not_faces (
                     face_id  INTEGER PRIMARY KEY,
                     FOREIGN KEY (face_id) REFERENCES faces(id) ON DELETE CASCADE
+                )
+                """);
+    }
+
+    /**
+     * Creates the table that records the face/name combinations the user
+     * rejected as "not the same person", so the naming tabs stop offering that
+     * face for that name. The fresh schema and the migration of an existing
+     * library both go through this method so they cannot drift apart. The row
+     * is kept rather than deleted so the decision survives a re-import, and the
+     * foreign keys tie its lifetime to the face and the name: removing either
+     * removes the rejection with it.
+     */
+    private static void createNotMatchesTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS not_matches (
+                    face_id  INTEGER NOT NULL,
+                    name_id  INTEGER NOT NULL,
+                    PRIMARY KEY (face_id, name_id),
+                    FOREIGN KEY (face_id) REFERENCES faces(id) ON DELETE CASCADE,
+                    FOREIGN KEY (name_id) REFERENCES names(id) ON DELETE CASCADE
                 )
                 """);
     }
@@ -346,6 +375,7 @@ public class Database implements AutoCloseable {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
         createNotFacesTable(stmt);
+        createNotMatchesTable(stmt);
         createPathIndexes(stmt);
         createMetaTable(stmt);
     }

@@ -5,6 +5,7 @@ import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.NotMatchDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
@@ -38,6 +39,7 @@ public class FaceToNameService {
     private final FaceSelector faceSelector;
     private final FaceDao faceDao;
     private final NameDao nameDao;
+    private final NotMatchDao notMatchDao;
     private final ImageDao imageDao;
     private final VideoDao videoDao;
     private final ConfigStore configStore;
@@ -49,16 +51,19 @@ public class FaceToNameService {
      * @param faceAiService engine for embedding math; must not be null
      * @param faceDao       data access for faces; must not be null
      * @param nameDao       data access for names; must not be null
+     * @param notMatchDao   data access for rejected face/name combinations; must not be null
      * @param imageDao      data access for images and image_paths; must not be null
      * @param videoDao      data access for videos, video_paths and video_frames; must not be null
      * @param configStore   application settings; must not be null
      */
     public FaceToNameService(FaceAiService faceAiService, FaceDao faceDao, NameDao nameDao,
-                             ImageDao imageDao, VideoDao videoDao, ConfigStore configStore) {
+                             NotMatchDao notMatchDao, ImageDao imageDao, VideoDao videoDao,
+                             ConfigStore configStore) {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
+        this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.configStore = Objects.requireNonNull(configStore, "configStore");
@@ -134,6 +139,10 @@ public class FaceToNameService {
      * another name's average than to {@code nameId}'s average, so only faces
      * whose best match is the selected name are offered.</p>
      *
+     * <p>Candidates the user rejected as "not the same person" for this name
+     * are left out, so a decision recorded once stops that combination from
+     * being offered again in any naming tab.</p>
+     *
      * @param nameId                     id of the reference name
      * @param limit                      maximum number of results; values &le; 0
      *                                   yield an empty list
@@ -163,9 +172,13 @@ public class FaceToNameService {
 
         Map<Long, float[]> otherAverages = excludeCloserToOtherNames
                 ? averageOfOtherNames(nameId) : Map.of();
+        Set<Long> rejected = notMatchDao.findFaceIdsByNameId(nameId);
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord candidate : faceDao.findUnnamed(pathPrefix)) {
+            if (rejected.contains(candidate.id())) {
+                continue;
+            }
             double similarity = faceAiService.calcSimilarity(average, candidate.embedding());
             if (similarity < cutoff) {
                 continue;

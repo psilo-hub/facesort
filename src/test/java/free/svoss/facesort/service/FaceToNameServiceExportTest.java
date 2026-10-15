@@ -6,6 +6,7 @@ import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
+import free.svoss.facesort.db.NotMatchDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
@@ -46,7 +47,8 @@ class FaceToNameServiceExportTest {
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
         service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
-                faceDao, nameDao, imageDao, new VideoDao(db.getConnection()),
+                faceDao, nameDao, new NotMatchDao(db.getConnection()), imageDao,
+                new VideoDao(db.getConnection()),
                 new ConfigStore(ConfigModel.defaults()));
     }
 

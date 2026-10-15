@@ -24,13 +24,15 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
 - **Agrupación automática de caras sin nombre**: las caras similares se agrupan
   en clusters para que puedas nombrar todas las fotos de una misma persona de una
   sola vez.
-- **Tres formas sencillas de etiquetar caras:**
+- **Cuatro formas sencillas de etiquetar caras:**
   - **Poner un nombre a una cara**: avanza por los grupos de caras sin nombre,
     primero los más grandes.
   - **Etiquetar cara al azar**: recorre caras sin nombre aleatorias y etiqueta
     las que selecciones.
   - **Añadir caras a un nombre**: elige a una persona y etiqueta las caras sin
     nombre más similares a ella.
+  - **Cara más similar**: muestra la cara sin nombre que mejor coincide con uno
+    de tus nombres, par a par.
 - **Detección de duplicados**: compara tus personas nombradas y te permite
   fusionar nombres que resultan ser la misma persona.
 - **Explorar y revisar**: ve a todas las personas de un vistazo, entra en las
@@ -150,24 +152,32 @@ este orden:
    descartar una detección que no es realmente una cara, de modo que deje de
    ofrecerse a cualquier nombre.
 
-5. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
+5. **Cara más similar**: la aplicación muestra la cara sin nombre que mejor
+   coincide con uno de tus nombres junto a una cara ya etiquetada con ese
+   nombre, con ambos valores de similitud. Decide *La misma persona* (la cara
+   sin nombre se etiqueta con ese nombre), *No es la misma persona* (la
+   combinación se recuerda y no se vuelve a ofrecer en ninguna pestaña) u
+   *Omitir* (el par se aparta durante esta sesión y reaparece en el próximo
+   inicio). El siguiente par aparece justo después de cada decisión.
+
+6. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
    similitud. En cada par decide: *Son duplicados* (a continuación, elige qué
    nombre sobrevive: todas las caras se fusionan), *No son duplicados* (se
    recuerda permanentemente) o *Omitir*.
 
-6. **Ver**: explora tu colección etiquetada. Cada persona es una tarjeta con una
+7. **Ver**: explora tu colección etiquetada. Cada persona es una tarjeta con una
    cara representativa y el número de caras etiquetadas. Un cuadro de búsqueda
    filtra las tarjetas por nombre mientras escribes, para que la lista siga siendo
    manejable incluso con cientos de personas. Haz clic en una tarjeta
    para ver las imágenes que contienen a esa persona; haz clic en una imagen para
    abrir el original, o usa el menú contextual para *Desetiquetar* esa persona.
 
-7. **Ajustes**: ajusta la detección de caras, el agrupamiento, la importación y
+8. **Ajustes**: ajusta la detección de caras, el agrupamiento, la importación y
    los parámetros de los modelos; consulta la información de cada control. Los
    cambios se aplican con **Guardar** o se restablecen con **Restablecer valores
    predeterminados**.
 
-8. **Comentarios**: envía un informe de error o una petición de función a los
+9. **Comentarios**: envía un informe de error o una petición de función a los
    desarrolladores.
 
 En toda la aplicación puedes hacer clic derecho en cualquier cara o miniatura
@@ -177,7 +187,7 @@ pasar el cursor sobre una cara se muestra la ruta de su imagen de origen.
 ### Flujo de trabajo sugerido
 
 ```
-Importar una carpeta  →  Poner un nombre a una cara / Etiquetar cara al azar / Añadir caras a un nombre (etiquetar personas)
+Importar una carpeta  →  Poner un nombre a una cara / Etiquetar cara al azar / Añadir caras a un nombre / Cara más similar (etiquetar personas)
                       →  Eliminar duplicados (fusionar nombres de persona duplicados)
                       →  Ver (revisar, abrir originales, quitar errores)
 ```

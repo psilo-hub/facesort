@@ -9,6 +9,7 @@ import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.MetaDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
+import free.svoss.facesort.db.NotMatchDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.db.DataRemovalDao;
 import free.svoss.facesort.i18n.I18n;
@@ -19,6 +20,7 @@ import free.svoss.facesort.service.FaceAiService;
 import free.svoss.facesort.service.FaceRotationMigration;
 import free.svoss.facesort.service.FaceToNameService;
 import free.svoss.facesort.service.ImportService;
+import free.svoss.facesort.service.MostSimilarService;
 import free.svoss.facesort.service.NamingService;
 import free.svoss.facesort.service.VideoImportService;
 import free.svoss.facesort.service.ViewService;
@@ -28,6 +30,7 @@ import free.svoss.facesort.ui.FeedbackView;
 import free.svoss.facesort.ui.ImportView;
 import free.svoss.facesort.ui.MainWindow;
 import free.svoss.facesort.ui.ModelDownloadView;
+import free.svoss.facesort.ui.MostSimilarView;
 import free.svoss.facesort.ui.NameFaceView;
 import free.svoss.facesort.ui.RandomNameView;
 import free.svoss.facesort.ui.SettingsView;
@@ -92,6 +95,7 @@ public class FaceSortApp extends Application {
     private ClusteringService clusteringService;
     private NamingService namingService;
     private FaceToNameService faceToNameService;
+    private MostSimilarService mostSimilarService;
     private DeduplicationService dedupService;
     private ViewService viewService;
     private DataRemovalService dataRemovalService;
@@ -201,6 +205,7 @@ public class FaceSortApp extends Application {
         FaceDao faceDao = new FaceDao(connection);
         NameDao nameDao = new NameDao(connection);
         NotDupeDao notDupeDao = new NotDupeDao(connection);
+        NotMatchDao notMatchDao = new NotMatchDao(connection);
         VideoDao videoDao = new VideoDao(connection);
 
         // 4. FaceAI engine. Models are already cached at this point (downloaded
@@ -239,7 +244,10 @@ public class FaceSortApp extends Application {
                 importAiServices, configStore, database.getTransactionRunner());
         clusteringService = new ClusteringService(faceAiService, faceDao, configStore);
         namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao);
-        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao, imageDao, videoDao, configStore);
+        faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao,
+                notMatchDao, imageDao, videoDao, configStore);
+        mostSimilarService = new MostSimilarService(faceToNameService, faceAiService,
+                nameDao, notMatchDao);
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
@@ -263,17 +271,19 @@ public class FaceSortApp extends Application {
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
         FaceNameView faceNameView = new FaceNameView(faceToNameService, configStore);
+        MostSimilarView mostSimilarView = new MostSimilarView(mostSimilarService, faceToNameService);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
         SettingsView settingsView = new SettingsView(configStore, configPath, this::changeLanguage);
         FeedbackView feedbackView = new FeedbackView();
 
-        // 7. Main window with the eight tabs.
+        // 7. Main window with the nine tabs.
         MainWindow mainWindow = new MainWindow(
                 tab("tab.import", importView),
                 tab("tab.nameFace", nameFaceView),
                 tab("tab.randomName", randomNameView),
                 tab("tab.faceName", faceNameView),
+                tab("tab.mostSimilar", mostSimilarView),
                 tab("tab.deduplicate", dedupeView),
                 tab("tab.view", viewView),
                 tab("tab.settings", settingsView),

@@ -23,10 +23,12 @@ runs locally on your own computer: **your photos never leave your machine.**
   kept as a small thumbnail, ready to tag.
 - **Automatic grouping of unnamed faces** — similar faces are clustered together,
   so you can name all photos of the same person in one go.
-- **Three easy ways to tag faces:**
+- **Four easy ways to tag faces:**
   - **Put a name to a face** — work through groups of unnamed faces, largest first.
   - **Tag random face** — browse random unnamed faces and tag the ones you select.
   - **Add faces to a name** — pick a person and tag the unnamed faces most similar to them.
+  - **Most similar** — the single best-matching unnamed face for one of your names,
+    one pair at a time.
 - **Duplicate detection** — compares your named people and lets you merge names
   that turn out to be the same person.
 - **Browse & review** — see every person at a glance, drill into the photos and
@@ -143,12 +145,20 @@ The main window is a set of tabs. Work through them roughly in this order:
    face* to dismiss a detection that is not really a face, so it stops being
    offered to any name.
 
-5. **Deduplicate** — press **Start** to compare name pairs by similarity. For
+5. **Most similar** — the app shows the unnamed face that best matches one of
+   your names next to a face that is already tagged with that name, together
+   with both similarity values. Decide *Same person* (the unnamed face is tagged
+   with the name), *Not the same person* (the combination is remembered and
+   never offered again, in any tab) or *Skip* (the pair is set aside for this
+   session and comes back on the next start). The next best pair appears right
+   after every decision.
+
+6. **Deduplicate** — press **Start** to compare name pairs by similarity. For
    each pair decide: *These are dupes* (then choose which name survives — all
    faces are merged), *These are not dupes* (remembered permanently), or
    *Skip*.
 
-6. **View** — browse your tagged collection. Each person is a card showing a
+7. **View** — browse your tagged collection. Each person is a card showing a
    representative face and the number of tagged faces. A search box filters the
    cards by name as you type, so the list stays manageable even with hundreds
    of people. Click a card to see the images containing that person; click an
@@ -156,13 +166,13 @@ The main window is a set of tabs. Work through them roughly in this order:
    that person. Video frames appear with their frame thumbnail; *Open Original*
    opens the source video the frame came from.
 
-7. **Settings** — tune face detection, clustering, import and model parameters;
+8. **Settings** — tune face detection, clustering, import and model parameters;
    see each control's tooltip for details. Changes are applied via **Save** or
    reset with **Reset to defaults**. The **Language** dropdown switches the UI
    language immediately (available languages: English, Deutsch, Français,
    Español, Русский, 中文).
 
-8. **Feedback** — send a bug report or feature request to the developers.
+9. **Feedback** — send a bug report or feature request to the developers.
 
 Throughout the app you can right-click any face or thumbnail to **Open Original**
 in your system's default viewer or **Open containing folder** to locate its
@@ -173,7 +183,7 @@ video the frame came from and **Open containing folder** opens its folder.
 ### Suggested workflow
 
 ```
-Import a folder  →  Put a name to a face / Tag random face / Add faces to a name (tag people)
+Import a folder  →  Put a name to a face / Tag random face / Add faces to a name / Most similar (tag people)
                  →  Deduplicate (merge duplicate person names)
                  →  View (review, open originals, untag mistakes)
                  →  Add faces to a name (export copies of a person's photos)

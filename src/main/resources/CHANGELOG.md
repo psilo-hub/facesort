@@ -4,6 +4,12 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- New "Most similar" tab: it shows the unnamed face that best matches one of
+  your names, side by side with a face already tagged with that name, together
+  with both similarities, and asks whether they are the same person. "Same
+  person" tags the unnamed face; "Not the same person" records the decision so
+  that combination is never suggested again (in any tab); "Skip" just moves on
+  to the next pair for now (2026-10-15)
 - Hold **Shift** and click the first and last face in the "Tag random face" tab
   to select the whole range in between, just like in the "Add faces to a name"
   tab (2026-10-15)
