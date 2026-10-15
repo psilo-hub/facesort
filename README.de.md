@@ -100,7 +100,7 @@ Das Hauptfenster besteht aus mehreren Tabs. Arbeite sie grob in dieser
 Reihenfolge ab:
 
 1. **Bilder importieren** – drücke auf *Durchsuchen…*, um einen Ordner mit Fotos
-   auszuwählen (JPG, JPEG, PNG, BMP, GIF, WebP; Unterordner werden rekursiv
+   auszuwählen (JPG, JPEG, PNG, BMP, GIF, WebP, ICO; Unterordner werden rekursiv
    durchsucht), und drücke dann auf **Import**. Jedes erkannte Gesicht wird
    zusammen mit seinem Embedding und einem Vorschaubild gespeichert; der
    Ausschnitt wird aufrecht abgelegt – ein seitlich oder kopfüber

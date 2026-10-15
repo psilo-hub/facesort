@@ -96,7 +96,7 @@ La ventana principal es un conjunto de pestañas. Trabájalas aproximadamente en
 este orden:
 
 1. **Importar imágenes**: pulsa *Examinar…* para elegir una carpeta de fotos
-   (JPG, JPEG, PNG, BMP, GIF, WebP; las subcarpetas se escanean de forma
+   (JPG, JPEG, PNG, BMP, GIF, WebP, ICO; las subcarpetas se escanean de forma
    recursiva) y luego pulsa **Importar**. Cada cara detectada se guarda junto con
    su embedding y una miniatura; el recorte se guarda en posición vertical, de
    modo que una cara fotografiada de lado o boca abajo se gira antes al cuarto de

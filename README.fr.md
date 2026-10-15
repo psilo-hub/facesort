@@ -103,7 +103,7 @@ La fenêtre principale est un ensemble d'onglets. Suivez-les à peu près dans c
 ordre :
 
 1. **Importer des images** — appuyez sur *Parcourir…* pour choisir un dossier de
-   photos (JPG, JPEG, PNG, BMP, GIF, WebP ; les sous-dossiers sont parcourus de
+   photos (JPG, JPEG, PNG, BMP, GIF, WebP, ICO ; les sous-dossiers sont parcourus de
    façon récursive), puis appuyez sur **Importer**. Chaque visage détecté est
    stocké avec son embedding et une vignette ; le recadrage est enregistré à
    l'endroit, un visage photographié de côté ou à l'envers étant au préalable

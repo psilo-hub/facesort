@@ -17,6 +17,9 @@ import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -109,6 +112,38 @@ class ImportServiceTest {
             g.dispose();
         }
         assertTrue(ImageIO.write(image, "png", file.toFile()), "PNG write must succeed");
+    }
+
+    private void writeIco(Path file, int size, Color color) throws Exception {
+        BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            g.setColor(color);
+            g.fillRect(0, 0, size, size);
+            g.setColor(Color.WHITE);
+            g.fillOval(size / 4, size / 4, size / 2, size / 2);
+        } finally {
+            g.dispose();
+        }
+
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        assertTrue(ImageIO.write(image, "png", png), "PNG write must succeed");
+
+        // ICONDIR followed by one ICONDIRENTRY holding a PNG-compressed image.
+        ByteBuffer ico = ByteBuffer.allocate(6 + 16 + png.size()).order(ByteOrder.LITTLE_ENDIAN);
+        ico.putShort((short) 0);      // reserved
+        ico.putShort((short) 1);      // resource type: icon
+        ico.putShort((short) 1);      // number of images
+        ico.put((byte) size);         // width (0 would mean 256)
+        ico.put((byte) size);         // height
+        ico.put((byte) 0);            // palette size
+        ico.put((byte) 0);            // reserved
+        ico.putShort((short) 1);      // color planes
+        ico.putShort((short) 32);     // bits per pixel
+        ico.putInt(png.size());       // payload size in bytes
+        ico.putInt(6 + 16);           // payload offset
+        ico.put(png.toByteArray());
+        Files.write(file, ico.array());
     }
 
     // ------------------------------------------------------------------
@@ -443,6 +478,24 @@ class ImportServiceTest {
             assertEquals(1, result.totalFiles());
             assertEquals(1, result.newImages());
             assertEquals(0, result.errors());
+        }
+    }
+
+    @Test
+    void importFolder_importsIcoFiles() throws Exception {
+        Path dir = Files.createDirectory(tempDir.resolve("icons"));
+        writeIco(dir.resolve("app.ico"), 200, Color.MAGENTA);
+
+        try (ImportService service = newImportService()) {
+            ImportService.ImportResult result = service.importFolder(dir, null);
+
+            assertEquals(1, result.totalFiles());
+            assertEquals(1, result.newImages());
+            assertEquals(1, result.newFaces());
+            assertEquals(0, result.errors());
+            assertEquals(1, imageDao.getAllHashes().size());
+            String hash = imageDao.getAllHashes().iterator().next();
+            assertTrue(imageDao.hasThumbnail(hash));
         }
     }
 

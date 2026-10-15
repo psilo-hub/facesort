@@ -45,7 +45,7 @@ public class ImportService implements AutoCloseable {
 
     /** Supported image file extensions (case-insensitive, without the leading dot). */
     static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
-            "jpg", "jpeg", "png", "bmp", "gif", "webp"
+            "jpg", "jpeg", "png", "bmp", "gif", "webp", "ico"
     );
 
     private final ImageDao imageDao;

@@ -93,7 +93,7 @@ After that, everything works offline.
 The main window is a set of tabs. Work through them roughly in this order:
 
 1. **Import photos & videos** — press *Browse…* to pick a folder of photos (JPG, JPEG, PNG, BMP,
-   GIF, WebP) and videos (MP4, MKV, MOV, AVI, WebM, M4V, FLV, MPG, MPEG, 3GP, TS, WMV;
+   GIF, WebP, ICO) and videos (MP4, MKV, MOV, AVI, WebM, M4V, FLV, MPG, MPEG, 3GP, TS, WMV;
    subfolders are scanned recursively), then press **Import**. Photos are imported
    first, then videos, in the same run. Every detected face is stored together
    with its embedding and a thumbnail; the crop is saved upright, so a face

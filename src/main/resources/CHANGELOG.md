@@ -4,6 +4,8 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Windows icon files (`.ico`) can now be imported like any other image; their
+  largest embedded size is used for face detection and thumbnails (2026-10-15)
 - New "Most similar" tab: it shows the unnamed face that best matches one of
   your names, side by side with a face already tagged with that name, together
   with both similarities, and asks whether they are the same person. "Same

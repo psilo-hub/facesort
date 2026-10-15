@@ -7,15 +7,18 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.Locale;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.MemoryCacheImageOutputStream;
 
 /**
  * Utility class for image processing operations.
- * Supports JPEG, PNG, BMP, GIF, and WebP (via TwelveMonkeys plugin).
+ * Supports JPEG, PNG, BMP, GIF, WebP and ICO (via TwelveMonkeys plugins).
  */
 public final class ImageUtils {
 
@@ -93,17 +96,55 @@ public final class ImageUtils {
 
     /**
      * Reads an image from the specified file path.
-     * Supports JPEG, PNG, BMP, GIF, and WebP (via TwelveMonkeys plugin).
+     * Supports JPEG, PNG, BMP, GIF, WebP and ICO (via TwelveMonkeys plugins).
+     * Icon files store the same picture at several sizes; the largest one is
+     * returned, so face detection sees the best available resolution.
      *
      * @param file the path to the image file
      * @return the loaded BufferedImage
      * @throws IOException if the file cannot be read or is not a supported image format
      */
     public static BufferedImage readImage(Path file) throws IOException {
-        BufferedImage img = ImageIO.read(file.toFile());
+        BufferedImage img = readLargestImage(file);
         if (img == null) {
             throw new IOException("Unsupported image format or cannot read: " + file);
         }
         return img;
+    }
+
+    private static BufferedImage readLargestImage(Path file) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(file.toFile())) {
+            if (input == null) {
+                return null;
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input);
+                int count = isIconContainer(reader) ? reader.getNumImages(true) : 1;
+                BufferedImage largest = null;
+                for (int index = 0; index < count; index++) {
+                    BufferedImage candidate = reader.read(index);
+                    if (largest == null || candidate.getWidth() > largest.getWidth()) {
+                        largest = candidate;
+                    }
+                }
+                return largest;
+            } finally {
+                reader.dispose();
+            }
+        }
+    }
+
+    private static boolean isIconContainer(ImageReader reader) throws IOException {
+        String format = reader.getFormatName();
+        if (format == null) {
+            return false;
+        }
+        String lowerCase = format.toLowerCase(Locale.ROOT);
+        return lowerCase.startsWith("ico") || lowerCase.startsWith("cur");
     }
 }

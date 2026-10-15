@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-15. `mvn test` is green: 543 tests / 57 test classes,
+State as of 2026-10-15. `mvn test` is green: 548 tests / 57 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,26 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 5): Windows icon files (`.ico`) are now
+  imported like any other image. Decoding uses the new TwelveMonkeys
+  `imageio-bmp` dependency (3.10.1, the same version as the existing
+  `imageio-webp` plugin), which also provides BMP/ICO/CUR readers; the shaded
+  jar registers `ICOImageReaderSpi` and `CURImageReaderSpi` through the
+  existing `ServicesResourceTransformer`. `ImageUtils.readImage` now returns the
+  largest embedded image from icon containers — ICO/CUR store the same picture
+  at several sizes and the plugin reads the first (usually 16x16) by default,
+  which is useless for face detection — while every other format still yields
+  its first image, so animated GIF/WebP behave exactly as before. `ico` was
+  added to `ImportService.SUPPORTED_EXTENSIONS`. Tests: 4 new `ImageUtilsTest`
+  (a single-size ICO decodes, a multi-size ICO yields the largest entry, plus
+  BMP and GIF round-trips that guard the switched reader path for the formats
+  the new plugin also claims) and 1 new `ImportServiceTest` (a folder containing
+  an `.ico` file imports and detects a face); 548 tests / 57 classes green
+  (543 before). Docs: `CHANGELOG.md`, the
+  READMEs in all six languages (ICO in the import format list) and
+  `new_features_todo.txt` item 5 ticked. The artifact is cached in the local
+  repository, so offline `mvn -o` builds keep working.
 
 * New feature (new_features_todo item 4): a new "Most similar" tab offers the
   single (name, unnamed face) pair with the highest similarity in the whole

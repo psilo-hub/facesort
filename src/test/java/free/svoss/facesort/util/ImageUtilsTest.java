@@ -8,11 +8,16 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +41,39 @@ class ImageUtilsTest {
             g.dispose();
         }
         return img;
+    }
+
+    private static void writeIco(Path file, Color color, int... sizes) throws IOException {
+        List<byte[]> payloads = new ArrayList<>();
+        for (int size : sizes) {
+            ByteArrayOutputStream png = new ByteArrayOutputStream();
+            ImageIO.write(solidImage(size, size, color), "png", png);
+            payloads.add(png.toByteArray());
+        }
+
+        int headerSize = 6 + 16 * sizes.length;
+        int total = headerSize + payloads.stream().mapToInt(payload -> payload.length).sum();
+        ByteBuffer ico = ByteBuffer.allocate(total).order(ByteOrder.LITTLE_ENDIAN);
+        ico.putShort((short) 0);              // reserved
+        ico.putShort((short) 1);              // resource type: icon
+        ico.putShort((short) sizes.length);   // number of images
+        int offset = headerSize;
+        for (int i = 0; i < sizes.length; i++) {
+            byte[] payload = payloads.get(i);
+            ico.put((byte) sizes[i]);         // width (0 would mean 256)
+            ico.put((byte) sizes[i]);         // height
+            ico.put((byte) 0);                // palette size
+            ico.put((byte) 0);                // reserved
+            ico.putShort((short) 1);          // color planes
+            ico.putShort((short) 32);         // bits per pixel
+            ico.putInt(payload.length);       // payload size in bytes
+            ico.putInt(offset);               // payload offset
+            offset += payload.length;
+        }
+        for (byte[] payload : payloads) {
+            ico.put(payload);
+        }
+        Files.write(file, ico.array());
     }
 
     @Test
@@ -88,6 +126,44 @@ class ImageUtilsTest {
         BufferedImage img = ImageUtils.readImage(file);
         assertEquals(8, img.getWidth());
         assertEquals(8, img.getHeight());
+    }
+
+    @Test
+    void readImage_validBmp_returnsImage() throws Exception {
+        Path file = tempDir.resolve("img.bmp");
+        assertTrue(ImageIO.write(solidImage(12, 10, Color.ORANGE), "bmp", file.toFile()),
+                "BMP write must succeed");
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(12, img.getWidth());
+        assertEquals(10, img.getHeight());
+    }
+
+    @Test
+    void readImage_validGif_returnsImage() throws Exception {
+        Path file = tempDir.resolve("img.gif");
+        assertTrue(ImageIO.write(solidImage(9, 7, Color.GREEN), "gif", file.toFile()),
+                "GIF write must succeed");
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(9, img.getWidth());
+        assertEquals(7, img.getHeight());
+    }
+
+    @Test
+    void readImage_validIco_returnsImage() throws Exception {
+        Path file = tempDir.resolve("icon.ico");
+        writeIco(file, Color.MAGENTA, 64);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(64, img.getWidth());
+        assertEquals(64, img.getHeight());
+    }
+
+    @Test
+    void readImage_multiSizeIco_usesLargestImage() throws Exception {
+        Path file = tempDir.resolve("multi.ico");
+        writeIco(file, Color.MAGENTA, 16, 64, 32);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(64, img.getWidth(), "the largest icon size must be read");
+        assertEquals(64, img.getHeight(), "the largest icon size must be read");
     }
 
     @Test
