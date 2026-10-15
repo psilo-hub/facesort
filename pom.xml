@@ -26,7 +26,7 @@
         <dependency>
             <groupId>free.svoss.tools</groupId>
             <artifactId>faceai</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
         </dependency>
 
         <!-- ffmpeg4j (locally installed; commit pinned, see ffmpeg4j-pin.txt) -->

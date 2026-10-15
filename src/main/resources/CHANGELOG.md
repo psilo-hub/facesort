@@ -4,6 +4,12 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Face crops are now stored upright: a face that was photographed sideways or
+  upside down is turned by the nearest quarter turn before it is saved, so the
+  thumbnails in the tagging tabs show the face the right way up. Libraries
+  imported by an earlier version are straightened once, automatically and in
+  the background, on the first start after this update — the Import tab shows
+  the progress (2026-10-15)
 - Mark a detection as "Not a face" from the right-click menu of an untagged
   face, in both the "Tag random face" and the "Add faces to a name" tab. The
   face then disappears from every list of untagged faces and from any name's

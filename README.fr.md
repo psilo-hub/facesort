@@ -103,9 +103,13 @@ ordre :
 1. **Importer des images** — appuyez sur *Parcourir…* pour choisir un dossier de
    photos (JPG, JPEG, PNG, BMP, GIF, WebP ; les sous-dossiers sont parcourus de
    façon récursive), puis appuyez sur **Importer**. Chaque visage détecté est
-   stocké avec son embedding et une vignette. Vous pouvez arrêter un import à
-   tout moment ; les fichiers déjà importés sont conservés. Réimporter ensuite le
-   même dossier n'enregistre que les nouveaux fichiers.
+   stocké avec son embedding et une vignette ; le recadrage est enregistré à
+   l'endroit, un visage photographié de côté ou à l'envers étant au préalable
+   tourné du quart de tour le plus proche. Les bibliothèques importées par une
+   version antérieure sont remises d'aplomb une fois, automatiquement et en
+   arrière-plan, au premier démarrage après cette mise à jour. Vous pouvez
+   arrêter un import à tout moment ; les fichiers déjà importés sont conservés.
+   Réimporter ensuite le même dossier n'enregistre que les nouveaux fichiers.
    Pour supprimer les entrées importées dont le chemin stocké commence par un
    préfixe donné (par exemple après avoir effacé les fichiers d'origine d'un
    dossier), appuyez sur **Supprimer par préfixe de chemin…** — une fenêtre

@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-15. `mvn test` is green: 480 tests / 51 test classes,
+State as of 2026-10-15. `mvn test` is green: 522 tests / 55 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,52 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 7): face crops are now stored upright.
+  The old pipeline cropped the raw bounding box and threw the RetinaFace
+  landmarks away, so a sideways or upside-down face was stored rotated (the
+  item's "usually a multiple of 90 degrees" is exactly that case, and it is a
+  quarter-turn offset, not an arbitrary rotation). FaceAI 0.2.0 now exposes
+  `DetectedFace.hasLandmarks()/landmarks()` (facesort's `pom.xml` bumped
+  0.1.0 -> 0.2.0) and the new `FaceRotation.uprightQuarterTurns` reads the
+  offset off the eyes-midpoint -> mouth-midpoint vector as
+  `floorMod(round((90 - atan2(dy, dx)) / 90), 4)`. The chin direction is what
+  makes it work: the eye line alone folds 180 degrees onto 0, so an
+  upside-down face would stay upside down. `rotateQuarterTurns` turns the crop
+  with `translate/rotate/translate` around the shared centre and
+  `VALUE_INTERPOLATION_NEAREST_NEIGHBOR`, which is exact for a quarter turn
+  (no resampling artefacts, and the pixel tests pin the exact placement:
+  3x2 -> `{D,A,E,B,F,C}` for one turn); `turns == 0` returns the input
+  instance unchanged. Order is crop -> rotate -> downsize -> embed -> encode,
+  so neither inference nor JPEG encoding ever sees an upright-but-large crop.
+  `FaceDetectionUtils` grew a shared `detectAllFaces`; `detectFaces` filters
+  it and `mapToOriginal` now scales the landmarks with the bounding box and
+  preserves them through the 6-arg `DetectedFace` constructor, so a
+  scaled-down detection does not lose the rotation.
+  Migration for existing libraries: schema version 5 adds a `meta` key/value
+  table (`MetaDao`, the run-once marker is the `face_rotation_migration`
+  key), new `FaceDao.FaceBbox/findAllBboxes/updateSubImage`, and the new
+  `FaceRotationMigration` re-derives each crop **from the original file**:
+  `StoredFaceImageSource` resolves the stored hash back to the photo (first
+  readable path) or, when no photo remains, to the video frame (forward-only
+  seek, reopening on a rewind or a video change), then the face is re-detected
+  and the stored box matched by IoU (`MIN_MATCH_IOU = 0.5`), the stored box is
+  reused for the crop, and only `embedding` + `sub_image_jpg` are rewritten —
+  never `bbox` or `name_id`. No match, no source file, or a rotation of 0
+  means skip (no write); an unencodable crop is counted as failed and does not
+  abort the pass. `FaceSortApp` runs it once on a daemon thread after the UI is
+  built, reports progress with the new `ImportView.showStatusMessage` through
+  `I18n.format`, and records completion in `meta` so later starts no-op; a
+  cancelled pass is deliberately not marked complete, and re-running it is
+  idempotent. The pass builds its own `FaceAiService` — face models are not
+  thread-safe — and closes it when done; only the long-lived migration object
+  (and its video handle) is closed by `stop()`. All 522 tests pass (480
+  before, 55 test classes), 10 of them new `FaceRotationTest` cases plus new
+  `StoredFaceImageSourceTest` (8), `FaceRotationMigrationTest` (12),
+  `MetaDaoTest` (5) and extensions to `FaceDetectionUtilsTest`,
+  `DatabaseTest` and `FaceDaoTest`. Docs: `new_features_todo.txt` item 7
+  ticked, `CHANGELOG.md` (### Added), READMEs in all six languages (face
+  crops stored upright + the one-time background straightening).
 
 * New feature (new_features_todo item 3): an untagged face can now be dismissed
   with a new "Not a face" entry in its right-click context menu, in both the

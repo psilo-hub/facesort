@@ -101,6 +101,69 @@ public class FaceDao {
     }
 
     /**
+     * Identification and bounding box of a stored face, without the heavy
+     * embedding and sub-image blobs. Used by the face-rotation migration, which
+     * only needs to know where each stored face sits to re-derive its crop.
+     *
+     * @param id        the face id
+     * @param imageHash hash of the image (or video frame) the face belongs to
+     * @param x         bounding box x, in original image coordinates
+     * @param y         bounding box y, in original image coordinates
+     * @param width     bounding box width
+     * @param height    bounding box height
+     */
+    public record FaceBbox(long id, String imageHash, int x, int y, int width, int height) {
+    }
+
+    /**
+     * Returns the id and bounding box of every stored face, ordered by id.
+     * The embedding and sub-image columns are left out so the caller can walk
+     * the whole library without holding the blobs in memory.
+     *
+     * @return the bounding box of every stored face
+     */
+    public List<FaceBbox> findAllBboxes() throws SQLException {
+        List<FaceBbox> boxes = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h FROM faces ORDER BY id");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                boxes.add(new FaceBbox(
+                        rs.getLong("id"),
+                        rs.getString("image_hash"),
+                        rs.getInt("bbox_x"),
+                        rs.getInt("bbox_y"),
+                        rs.getInt("bbox_w"),
+                        rs.getInt("bbox_h")));
+            }
+        }
+        return boxes;
+    }
+
+    /**
+     * Replaces the stored embedding and sub-image of a face. The bounding box
+     * and any assigned name are left untouched: they identify the face and are
+     * referenced elsewhere, while both replaced values are derived data.
+     *
+     * @param faceId      the face to update
+     * @param embedding   the new embedding
+     * @param subImageJpg the new face thumbnail JPEG
+     * @throws IllegalArgumentException if the sub-image JPEG is null
+     */
+    public void updateSubImage(long faceId, float[] embedding, byte[] subImageJpg) throws SQLException {
+        if (subImageJpg == null) {
+            throw new IllegalArgumentException("subImageJpg must not be null");
+        }
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE faces SET embedding = ?, sub_image_jpg = ? WHERE id = ?")) {
+            ps.setBytes(1, EmbeddingUtils.floatArrayToBytes(embedding));
+            ps.setBytes(2, subImageJpg);
+            ps.setLong(3, faceId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
      * Returns all unnamed faces (name_id IS NULL).
      *
      * @return all unnamed faces

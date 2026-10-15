@@ -61,15 +61,8 @@ final class FaceDetectionUtils {
         Objects.requireNonNull(image, "image must not be null");
         Objects.requireNonNull(service, "service must not be null");
         Objects.requireNonNull(sourceDescription, "sourceDescription must not be null");
-        double detectionScale = computeDetectionScale(image, maxDetectionDimension);
-        BufferedImage detectionImage = detectionScale < 1.0
-                ? ImageUtils.downsize(image, maxDetectionDimension)
-                : image;
-        DetectedFace[] allFaces = service.detectFaces(detectionImage);
-
         // Filter faces by criteria, working in original image coordinates
-        List<DetectedFace> qualifying = Arrays.stream(allFaces)
-                .map(face -> mapToOriginal(face, detectionScale))
+        List<DetectedFace> qualifying = detectAllFaces(image, maxDetectionDimension, service).stream()
                 .filter(f -> f.width() >= minBbox && f.height() >= minBbox)
                 .filter(f -> f.confidence() >= minConfidence)
                 .limit(maxFacesPerImage)
@@ -82,7 +75,7 @@ final class FaceDetectionUtils {
         int droppedFaces = 0;
         for (DetectedFace face : qualifying) {
             try {
-                BufferedImage faceCrop = face.crop(image);
+                BufferedImage faceCrop = FaceRotation.uprightCrop(face, image);
                 BufferedImage faceThumb = ImageUtils.downsize(faceCrop, faceCropSize);
                 float[] embedding = service.getEmbedding(faceThumb);
                 byte[] subImageJpg = ImageUtils.toJpegBytes(faceThumb, thumbnailQuality);
@@ -121,6 +114,33 @@ final class FaceDetectionUtils {
     }
 
     /**
+     * Detects every face in an image and maps the results back to the original
+     * image coordinates.
+     *
+     * <p>Large images are scaled down before detection and both the bounding
+     * boxes and the landmarks are mapped back afterwards. Unlike
+     * {@link #detectFaces}, no criteria are applied: the caller receives the
+     * raw detections.</p>
+     *
+     * @param image                 the full-resolution image; must not be null
+     * @param maxDetectionDimension longest allowed side of the detection input
+     * @param service               face detection service; must not be null
+     * @return every detected face, in original image coordinates
+     */
+    static List<DetectedFace> detectAllFaces(BufferedImage image, int maxDetectionDimension,
+                                             FaceAiService service) {
+        Objects.requireNonNull(image, "image must not be null");
+        Objects.requireNonNull(service, "service must not be null");
+        double detectionScale = computeDetectionScale(image, maxDetectionDimension);
+        BufferedImage detectionImage = detectionScale < 1.0
+                ? ImageUtils.downsize(image, maxDetectionDimension)
+                : image;
+        return Arrays.stream(service.detectFaces(detectionImage))
+                .map(face -> mapToOriginal(face, detectionScale))
+                .toList();
+    }
+
+    /**
      * Computes the factor used to scale an image down for face detection.
      * Returns {@code 1.0} when the image already fits within
      * {@code maxDimension}.
@@ -142,7 +162,7 @@ final class FaceDetectionUtils {
      * Maps a face detected on a scaled-down image back to the original image
      * coordinates. When {@code scale} is {@code 1.0} the face is returned
      * unchanged. Coordinates are rounded the same way {@link ImageUtils#crop}
-     * rounds them.
+     * rounds them, while landmarks are scaled proportionally.
      *
      * @param face  the face detected on the scaled image
      * @param scale the scale the image was downscaled by before detection
@@ -152,11 +172,18 @@ final class FaceDetectionUtils {
         if (scale >= 1.0) {
             return face;
         }
+        float[] landmarks = face.landmarks();
+        if (landmarks != null) {
+            for (int i = 0; i < landmarks.length; i++) {
+                landmarks[i] = (float) (landmarks[i] / scale);
+            }
+        }
         return new DetectedFace(
                 (int) Math.round(face.x() / scale),
                 (int) Math.round(face.y() / scale),
                 (int) Math.round(face.width() / scale),
                 (int) Math.round(face.height() / scale),
-                face.confidence());
+                face.confidence(),
+                landmarks);
     }
 }

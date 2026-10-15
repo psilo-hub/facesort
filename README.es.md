@@ -96,7 +96,11 @@ este orden:
 1. **Importar imágenes**: pulsa *Examinar…* para elegir una carpeta de fotos
    (JPG, JPEG, PNG, BMP, GIF, WebP; las subcarpetas se escanean de forma
    recursiva) y luego pulsa **Importar**. Cada cara detectada se guarda junto con
-   su embedding y una miniatura. Puedes detener una importación en cualquier
+   su embedding y una miniatura; el recorte se guarda en posición vertical, de
+   modo que una cara fotografiada de lado o boca abajo se gira antes al cuarto de
+   vuelta más cercano. Las bibliotecas importadas con una versión anterior se
+   enderezan una vez de forma automática, en segundo plano, en el primer inicio
+   tras esta actualización. Puedes detener una importación en cualquier
    momento; los archivos ya importados se conservan. Reimportar la misma carpeta
    más tarde solo registra los archivos nuevos.
    Para eliminar registros importados cuya ruta almacenada comienza por un

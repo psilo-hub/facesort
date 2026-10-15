@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
 
     /**
      * Milliseconds SQLite waits for a lock held by another connection before
@@ -185,6 +185,28 @@ public class Database implements AutoCloseable {
             // makes this a no-op.
             createNotFacesTable(stmt);
         }
+        if (fromVersion < 5) {
+            // Version 5 adds the meta key/value table used for bookkeeping
+            // flags that are not part of the user's data, such as whether the
+            // one-time face-rotation migration already ran. A brand-new
+            // baseline already declares the table, so there the IF NOT EXISTS
+            // makes this a no-op.
+            createMetaTable(stmt);
+        }
+    }
+
+    /**
+     * Creates the {@code meta} key/value table used for bookkeeping flags that
+     * are not part of the user's data. The fresh schema and the migration of an
+     * existing library both go through this method so they cannot drift apart.
+     */
+    private static void createMetaTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS meta (
+                    key    TEXT PRIMARY KEY,
+                    value  TEXT NOT NULL
+                )
+                """);
     }
 
     /**
@@ -325,6 +347,7 @@ public class Database implements AutoCloseable {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
         createNotFacesTable(stmt);
         createPathIndexes(stmt);
+        createMetaTable(stmt);
     }
 
     @Override

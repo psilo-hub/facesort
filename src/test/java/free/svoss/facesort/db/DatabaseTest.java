@@ -65,6 +65,16 @@ class DatabaseTest {
     }
 
     @Test
+    void freshDatabase_createsTheMetaTable() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'"),
+                        "bookkeeping flags that are not user data live in their own key/value table");
+            }
+        }
+    }
+
+    @Test
     void databaseFromVersionThree_gainsTheNotFacesTable() throws Exception {
         Path dbFile = tempDir.resolve("v3.db");
         try (Database db = new Database(dbFile)) {
@@ -81,6 +91,27 @@ class DatabaseTest {
             try (Statement stmt = migrated.getConnection().createStatement()) {
                 assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'not_faces'"),
                         "an existing library must gain the not_faces table on the next open");
+            }
+        }
+    }
+
+    @Test
+    void databaseFromVersionFour_gainsTheMetaTable() throws Exception {
+        Path dbFile = tempDir.resolve("v4.db");
+        try (Database db = new Database(dbFile)) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                // Recreate the version-4 schema: the same tables, no meta table.
+                stmt.execute("DROP TABLE meta");
+                stmt.execute("PRAGMA user_version = 4");
+            }
+        }
+
+        try (Database migrated = new Database(dbFile)) {
+            assertEquals(Database.SCHEMA_VERSION, userVersion(migrated),
+                    "a version-4 database must be migrated to the current schema version");
+            try (Statement stmt = migrated.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'"),
+                        "an existing library must gain the meta table on the next open");
             }
         }
     }

@@ -100,8 +100,13 @@ Reihenfolge ab:
 1. **Bilder importieren** – drücke auf *Durchsuchen…*, um einen Ordner mit Fotos
    auszuwählen (JPG, JPEG, PNG, BMP, GIF, WebP; Unterordner werden rekursiv
    durchsucht), und drücke dann auf **Import**. Jedes erkannte Gesicht wird
-   zusammen mit seinem Embedding und einem Vorschaubild gespeichert. Du kannst
-   einen Import jederzeit stoppen; bereits importierte Dateien bleiben erhalten.
+   zusammen mit seinem Embedding und einem Vorschaubild gespeichert; der
+   Ausschnitt wird aufrecht abgelegt – ein seitlich oder kopfüber
+   fotografiertes Gesicht wird dafür zuvor um die nächstgelegene Vierteldrehung
+   gedreht. Bibliotheken, die mit einer älteren Version importiert wurden,
+   werden nach diesem Update beim ersten Start einmal automatisch im Hintergrund
+   ausgerichtet. Du kannst einen Import jederzeit stoppen;
+   bereits importierte Dateien bleiben erhalten.
    Ein späterer erneuter Import desselben Ordners protokolliert nur neue Dateien.
    Um importierte Einträge zu löschen, deren gespeicherter Pfad mit einem
    bestimmten Präfix beginnt (z. B. nachdem die Originaldateien eines Ordners

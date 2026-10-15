@@ -10,6 +10,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -166,6 +167,63 @@ class FaceDetectionUtilsTest {
                     "the stored face crop must be downscaled to the configured size");
             assertEquals(50, stored.getHeight(),
                     "the stored face crop must be downscaled to the configured size");
+        }
+    }
+
+    @Test
+    void detectAllFaces_mapsLandmarksBackToOriginalCoordinates() {
+        // Same 0.5 detection scale as above: landmarks must be inflated with the
+        // bounding box, otherwise a rotation read off them would come from a
+        // shrunken face.
+        FakeFaceAiEngine engine = new FakeFaceAiEngine().withFaces(
+                new DetectedFace(100, 100, 200, 200, 0.95f,
+                        new float[]{120, 130, 160, 130, 140, 160, 125, 190, 155, 190}));
+        try (FaceAiService service = new FaceAiService(engine)) {
+
+            List<DetectedFace> faces =
+                    FaceDetectionUtils.detectAllFaces(solidImage(1000, 800), 500, service);
+
+            assertEquals(1, faces.size());
+            DetectedFace mapped = faces.get(0);
+            assertEquals(200, mapped.x());
+            assertEquals(200, mapped.y());
+            assertEquals(400, mapped.width());
+            assertEquals(400, mapped.height());
+            assertTrue(mapped.hasLandmarks(), "landmarks must survive the mapping");
+            assertArrayEquals(new float[]{240, 260, 320, 260, 280, 320, 250, 380, 310, 380},
+                    mapped.landmarks(), 1e-3f,
+                    "landmarks must be scaled with the same factor as the bounding box");
+        }
+    }
+
+    @Test
+    void detectFaces_storesASidewaysFaceUpright() throws Exception {
+        // A face recorded rotated a quarter turn clockwise: the eyes sit to the
+        // right of the mouth, so the stored crop must come out upright, which
+        // swaps its sides.
+        FakeFaceAiEngine engine = new FakeFaceAiEngine().withFaces(
+                new DetectedFace(10, 10, 20, 40, 0.95f, new float[]{
+                        30, 30,   // left eye
+                        30, 40,   // right eye
+                        25, 35,   // nose tip
+                        20, 33,   // left mouth corner
+                        20, 37})); // right mouth corner
+        try (FaceAiService service = new FaceAiService(engine)) {
+
+            FaceDetectionUtils.DetectionResult result =
+                    FaceDetectionUtils.detectFaces("img1", solidImage(100, 100), 1600,
+                            10, 0.8, 10, 200, 0.95f, service, SOURCE);
+
+            assertEquals(1, result.faces().size());
+            assertEquals(0, result.droppedFaces());
+            FaceRecord stored = result.faces().get(0);
+            assertEquals(20, stored.bboxW());
+            assertEquals(40, stored.bboxH());
+            BufferedImage crop = ImageIO.read(new ByteArrayInputStream(stored.subImageJpg()));
+            assertEquals(40, crop.getWidth(),
+                    "the stored crop must be the sideways face turned upright");
+            assertEquals(20, crop.getHeight(),
+                    "the stored crop must be the sideways face turned upright");
         }
     }
 

@@ -149,6 +149,57 @@ class FaceDaoTest {
     }
 
     @Test
+    void findAllBboxes_returnsEveryFaceInIdOrder() throws Exception {
+        insertImage("img1");
+        long first = insertFace("img1", 1, 2, new float[]{1.0f}, null);
+        long second = insertFace("img1", 30, 40, new float[]{2.0f}, null);
+
+        List<FaceDao.FaceBbox> boxes = faceDao.findAllBboxes();
+
+        assertEquals(List.of(
+                        new FaceDao.FaceBbox(first, "img1", 1, 2, 10, 10),
+                        new FaceDao.FaceBbox(second, "img1", 30, 40, 10, 10)),
+                boxes,
+                "the stored boxes are walked in id order, without loading the blobs");
+    }
+
+    @Test
+    void updateSubImage_replacesEmbeddingAndThumbnailButKeepsIdentity() throws Exception {
+        insertImage("img1");
+        long nameId = nameDao.insert("Alice");
+        long id = insertFace("img1", 5, 6, new float[]{1.0f, 0.0f}, nameId);
+
+        float[] embedding = {0.5f, 0.25f};
+        byte[] jpeg = {9, 8, 7};
+        faceDao.updateSubImage(id, embedding, jpeg);
+
+        FaceRecord updated = faceDao.findById(id).orElseThrow();
+        assertArrayEquals(embedding, updated.embedding(),
+                "a corrected crop stores the embedding computed for it");
+        assertArrayEquals(jpeg, updated.subImageJpg(),
+                "a corrected crop replaces the stored thumbnail");
+        assertEquals(5, updated.bboxX(), "rewriting a crop must not move the stored box");
+        assertEquals(6, updated.bboxY(), "rewriting a crop must not move the stored box");
+        assertEquals(10, updated.bboxW(), "rewriting a crop must not resize the stored box");
+        assertEquals(10, updated.bboxH(), "rewriting a crop must not resize the stored box");
+        assertEquals(Long.valueOf(nameId), updated.nameId(),
+                "tagging is untouched by a crop rewrite");
+    }
+
+    @Test
+    void updateSubImage_onlyTouchesTheGivenFace() throws Exception {
+        insertImage("img1");
+        long rewritten = insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        long untouched = insertFace("img1", 20, 0, new float[]{2.0f}, null);
+
+        faceDao.updateSubImage(rewritten, new float[]{9.0f}, new byte[]{1});
+
+        assertArrayEquals(new byte[]{1}, faceDao.findById(rewritten).orElseThrow().subImageJpg());
+        assertArrayEquals(new float[]{2.0f}, faceDao.findById(untouched).orElseThrow().embedding(),
+                "neighbouring faces keep their own embedding");
+    }
+
+    @Test
     void findUnnamed_onlyReturnsUnnamedFaces() throws Exception {
         insertImage("img1");
         long nameId = nameDao.insert("Alice");

@@ -6,6 +6,7 @@ import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
+import free.svoss.facesort.db.MetaDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotDupeDao;
 import free.svoss.facesort.db.VideoDao;
@@ -15,6 +16,7 @@ import free.svoss.facesort.service.ClusteringService;
 import free.svoss.facesort.service.DataRemovalService;
 import free.svoss.facesort.service.DeduplicationService;
 import free.svoss.facesort.service.FaceAiService;
+import free.svoss.facesort.service.FaceRotationMigration;
 import free.svoss.facesort.service.FaceToNameService;
 import free.svoss.facesort.service.ImportService;
 import free.svoss.facesort.service.NamingService;
@@ -93,6 +95,9 @@ public class FaceSortApp extends Application {
     private DeduplicationService dedupService;
     private ViewService viewService;
     private DataRemovalService dataRemovalService;
+    private FaceRotationMigration faceRotationMigration;
+    /** Guards the one-off pass: rebuilding the window after a language change must not start a second one. */
+    private boolean faceRotationMigrationStarted;
 
     @Override
     public void start(Stage primaryStage) {
@@ -212,7 +217,10 @@ public class FaceSortApp extends Application {
         //    faceAiService stays dedicated to the other services. The video
         //    import reuses the same worker services because its phase always
         //    runs after the photo phase inside one Task, so the two never
-        //    detect concurrently.
+        //    detect concurrently. The face-rotation pass in
+        //    startFaceRotationMigration() builds yet another one for the same
+        //    reason: it runs in the background while the shared service may be
+        //    busy with the open tabs, and face models are not thread-safe.
         List<FaceAiService> importAiServices = new ArrayList<>();
         try {
             for (int i = 0; i < ConfigModel.MAX_IMPORT_THREADS; i++) {
@@ -237,6 +245,8 @@ public class FaceSortApp extends Application {
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
         dataRemovalService = new DataRemovalService(
                 new DataRemovalDao(connection), database.getTransactionRunner());
+        faceRotationMigration = new FaceRotationMigration(
+                faceDao, new MetaDao(connection), imageDao, videoDao, configStore);
 
         buildMainWindowUi();
     }
@@ -285,7 +295,65 @@ public class FaceSortApp extends Application {
             mainWindow.getSelectionModel().select(selected);
         }
         primaryStage.show();
+        startFaceRotationMigration(importView);
         return settingsView;
+    }
+
+    /**
+     * Starts the one-time pass that straightens face crops stored by earlier
+     * builds, unless it has already run against this library.
+     *
+     * <p>The pass runs on a daemon thread because it can take minutes on a
+     * large library and must never hold up startup; its progress and its
+     * outcome are posted back to the application thread and shown in the
+     * Import tab status line. It gets a {@link FaceAiService} of its own for
+     * the duration of the pass, because face models are not thread-safe and
+     * the shared service belongs to the open tabs.</p>
+     *
+     * <p>Rebuilding the window after a language change must not start a second
+     * pass, hence {@link #faceRotationMigrationStarted}. The thread is marked
+     * as a daemon, so a pass that is still going when the application quits
+     * dies with the process instead of keeping it alive.</p>
+     *
+     * @param importView the import tab whose status line reports progress;
+     *                   must not be null
+     */
+    private void startFaceRotationMigration(ImportView importView) {
+        if (faceRotationMigrationStarted) {
+            return;
+        }
+        faceRotationMigrationStarted = true;
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                if (faceRotationMigration.isCompleted()) {
+                    return null;
+                }
+                try (FaceAiService migrationService = new FaceAiService(configStore.get())) {
+                    FaceRotationMigration.Result result = faceRotationMigration.run(
+                            migrationService,
+                            (processed, total) -> Platform.runLater(() -> importView.showStatusMessage(
+                                    I18n.format("ui.import.rotateMigration", processed, total))),
+                            () -> Thread.currentThread().isInterrupted());
+                    Platform.runLater(() -> importView.showStatusMessage(
+                            I18n.format("ui.import.rotateMigrationDone",
+                                    result.rotated(), result.skipped(), result.failed())));
+                }
+                return null;
+            }
+        };
+        task.setOnFailed(e -> {
+            Throwable error = task.getException();
+            LOG.log(Level.WARNING, "Face rotation migration failed", error);
+            Platform.runLater(() -> importView.showStatusMessage(
+                    I18n.format("ui.import.rotateMigrationFailed",
+                            error == null ? "" : String.valueOf(error.getMessage()))));
+        });
+
+        Thread thread = new Thread(task, "face-rotation-migration");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /**
@@ -362,7 +430,10 @@ public class FaceSortApp extends Application {
     public void stop() throws Exception {
         // videoImportService shares the import worker FaceAI services with
         // importService, so closing importService releases them exactly once.
-        closeAll(importService, faceAiService, database);
+        // faceRotationMigration only releases the video file it keeps open while
+        // a pass is in flight; its own face model is a local of the pass and is
+        // closed there.
+        closeAll(faceRotationMigration, importService, faceAiService, database);
     }
 
     /**

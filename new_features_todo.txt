@@ -10,4 +10,4 @@
 
 [ ] 6. In the "Tag random face" selecting a range should also be possible, in the same way as in the "Add faces to a name" tab.
 
-[ ] 7. Some of the face sub-images show a face that is rotated ... usually by a multiple of 90 degrees. This should be prevented during import by rotating the sub-image before storing it in the database. As a migration, already stored images in the database should be analysed and (if necessary) rotated. Rotating by the detected angle or the closest multiple of 90 degrees should be considered.
+[x] 7. Some of the face sub-images show a face that is rotated ... usually by a multiple of 90 degrees. This should be prevented during import by rotating the sub-image before storing it in the database. As a migration, already stored images in the database should be analysed and (if necessary) rotated. Rotating by the detected angle or the closest multiple of 90 degrees should be considered.

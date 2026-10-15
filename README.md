@@ -94,7 +94,11 @@ The main window is a set of tabs. Work through them roughly in this order:
    GIF, WebP) and videos (MP4, MKV, MOV, AVI, WebM, M4V, FLV, MPG, MPEG, 3GP, TS, WMV;
    subfolders are scanned recursively), then press **Import**. Photos are imported
    first, then videos, in the same run. Every detected face is stored together
-   with its embedding and a thumbnail. You can stop an import at any time;
+   with its embedding and a thumbnail; the crop is saved upright, so a face
+   photographed sideways or upside down is turned by the nearest quarter turn
+   first. Libraries imported by an older version are straightened once
+   automatically, in the background, on the first start after this update.
+   You can stop an import at any time;
    already-imported files are kept. Re-importing the same folder later only
    records new files. To drop imported rows whose stored path starts with a
    given prefix (for example after deleting the original files of a folder), press

@@ -153,6 +153,21 @@ public class ImportView extends BorderPane {
     }
 
     /**
+     * Shows a message in the status line for work that runs in the background
+     * outside an import — today the one-time face-rotation pass — so the user
+     * can see that it is still busy without the Import tab itself being run.
+     * Nothing is written to the log, so a pass over a large library does not
+     * drown the user in lines.
+     *
+     * <p>Must be called on the JavaFX application thread.</p>
+     *
+     * @param message the localized message to display
+     */
+    public void showStatusMessage(String message) {
+        statusLabel.setText(message);
+    }
+
+    /**
      * Starts the import in the background when the Import button is pressed.
      */
     private void onImport() {
