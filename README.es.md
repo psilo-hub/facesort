@@ -116,7 +116,9 @@ este orden:
    etiquetes en la misma pasada. Pasa al siguiente cluster con *Siguiente cluster*.
 
 3. **Etiquetar cara al azar**: una muestra aleatoria de caras sin nombre. Haz clic
-   en las caras para seleccionarlas, escribe un nombre y pulsa **Etiquetar
+   en las caras para seleccionarlas —o mantén pulsada la tecla **Mayús** y haz
+   clic en la primera y la última cara para seleccionar todo el intervalo
+   intermedio—, escribe un nombre y pulsa **Etiquetar
    selección**. Usa el campo *prefijo de ruta* para limitar la muestra a una
    carpeta o archivo concretos (los fotogramas de vídeo se comparan por la ruta de
    su archivo de vídeo). Haz clic derecho en una cara y elige *Pegar ruta en el

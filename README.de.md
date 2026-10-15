@@ -121,7 +121,9 @@ Reihenfolge ab:
    benennen kannst. Wechsle mit *Nächste Gruppe* zur nächsten Gruppe.
 
 3. **Zufälliges Gesicht benennen** – eine zufällige Stichprobe unbenannter
-   Gesichter. Klicke Gesichter an, um sie auszuwählen, gib einen Namen ein und
+   Gesichter. Klicke Gesichter an, um sie auszuwählen – oder halte die
+   **Umschalttaste** gedrückt und klicke auf das erste und das letzte Gesicht, um
+   den ganzen Bereich dazwischen auszuwählen –, gib einen Namen ein und
    drücke **Ausgewählte benennen**. Nutze das Feld *Pfadpräfix*, um die Stichprobe
    auf einen bestimmten Ordner oder eine Datei zu beschränken (Video-Frames
    werden über den Pfad ihrer Videodatei abgeglichen). Klicke mit Rechtsklick auf

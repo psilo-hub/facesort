@@ -23,8 +23,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -38,6 +40,9 @@ final class FaceUi {
     /** Status styles for the name-existence check (see {@code css/styles.css}). */
     static final String NAME_STATUS_EXISTS = "name-status-exists";
     static final String NAME_STATUS_NEW = "name-status-new";
+
+    /** Style class that marks a face card as selected for a bulk action. */
+    static final String SELECTED = "selected";
 
     private FaceUi() {
         // Utility class - not instantiable
@@ -348,6 +353,90 @@ final class FaceUi {
     static void applyNotAFaceResult(long faceId, NotAFacePresenter presenter) {
         presenter.removeFace(faceId);
         presenter.showStatus(I18n.get("common.notAFaceMarked"));
+    }
+
+    /**
+     * Applies a click on a selectable face card and returns the card that
+     * anchors the next shift range. A shift-click with a live anchor selects
+     * the whole range between the two cards; every other click toggles the
+     * clicked card and makes it the new anchor. Shared by the two tagging views
+     * so a range behaves identically in both.
+     *
+     * <p>A shift-click whose anchor is no longer part of the grid (the user
+     * moved on to another name or sample) falls back to a plain click, because
+     * there is no range to measure.</p>
+     *
+     * @param cards     the cards currently shown, in display order
+     * @param clicked   the clicked card
+     * @param shiftDown whether shift was held during the click
+     * @param anchor    the card that fixes the start of a shift range, or
+     *                  {@code null} when nothing was clicked yet
+     * @param <C>       the card type of the calling view
+     * @return the card that anchors the next shift range
+     */
+    static <C extends Node> C selectOnClick(List<? extends Node> cards, C clicked,
+                                            boolean shiftDown, C anchor) {
+        if (shiftDown && anchor != null && cards.contains(anchor)) {
+            selectRange(cards, cards.indexOf(anchor), cards.indexOf(clicked));
+            return anchor;
+        }
+        setSelected(clicked, !clicked.getStyleClass().contains(SELECTED));
+        return clicked;
+    }
+
+    /**
+     * Selects the whole range between two card indices, replacing the previous
+     * selection: exactly the cards in between end up selected, every other card
+     * is cleared.
+     *
+     * @param cards        the cards currently shown, in display order
+     * @param anchorIndex  index of the anchor card
+     * @param clickedIndex index of the shift-clicked card
+     */
+    private static void selectRange(List<? extends Node> cards, int anchorIndex, int clickedIndex) {
+        Set<Integer> range = new HashSet<>(rangeSelection(anchorIndex, clickedIndex, cards.size()));
+        for (int i = 0; i < cards.size(); i++) {
+            setSelected(cards.get(i), range.contains(i));
+        }
+    }
+
+    /**
+     * Puts or removes the {@code selected} style class on a card.
+     *
+     * @param card     the card to update
+     * @param selected whether the card should look selected
+     */
+    static void setSelected(Node card, boolean selected) {
+        if (selected && !card.getStyleClass().contains(SELECTED)) {
+            card.getStyleClass().add(SELECTED);
+        } else if (!selected) {
+            card.getStyleClass().remove(SELECTED);
+        }
+    }
+
+    /**
+     * Computes the inclusive range of card indices between the range anchor and
+     * the shift-clicked card, in ascending display order.
+     *
+     * @param anchorIndex  index of the anchor card
+     * @param clickedIndex index of the shift-clicked card
+     * @param size         number of cards currently shown
+     * @return the ascending, inclusive indices between the two cards,
+     *         clamped to {@code [0, size)}; empty when {@code size <= 0}
+     */
+    static List<Integer> rangeSelection(int anchorIndex, int clickedIndex, int size) {
+        if (size <= 0) {
+            return List.of();
+        }
+        int anchor = Math.max(0, Math.min(anchorIndex, size - 1));
+        int clicked = Math.max(0, Math.min(clickedIndex, size - 1));
+        int low = Math.min(anchor, clicked);
+        int high = Math.max(anchor, clicked);
+        List<Integer> indices = new ArrayList<>(high - low + 1);
+        for (int i = low; i <= high; i++) {
+            indices.add(i);
+        }
+        return indices;
     }
 
     /**

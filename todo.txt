@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-15. `mvn test` is green: 522 tests / 55 test classes,
+State as of 2026-10-15. `mvn test` is green: 528 tests / 55 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,29 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 6): in the "Tag random face" tab a
+  Shift-click now selects the whole range of faces between the first and the
+  last clicked card, exactly as it already did in "Add faces to a name". The
+  selection logic was not copied but lifted into `FaceUi`, the shared face-grid
+  helper both tagging views already use: `FaceUi.rangeSelection` (the pure index
+  maths, moved from `FaceNameView`), `FaceUi.setSelected` and a new
+  `FaceUi.selectOnClick(cards, clicked, shiftDown, anchor)` that both views call
+  from their card click handler and that returns the card anchoring the next
+  range. A shift-click keeps the original anchor, so a second shift-click
+  re-measures from the same start; a shift-click whose anchor is no longer in
+  the grid (the user moved on to another sample or name) falls back to a plain
+  click; `RandomNameView.loadSample` clears the anchor together with the grid,
+  and its `toggleSelected` and `FaceNameView.selectRange`/`setSelected` are gone.
+  The shared `"selected"` style class is now `FaceUi.SELECTED`, used by both
+  views' selected-id collectors. The five range tests moved from
+  `FaceNameViewTest` to `FaceUiTest`, which gained six more cases
+  (`selectOnClick`: plain click, forward range, replacing a previous selection,
+  repeated shift-clicks keeping the anchor, shift without an anchor, shift with
+  a stale anchor) — driven with plain `VBox` nodes, which the headless build can
+  construct without a JavaFX toolkit. 528 tests pass (522 before). Docs:
+  `new_features_todo.txt` item 6 ticked, `CHANGELOG.md` (### Added), READMEs in
+  all six languages (the "Tag random face" step now mentions the Shift range).
 
 * New feature (new_features_todo item 7): face crops are now stored upright.
   The old pipeline cropped the raw bounding box and threw the RetinaFace

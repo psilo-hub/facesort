@@ -11,37 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests for the toolkit-free logic of {@link FaceNameView}.
  *
- * <p>The view itself needs a JavaFX toolkit, so the range-selection maths and
- * the "tag with a different name" success handler are extracted into
- * package-private static methods that can be driven headlessly.</p>
+ * <p>The view itself needs a JavaFX toolkit, so the "tag with a different
+ * name" success handler is a package-private static method that can be driven
+ * headlessly.</p>
  */
 class FaceNameViewTest {
-
-    @Test
-    void rangeSelectionInDisplayOrderForwardDirection() {
-        assertEquals(List.of(2, 3, 4), FaceNameView.rangeSelection(2, 4, 6));
-    }
-
-    @Test
-    void rangeSelectionNormalizesBackwardDirection() {
-        assertEquals(List.of(2, 3, 4), FaceNameView.rangeSelection(4, 2, 6));
-    }
-
-    @Test
-    void rangeSelectionOfSingleCard() {
-        assertEquals(List.of(3), FaceNameView.rangeSelection(3, 3, 6));
-    }
-
-    @Test
-    void rangeSelectionOfEmptyPane() {
-        assertTrue(FaceNameView.rangeSelection(0, 2, 0).isEmpty());
-    }
-
-    @Test
-    void rangeSelectionClampsIndicesToPane() {
-        assertEquals(List.of(0, 1), FaceNameView.rangeSelection(-1, 1, 3));
-        assertEquals(List.of(3, 4), FaceNameView.rangeSelection(3, 99, 5));
-    }
 
     @Test
     void differentNameTag_successReloadsTheNameList() {

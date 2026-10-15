@@ -353,13 +353,9 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
             if (selectable) {
                 card.setOnMouseClicked(e -> {
                     if (e.getButton() == MouseButton.PRIMARY) {
-                        if (e.isShiftDown() && rangeAnchor != null
-                                && candidatesPane.getChildren().contains(rangeAnchor)) {
-                            selectRange(rangeAnchor, card);
-                        } else {
-                            toggleSelected(card);
-                            rangeAnchor = card;
-                        }
+                        rangeAnchor = FaceUi.selectOnClick(
+                                candidatesPane.getChildren(), card, e.isShiftDown(), rangeAnchor);
+                        tagSelectedButton.setDisable(selectedCandidates().isEmpty());
                     }
                 });
             }
@@ -551,80 +547,6 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     }
 
     /**
-     * Toggles a candidate card's selected look and keeps the Tag button
-     * enabled while any candidate is selected.
-     *
-     * @param card the clicked candidate card
-     */
-    private void toggleSelected(VBox card) {
-        setSelected(card, !card.getStyleClass().contains("selected"));
-        tagSelectedButton.setDisable(selectedCandidates().isEmpty());
-    }
-
-    /**
-     * Selects the whole range of candidate cards between the anchor and the
-     * shift-clicked card, replacing the previous selection.
-     *
-     * @param anchorCard the card that fixes the start of the range
-     * @param clickedCard the shift-clicked card that fixes the end
-     */
-    private void selectRange(VBox anchorCard, VBox clickedCard) {
-        List<javafx.scene.Node> children = candidatesPane.getChildren();
-        int size = children.size();
-        List<Integer> indices = rangeSelection(
-                children.indexOf(anchorCard), children.indexOf(clickedCard), size);
-        if (indices.isEmpty()) {
-            return;
-        }
-        java.util.Set<Integer> range = new java.util.HashSet<>(indices);
-        for (int i = 0; i < size; i++) {
-            setSelected((VBox) children.get(i), range.contains(i));
-        }
-        tagSelectedButton.setDisable(selectedCandidates().isEmpty());
-    }
-
-    /**
-     * Puts or removes the {@code selected} style class on a candidate card.
-     *
-     * @param card     the card to update
-     * @param selected whether the card should look selected
-     */
-    private static void setSelected(VBox card, boolean selected) {
-        if (selected) {
-            if (!card.getStyleClass().contains("selected")) {
-                card.getStyleClass().add("selected");
-            }
-        } else {
-            card.getStyleClass().remove("selected");
-        }
-    }
-
-    /**
-     * Computes the inclusive range of candidate indices between the range
-     * anchor and the shift-clicked card, in ascending display order.
-     *
-     * @param anchorIndex  index of the anchor card
-     * @param clickedIndex index of the shift-clicked card
-     * @param size         number of candidate cards currently shown
-     * @return the ascending, inclusive indices between the two cards,
-     *         clamped to {@code [0, size)}; empty when {@code size <= 0}
-     */
-    static List<Integer> rangeSelection(int anchorIndex, int clickedIndex, int size) {
-        if (size <= 0) {
-            return List.of();
-        }
-        int anchor = Math.max(0, Math.min(anchorIndex, size - 1));
-        int clicked = Math.max(0, Math.min(clickedIndex, size - 1));
-        int low = Math.min(anchor, clicked);
-        int high = Math.max(anchor, clicked);
-        List<Integer> indices = new ArrayList<>(high - low + 1);
-        for (int i = low; i <= high; i++) {
-            indices.add(i);
-        }
-        return indices;
-    }
-
-    /**
      * Collects the face ids of the currently selected candidate cards.
      *
      * @return the selected face ids
@@ -632,7 +554,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     private List<Long> selectedCandidates() {
         List<Long> ids = new ArrayList<>();
         for (javafx.scene.Node node : candidatesPane.getChildren()) {
-            if (node.getStyleClass().contains("selected") && node.getUserData() instanceof Long id) {
+            if (node.getStyleClass().contains(FaceUi.SELECTED) && node.getUserData() instanceof Long id) {
                 ids.add(id);
             }
         }

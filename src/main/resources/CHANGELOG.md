@@ -4,6 +4,9 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Hold **Shift** and click the first and last face in the "Tag random face" tab
+  to select the whole range in between, just like in the "Add faces to a name"
+  tab (2026-10-15)
 - Face crops are now stored upright: a face that was photographed sideways or
   upside down is turned by the nearest quarter turn before it is saved, so the
   thumbnails in the tagging tabs show the face the right way up. Libraries

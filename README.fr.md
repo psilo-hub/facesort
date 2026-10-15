@@ -123,7 +123,9 @@ ordre :
    nommiez dans la même session. Passez au cluster suivant avec *Cluster suivant*.
 
 3. **Nommer un visage au hasard** — un échantillon aléatoire de visages non
-   nommés. Cliquez sur des visages pour les sélectionner, saisissez un nom et
+   nommés. Cliquez sur des visages pour les sélectionner — ou maintenez **Maj**
+   enfoncée et cliquez sur le premier et le dernier visage pour sélectionner toute
+   la plage intermédiaire —, saisissez un nom et
    appuyez sur **Nommer la sélection**. Utilisez le champ *préfixe de chemin*
    pour limiter l'échantillon à un dossier ou un fichier particulier (les images
    de vidéo sont mises en correspondance via le chemin de leur fichier vidéo).

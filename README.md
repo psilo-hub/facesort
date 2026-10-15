@@ -112,7 +112,9 @@ The main window is a set of tabs. Work through them roughly in this order:
    the next cluster with *Next cluster*.
 
 3. **Tag random face** — a random sample of unnamed faces. Click faces to select
-   them, type a name and press **Tag selected**. Use the *path prefix* field to
+   them — or hold **Shift** and click the first and last face to select the whole
+   range in between — type a name and press **Tag selected**. Use the *path
+   prefix* field to
    restrict the sample to a particular folder or file (video frames are matched
    through their video file's path). Right-click a face and choose *Paste Path
    to Path Filter* to fill the field with that face's folder, or — for a video

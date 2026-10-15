@@ -58,6 +58,9 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
     private final TaskRunner taskRunner = new TaskRunner();
     private final FaceUi.FaceActions faceActions;
 
+    /** Card that fixes the start of a shift-click range, or null. */
+    private VBox rangeAnchor;
+
     /**
      * Creates the random-tagging tab.
      *
@@ -147,6 +150,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
         String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
         statusLabel.setText(I18n.get("ui.randomName.loading"));
         facesPane.getChildren().clear();
+        rangeAnchor = null;
 
         Task<List<FaceThumb>> task = new Task<>() {
             @Override
@@ -214,7 +218,9 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
             card.getChildren().add(idLabel);
             card.setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY) {
-                    toggleSelected(card);
+                    rangeAnchor = FaceUi.selectOnClick(
+                            facesPane.getChildren(), card, e.isShiftDown(), rangeAnchor);
+                    tagSelectedButton.setDisable(selectedFaceIds().isEmpty());
                 }
             });
             installContextMenu(card, face);
@@ -310,21 +316,6 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
     }
 
     /**
-     * Toggles a card's selected look and keeps the Tag button enabled while
-     * any face is selected.
-     *
-     * @param card the clicked card
-     */
-    private void toggleSelected(VBox card) {
-        if (card.getStyleClass().contains("selected")) {
-            card.getStyleClass().remove("selected");
-        } else {
-            card.getStyleClass().add("selected");
-        }
-        tagSelectedButton.setDisable(selectedFaceIds().isEmpty());
-    }
-
-    /**
      * Collects the face ids of the currently selected cards.
      *
      * @return the selected face ids
@@ -332,7 +323,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
     private List<Long> selectedFaceIds() {
         List<Long> ids = new ArrayList<>();
         for (javafx.scene.Node node : facesPane.getChildren()) {
-            if (node.getStyleClass().contains("selected") && node.getUserData() instanceof Long id) {
+            if (node.getStyleClass().contains(FaceUi.SELECTED) && node.getUserData() instanceof Long id) {
                 ids.add(id);
             }
         }
