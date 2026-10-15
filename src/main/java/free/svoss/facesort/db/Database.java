@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     /**
      * Milliseconds SQLite waits for a lock held by another connection before
@@ -178,6 +178,30 @@ public class Database implements AutoCloseable {
             // declares them, so there the IF NOT EXISTS makes this a no-op.
             createPathIndexes(stmt);
         }
+        if (fromVersion < 4) {
+            // Version 4 records the faces the user dismissed as "not a face"
+            // so the unnamed-face queries can leave them out. A brand-new
+            // baseline already declares the table, so there the IF NOT EXISTS
+            // makes this a no-op.
+            createNotFacesTable(stmt);
+        }
+    }
+
+    /**
+     * Creates the table that records faces the user dismissed as "not a face".
+     * The fresh schema and the migration of an existing library both go through
+     * this method so they cannot drift apart. The row is kept rather than
+     * deleted so a dismissed detection does not come back on re-import, and the
+     * foreign key ties its lifetime to the face: removing the image removes the
+     * dismissal with it.
+     */
+    private static void createNotFacesTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS not_faces (
+                    face_id  INTEGER PRIMARY KEY,
+                    FOREIGN KEY (face_id) REFERENCES faces(id) ON DELETE CASCADE
+                )
+                """);
     }
 
     /**
@@ -299,6 +323,7 @@ public class Database implements AutoCloseable {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_name_id ON faces(name_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_hash ON faces(image_hash)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_video_frames_video_hash ON video_frames(video_hash)");
+        createNotFacesTable(stmt);
         createPathIndexes(stmt);
     }
 

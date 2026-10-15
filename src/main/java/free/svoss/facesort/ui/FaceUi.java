@@ -334,6 +334,23 @@ final class FaceUi {
     }
 
     /**
+     * Applies a finished "not a face" marking to a face view: the dismissed
+     * face's card is dropped from the grid and the outcome announced. Shared by
+     * the two tagging views so the two behave identically.
+     *
+     * <p>Package-private static with an injected presenter so a headless test
+     * can pin that the card disappears, which is otherwise unreachable without
+     * a JavaFX toolkit.</p>
+     *
+     * @param faceId    id of the dismissed face
+     * @param presenter the view to update, or a test double
+     */
+    static void applyNotAFaceResult(long faceId, NotAFacePresenter presenter) {
+        presenter.removeFace(faceId);
+        presenter.showStatus(I18n.get("common.notAFaceMarked"));
+    }
+
+    /**
      * The "Open Original" / "Open containing folder" operations every face view
      * offers, plus the context menu that presents them. Each view supplies the
      * service-backed {@link Source}, a status-bar setter and its own failure

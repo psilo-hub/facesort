@@ -29,6 +29,15 @@ public class FaceDao {
     static final String SELECT_COLUMNS =
             "id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id";
 
+    /**
+     * The predicate every query that offers unnamed faces for tagging appends,
+     * so a face the user dismissed as "not a face" is never offered again. It
+     * references {@code faces.id}, so it can only be used in queries that
+     * select from {@code faces} without an alias.
+     */
+    static final String NOT_A_FACE_CLAUSE =
+            " AND NOT EXISTS (SELECT 1 FROM not_faces nf WHERE nf.face_id = faces.id)";
+
     private final Connection conn;
 
     public FaceDao(Connection conn) {
@@ -109,14 +118,15 @@ public class FaceDao {
      *
      * @param pathPrefix path prefix the stored photo/video path must start with,
      *                   or {@code null}/{@code ""} to return all unnamed faces
-     * @return the matching unnamed faces
+     * @return the matching unnamed faces, excluding those the user dismissed as
+     *         "not a face"
      * @throws SQLException on database error
      */
     public List<FaceRecord> findUnnamed(String pathPrefix) throws SQLException {
         PathPrefix filter = PathPrefix.of(pathPrefix);
         List<FaceRecord> faces = new ArrayList<>();
         try (PreparedStatement ps = prepareWithPathFilter(
-                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL", filter)) {
+                "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE, filter)) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
@@ -172,7 +182,7 @@ public class FaceDao {
         }
         List<Long> ids = new ArrayList<>();
         try (PreparedStatement ps = prepareWithPathFilter(
-                "SELECT id FROM faces WHERE name_id IS NULL", PathPrefix.of(pathPrefix))) {
+                "SELECT id FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE, PathPrefix.of(pathPrefix))) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 ids.add(rs.getLong(1));
@@ -189,7 +199,7 @@ public class FaceDao {
         }
         List<Long> ids = new ArrayList<>();
         try (PreparedStatement ps = prepareWithPathFilter(
-                "SELECT id FROM faces WHERE name_id IS NULL", PathPrefix.of(pathPrefix))) {
+                "SELECT id FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE, PathPrefix.of(pathPrefix))) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 ids.add(rs.getLong(1));
@@ -259,7 +269,7 @@ public class FaceDao {
             List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id IN ("
-                            + placeholders(chunk.size()) + ") AND name_id IS NULL")) {
+                            + placeholders(chunk.size()) + ") AND name_id IS NULL" + NOT_A_FACE_CLAUSE)) {
                 for (int i = 0; i < chunk.size(); i++) {
                     ps.setLong(i + 1, chunk.get(i));
                 }
@@ -292,7 +302,8 @@ public class FaceDao {
             List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, sub_image_jpg, name_id"
-                            + " FROM faces WHERE id IN (" + placeholders(chunk.size()) + ") AND name_id IS NULL")) {
+                            + " FROM faces WHERE id IN (" + placeholders(chunk.size()) + ") AND name_id IS NULL"
+                            + NOT_A_FACE_CLAUSE)) {
                 for (int i = 0; i < chunk.size(); i++) {
                     ps.setLong(i + 1, chunk.get(i));
                 }
@@ -493,6 +504,23 @@ public class FaceDao {
                 "UPDATE faces SET name_id = ? WHERE name_id = ?")) {
             ps.setLong(1, toNameId);
             ps.setLong(2, fromNameId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Records that a face is not really a face, so it is left out of every
+     * query that offers unnamed faces for tagging. The face row itself is kept
+     * — the decision is about the detection, not about the stored pixels — and
+     * marking the same face again is a no-op.
+     *
+     * @param faceId id of the face to dismiss; must exist
+     * @throws SQLException on database error
+     */
+    public void markNotAFace(long faceId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT OR IGNORE INTO not_faces (face_id) VALUES (?)")) {
+            ps.setLong(1, faceId);
             ps.executeUpdate();
         }
     }

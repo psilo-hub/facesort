@@ -4,6 +4,11 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Mark a detection as "Not a face" from the right-click menu of an untagged
+  face, in both the "Tag random face" and the "Add faces to a name" tab. The
+  face then disappears from every list of untagged faces and from any name's
+  suggestions, but its row is kept, so the decision survives a re-import of the
+  image (2026-10-15)
 - "Paste Path to Path Filter" now fills the path filter with the full path of
   the source video — including the file name — when you right-click a face from
   a video. Photo faces still fill the field with their folder (2026-10-14)

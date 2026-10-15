@@ -117,7 +117,10 @@ este orden:
    carpeta o archivo concretos (los fotogramas de vídeo se comparan por la ruta de
    su archivo de vídeo). Haz clic derecho en una cara y elige *Pegar ruta en el
    filtro de ruta* para rellenar el campo con la carpeta de esa cara o, si es un
-   fotograma de vídeo, con la ruta completa de su vídeo de origen.
+   fotograma de vídeo, con la ruta completa de su vídeo de origen. Haz clic
+   derecho en una cara y elige *No es una cara* para descartar una detección que
+   no es realmente una cara; a partir de entonces se excluye de todas las listas
+   de caras sin nombre, aunque la imagen almacenada se conserva.
 
 4. **Añadir caras a un nombre**: selecciona a una persona a la izquierda; la
    aplicación ordena cada cara sin nombre por su similitud con el embedding medio
@@ -136,7 +139,10 @@ este orden:
    miniaturas). Al hacer clic derecho en una cara candidata sin nombre, elige
    *Etiquetar con otro nombre* para etiquetarla con un nombre distinto del
    ofrecido: el diálogo previsualiza los nombres existentes con su cara más
-   representativa y la similitud con el embedding medio del nombre.
+   representativa y la similitud con el embedding medio del nombre. Haz clic
+   derecho en una cara candidata sin nombre y elige *No es una cara* para
+   descartar una detección que no es realmente una cara, de modo que deje de
+   ofrecerse a cualquier nombre.
 
 5. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
    similitud. En cada par decide: *Son duplicados* (a continuación, elige qué

@@ -1,6 +1,7 @@
 package free.svoss.facesort.db;
 
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.FaceThumb;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,13 @@ class FaceDaoTest {
         return faces.stream().map(FaceRecord::imageHash).sorted().toList();
     }
 
+    private int countRows(String sql) throws Exception {
+        try (Statement stmt = db.getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
     @Test
     void insert_returnsGeneratedId() throws Exception {
         insertImage("img1");
@@ -99,6 +107,45 @@ class FaceDaoTest {
 
         assertEquals(2, faceDao.findByImageHash("img1").size());
         assertEquals(1, faceDao.findByImageHash("img2").size());
+    }
+
+    @Test
+    void markNotAFace_excludesTheFaceFromEveryUnnamedQuery() throws Exception {
+        insertImage("img1");
+        long dismissed = insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        long kept = insertFace("img1", 20, 0, new float[]{2.0f}, null);
+
+        faceDao.markNotAFace(dismissed);
+
+        assertEquals(List.of(kept), faceDao.findUnnamed().stream().map(FaceRecord::id).toList(),
+                "a face the user dismissed is no longer offered for tagging");
+        assertEquals(List.of(kept), faceDao.findRandomUnnamed(10).stream().map(FaceRecord::id).toList(),
+                "the random sample must not offer a dismissed face");
+        assertEquals(List.of(kept), faceDao.findRandomUnnamedThumbs(10, null).stream().map(FaceThumb::id).toList(),
+                "the random sample's thumbnails must not show a dismissed face");
+    }
+
+    @Test
+    void markNotAFace_keepsTheFaceRow() throws Exception {
+        insertImage("img1");
+        long dismissed = insertFace("img1", 0, 0, new float[]{1.0f}, null);
+
+        faceDao.markNotAFace(dismissed);
+
+        assertTrue(faceDao.findById(dismissed).isPresent(),
+                "a dismissed detection is hidden from the tagging views, not deleted");
+        assertEquals(1, faceDao.findAll().size(), "the face row must survive its dismissal");
+    }
+
+    @Test
+    void markNotAFace_twice_recordsOneDismissal() throws Exception {
+        insertImage("img1");
+        long dismissed = insertFace("img1", 0, 0, new float[]{1.0f}, null);
+
+        faceDao.markNotAFace(dismissed);
+        faceDao.markNotAFace(dismissed);
+
+        assertEquals(1, countRows("SELECT count(*) FROM not_faces"));
     }
 
     @Test

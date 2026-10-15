@@ -112,7 +112,10 @@ The main window is a set of tabs. Work through them roughly in this order:
    restrict the sample to a particular folder or file (video frames are matched
    through their video file's path). Right-click a face and choose *Paste Path
    to Path Filter* to fill the field with that face's folder, or — for a video
-   frame — the full path of its source video.
+   frame — the full path of its source video. Right-click a face and choose
+   *Not a face* to dismiss a detection that is not really a face; from then on
+   it is left out of every list of untagged faces, while the stored image is
+   kept.
 
 4. **Add faces to a name** — Select a person on the left; the app
    ranks every unnamed face by similarity to that person's average embedding and
@@ -130,7 +133,9 @@ The main window is a set of tabs. Work through them roughly in this order:
    unnamed candidate face and choose *Tag with a different name* to tag it with
    a name other than the one it was offered under: the dialog previews existing
    names with their most representative face and the similarity to the name's
-   average embedding.
+   average embedding. Right-click an unnamed candidate face and choose *Not a
+   face* to dismiss a detection that is not really a face, so it stops being
+   offered to any name.
 
 5. **Deduplicate** — press **Start** to compare name pairs by similarity. For
    each pair decide: *These are dupes* (then choose which name survives — all

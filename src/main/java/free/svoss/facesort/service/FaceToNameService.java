@@ -327,6 +327,18 @@ public class FaceToNameService {
     }
 
     /**
+     * Records that the given face is not a face after all, taking it out of the
+     * candidate suggestions of every name. The face row is kept, so the
+     * decision survives a re-import of the image.
+     *
+     * @param faceId id of the face to dismiss
+     * @throws SQLException if the update fails
+     */
+    public void markNotAFace(long faceId) throws SQLException {
+        faceDao.markNotAFace(faceId);
+    }
+
+    /**
      * Returns the existing name record for the given display name, or empty
      * when the name has not been created yet. The lookup is trimmed.
      *

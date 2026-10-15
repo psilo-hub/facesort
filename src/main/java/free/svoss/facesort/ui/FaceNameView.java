@@ -49,7 +49,7 @@ import java.util.Optional;
  * {@link FaceToNameService}. Queries run on background {@link Task}s so the
  * UI stays responsive.</p>
  */
-public class FaceNameView extends BorderPane implements Refreshable, TaggedFacePresenter {
+public class FaceNameView extends BorderPane implements Refreshable, TaggedFacePresenter, NotAFacePresenter {
 
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int NAMED_LIMIT = 5;
@@ -375,7 +375,8 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      * "Paste path to path filter" entry that drops the source folder into the
      * filter field, grayed out while the media file has no stored path. For
      * unnamed candidate cards a "Tag with a different name" entry is added,
-     * opening a dialog that tags the face with a name of the user's choosing.
+     * opening a dialog that tags the face with a name of the user's choosing,
+     * and a "Not a face" entry that dismisses a detection the detector got wrong.
      *
      * @param card                 the card to attach the menu to
      * @param face                 the face whose source image should be openable
@@ -404,11 +405,44 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
             if (tagWithDifferentName) {
                 MenuItem differentNameItem = new MenuItem(I18n.get("common.tagWithDifferentName"));
                 differentNameItem.setOnAction(ev -> onTagWithDifferentName(face));
-                faceActions.installFaceMenu(card, face, pasteFilterItem, differentNameItem);
+                MenuItem notAFaceItem = new MenuItem(I18n.get("common.notAFace"));
+                notAFaceItem.setOnAction(ev -> onMarkNotAFace(face));
+                faceActions.installFaceMenu(card, face, pasteFilterItem, differentNameItem, notAFaceItem);
             } else {
                 faceActions.installFaceMenu(card, face, pasteFilterItem);
             }
         });
+    }
+
+    /**
+     * Records that the given candidate is not a face after all, so it is left
+     * out of every name's suggestions from now on. The card is removed on
+     * success; the face row itself is kept.
+     *
+     * @param face the face to dismiss
+     */
+    private void onMarkNotAFace(FaceRecord face) {
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                faceToNameService.markNotAFace(face.id());
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> FaceUi.applyNotAFaceResult(face.id(), this));
+
+        task.setOnFailed(e ->
+                handleFailure(I18n.get("common.notAFaceFailed"), task.getException()));
+
+        taskRunner.start(task, "facename-not-a-face");
+    }
+
+    @Override
+    public void removeFace(long faceId) {
+        candidatesPane.getChildren().removeIf(node ->
+                node.getUserData() instanceof Long id && id == faceId);
+        tagSelectedButton.setDisable(selectedCandidates().isEmpty());
     }
 
     /**

@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-14. `mvn test` is green: 471 tests / 50 test classes,
+State as of 2026-10-15. `mvn test` is green: 480 tests / 51 test classes,
 0 failures, 0 skipped.
 
 The detailed backlog lives in `suggestions.md` (26 open items, with the
@@ -12,6 +12,27 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* New feature (new_features_todo item 3): an untagged face can now be dismissed
+  with a new "Not a face" entry in its right-click context menu, in both the
+  "Tag random face" and the "Add faces to a name" tab. The decision is recorded
+  in a new `not_faces` table (schema version 4, `ON DELETE CASCADE` on the face)
+  rather than a new `faces` column, because `FaceDaoTest` pins the physical
+  `faces` schema; the row is kept, not deleted, so a dismissed detection does
+  not come back on re-import. `FaceDao.NOT_A_FACE_CLAUSE` is appended to every
+  query that offers unnamed faces — `findUnnamed` (both overloads), the two
+  random-sample picks and, defensively, the by-id fetches — so `ClusteringService`
+  and the "Add faces to a name" candidates inherit the filter automatically;
+  `findByImageHash`/`findAll`/`findByNameId*` (named faces) are untouched. New
+  `FaceDao.markNotAFace`, `NamingService.markNotAFace` and
+  `FaceToNameService.markNotAFace` (`INSERT OR IGNORE`, idempotent). UI: a new
+  package-private `NotAFacePresenter` (`removeFace`, `showStatus`) implemented by
+  both views, and the shared `FaceUi.applyNotAFaceResult(long, NotAFacePresenter)`
+  success handler pinned by a new `FaceUiTest`; each view drops the dismissed
+  card from its grid and re-evaluates its tag button. i18n: `common.notAFace`,
+  `common.notAFaceMarked`, `common.notAFaceFailed` in all six bundles. All 480
+  tests pass (471 before). Docs: `new_features_todo.txt` item 3 ticked,
+  `CHANGELOG.md` (### Added), READMEs (new menu entry).
 
 * New feature (new_features_todo item 2): in the "Add faces to a name" tab,
   "Tag with a different name" now reloads the list of names on the left after a

@@ -40,7 +40,7 @@ import java.util.Optional;
  * {@link NamingService}. Queries run on background {@link Task}s so the UI
  * stays responsive.</p>
  */
-public class RandomNameView extends BorderPane implements Refreshable {
+public class RandomNameView extends BorderPane implements Refreshable, NotAFacePresenter {
 
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int BATCH_SIZE = 25;
@@ -226,7 +226,8 @@ public class RandomNameView extends BorderPane implements Refreshable {
      * Installs a right-click context menu on a face card: the standard "Open
      * Original" and "Open containing folder" entries plus the "Paste path to
      * path filter" entry that drops the source folder into the filter field,
-     * grayed out while the media file has no stored path.
+     * grayed out while the media file has no stored path, and the "Not a face"
+     * entry that dismisses a detection that is not really a face.
      *
      * @param card the card to attach the menu to
      * @param face the face whose source image should be openable
@@ -249,8 +250,52 @@ public class RandomNameView extends BorderPane implements Refreshable {
                     },
                     ex -> pasteFilterItem.setDisable(true),
                     "randomname-filter-folder-" + hash);
-            faceActions.installFaceMenu(card, face, pasteFilterItem);
+            MenuItem notAFaceItem = new MenuItem(I18n.get("common.notAFace"));
+            notAFaceItem.setOnAction(ev -> onMarkNotAFace(face));
+            faceActions.installFaceMenu(card, face, pasteFilterItem, notAFaceItem);
         });
+    }
+
+    /**
+     * Records that the given sample face is not a face after all, so it is left
+     * out of the sample from now on. The card is removed on success; the face
+     * row itself is kept.
+     *
+     * @param face the face to dismiss
+     */
+    private void onMarkNotAFace(FaceThumb face) {
+        setBusy(true);
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                namingService.markNotAFace(face.id());
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            setBusy(false);
+            FaceUi.applyNotAFaceResult(face.id(), this);
+        });
+
+        task.setOnFailed(e -> {
+            setBusy(false);
+            handleFailure(I18n.get("common.notAFaceFailed"), task.getException());
+        });
+
+        taskRunner.start(task, "random-not-a-face");
+    }
+
+    @Override
+    public void removeFace(long faceId) {
+        facesPane.getChildren().removeIf(node ->
+                node.getUserData() instanceof Long id && id == faceId);
+        tagSelectedButton.setDisable(selectedFaceIds().isEmpty());
+    }
+
+    @Override
+    public void showStatus(String message) {
+        statusLabel.setText(message);
     }
 
     /**

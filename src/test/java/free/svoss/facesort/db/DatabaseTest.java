@@ -55,6 +55,37 @@ class DatabaseTest {
     }
 
     @Test
+    void freshDatabase_createsTheNotFacesTable() throws Exception {
+        try (Database db = Database.inMemory()) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'not_faces'"),
+                        "faces dismissed by the user are recorded in their own table");
+            }
+        }
+    }
+
+    @Test
+    void databaseFromVersionThree_gainsTheNotFacesTable() throws Exception {
+        Path dbFile = tempDir.resolve("v3.db");
+        try (Database db = new Database(dbFile)) {
+            try (Statement stmt = db.getConnection().createStatement()) {
+                // Recreate the version-3 schema: the same tables, no not_faces table.
+                stmt.execute("DROP TABLE not_faces");
+                stmt.execute("PRAGMA user_version = 3");
+            }
+        }
+
+        try (Database migrated = new Database(dbFile)) {
+            assertEquals(Database.SCHEMA_VERSION, userVersion(migrated),
+                    "a version-3 database must be migrated to the current schema version");
+            try (Statement stmt = migrated.getConnection().createStatement()) {
+                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'not_faces'"),
+                        "an existing library must gain the not_faces table on the next open");
+            }
+        }
+    }
+
+    @Test
     void databaseFromVersionTwo_gainsThePathPrefixIndexes() throws Exception {
         Path dbFile = tempDir.resolve("v2.db");
         try (Database db = new Database(dbFile)) {
@@ -189,6 +220,7 @@ class DatabaseTest {
                         VALUES ('img1', 10, 10, 80, 80, 0.9, X'00', X'FF',
                             (SELECT id FROM names WHERE name = 'Alice'))
                         """);
+                stmt.execute("INSERT INTO not_faces (face_id) SELECT id FROM faces WHERE image_hash = 'img1'");
                 stmt.execute("INSERT INTO videos (hash, detection_ts, criteria_json, duration_secs) VALUES ('vid1', 0, '{}', 2.5)");
                 stmt.execute("INSERT INTO video_paths (hash, path) VALUES ('vid1', '/v/p.mp4')");
                 stmt.execute("INSERT INTO video_frames (frame_hash, video_hash, timestamp_ms) VALUES ('frameImg', 'vid1', 500)");
@@ -198,6 +230,8 @@ class DatabaseTest {
                 assertEquals(0, countRows(stmt, "SELECT count(*) FROM image_paths WHERE hash = 'img1'"));
                 assertEquals(0, countRows(stmt, "SELECT count(*) FROM thumbnails WHERE hash = 'img1'"));
                 assertEquals(0, countRows(stmt, "SELECT count(*) FROM faces WHERE image_hash = 'img1'"));
+                assertEquals(0, countRows(stmt, "SELECT count(*) FROM not_faces"),
+                        "a dismissal must not outlive the face it dismissed");
                 assertEquals(1, countRows(stmt, "SELECT count(*) FROM names WHERE name = 'Alice'"),
                         "names are reached via ON DELETE SET NULL and must survive");
 

@@ -125,7 +125,10 @@ ordre :
    de vidéo sont mises en correspondance via le chemin de leur fichier vidéo).
    Faites un clic droit sur un visage et choisissez *Coller le chemin dans le
    filtre de chemin* pour remplir le champ avec le dossier de ce visage ou, pour
-   une image de vidéo, le chemin complet de sa vidéo source.
+   une image de vidéo, le chemin complet de sa vidéo source. Faites un clic droit
+   sur un visage et choisissez *Pas un visage* pour écarter une détection qui
+   n'est pas vraiment un visage ; elle est ensuite retirée de toutes les listes de
+   visages non nommés, tandis que l'image stockée est conservée.
 
 4. **Ajouter des visages à un nom** — Sélectionnez une personne à gauche ;
    l'application classe chaque visage non nommé selon sa similitude avec
@@ -146,6 +149,9 @@ ordre :
    *Étiqueter avec un autre nom* pour l'étiqueter avec un nom autre que celui
    proposé : la boîte de dialogue prévisualise les noms existants avec leur
    visage le plus représentatif et la similarité avec l'embedding moyen du nom.
+   Un clic droit sur un visage candidat non nommé et *Pas un visage* permet
+   d'écarter une détection qui n'est pas vraiment un visage, afin qu'elle ne soit
+   plus proposée à aucun nom.
 
 5. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
    de noms par similitude. Pour chaque paire, décidez : *Ce sont des doublons*

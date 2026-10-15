@@ -122,7 +122,10 @@ Reihenfolge ab:
    werden über den Pfad ihrer Videodatei abgeglichen). Klicke mit Rechtsklick auf
    ein Gesicht und wähle *Pfad in den Pfadfilter einfügen*, um das Feld mit dem
    Ordner dieses Gesichts oder – bei einem Video-Frame – dem vollständigen Pfad
-   seines Quellvideos zu füllen.
+   seines Quellvideos zu füllen. Klicke mit Rechtsklick auf ein Gesicht und wähle
+   *Kein Gesicht*, um eine Erkennung zu verwerfen, die kein Gesicht ist; sie wird
+   dann aus allen Listen unbenannter Gesichter herausgehalten, das gespeicherte
+   Bild bleibt jedoch erhalten.
 
 4. **Gesichter einem Namen hinzufügen** – Wähle links eine Person; die App reiht
    jedes unbenannte Gesicht nach Ähnlichkeit zum durchschnittlichen Embedding der
@@ -138,7 +141,9 @@ Reihenfolge ab:
    vollständigen Pfad seines Quellvideos zu füllen). Du kannst hier auch
    jede Person **Umbenennen…** oder mit **Bilder exportieren…** alle Fotos der
    ausgewählten Person in einen Ordner deiner Wahl kopieren (fehlende Originale
-   werden als Vorschaubilder exportiert).
+   werden als Vorschaubilder exportiert). Klicke mit Rechtsklick auf ein
+   unbenanntes Kandidatengesicht und wähle *Kein Gesicht*, um eine Erkennung zu
+   verwerfen, die kein Gesicht ist; sie wird dann keinem Namen mehr angeboten.
 
 5. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
    vergleichen. Entscheide bei jedem Paar: *Das sind Duplikate* (wähle dann,

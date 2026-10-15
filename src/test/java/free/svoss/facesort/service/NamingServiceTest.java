@@ -86,6 +86,17 @@ class NamingServiceTest {
     }
 
     @Test
+    void markNotAFace_keepsTheFaceOutOfTheRandomSample() throws SQLException {
+        long dismissed = addImageAndFace("imgDismissed", null);
+        long kept = addImageAndFace("imgKept", null);
+
+        service.markNotAFace(dismissed);
+
+        assertEquals(List.of(kept), service.findRandomUnnamed(25).stream().map(FaceRecord::id).toList(),
+                "a face dismissed as not a face must not be offered for tagging again");
+    }
+
+    @Test
     void findRandomUnnamed_returnsFewerWhenFewUnnamedFaces() throws SQLException {
         addImageAndFace("imgU1", null);
         addImageAndFace("imgU2", null);

@@ -273,6 +273,18 @@ public final class NamingService {
     }
 
     /**
+     * Records that the given face is not a face after all, taking it out of the
+     * random sample and out of every name's candidate suggestions. The face row
+     * is kept, so the decision survives a re-import of the image.
+     *
+     * @param faceId id of the face to dismiss
+     * @throws SQLException if the update fails
+     */
+    public void markNotAFace(long faceId) throws SQLException {
+        faceDao.markNotAFace(faceId);
+    }
+
+    /**
      * Returns the top {@code limit} unnamed faces most similar to the given
      * face, sorted by descending similarity. The face itself is excluded.
      *

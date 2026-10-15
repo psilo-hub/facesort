@@ -150,6 +150,21 @@ class FaceToNameServiceTest {
     }
 
     @Test
+    void findUnnamedForName_leavesOutFacesDismissedAsNotAFace() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long dismissed = addImageAndFace("imgU1", xLike(), null);
+        long kept = addImageAndFace("imgU2", xLike(), null);
+
+        service.markNotAFace(dismissed);
+
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10);
+
+        assertEquals(1, results.size(), "a dismissed detection must not be offered to a name");
+        assertEquals(kept, results.get(0).faceRecord().id());
+    }
+
+    @Test
     void findUnnamedForName_nonPositiveLimitReturnsEmpty() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA1", xLike(), alice);
