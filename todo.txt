@@ -13,6 +13,15 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 Just completed
 --------------
 
+* Fixed Linux CI build broken by Maven 3.10.0: removed the `-Djavafx.platform`
+  user property from the GitHub Actions workflow and local build scripts. The
+  property was activating OpenJFX's `javafx.platform.custom` profile, which
+  contains a self-reference (`<javafx.platform>${javafx.platform}</javafx.platform>`);
+  Maven 3.10.0 detects that as a recursive expression cycle, marks the OpenJFX
+  POM invalid and drops the classified JavaFX artifacts, so compilation fails.
+  OpenJFX's OS/arch profiles now select the platform automatically. Updated
+  `note_about_maven.txt`, cleaned up the vestigial `javafx.platform` profile
+  properties in `pom.xml` and adjusted `CHANGELOG.md`.
 * New feature (new_features_todo item 6): in the "Tag random face" tab a
   Shift-click now selects the whole range of faces between the first and the
   last clicked card, exactly as it already did in "Add faces to a name". The

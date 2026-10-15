@@ -264,6 +264,10 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Fixed the Linux platform build on GitHub Actions: CI no longer passes
+  `-Djavafx.platform`, because that flag activates an OpenJFX profile which
+  self-references the property and breaks on Maven 3.10+. OpenJFX's OS/arch
+  profiles now select the correct platform artifact automatically (2026-10-15)
 - Tagging a face with a name it was not offered under ("Tag with a different
   name" in the "Add faces to a name" tab) now adds a newly typed name to the
   list of names on the left straight away, instead of only refreshing the

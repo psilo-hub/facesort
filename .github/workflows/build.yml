@@ -54,19 +54,14 @@ jobs:
         include:
           - platform: linux-x86_64
             os: ubuntu-latest
-            javafx-platform: linux
           - platform: linux-aarch64
             os: ubuntu-24.04-arm
-            javafx-platform: linux-aarch64
           - platform: mac-aarch64
             os: macos-latest
-            javafx-platform: mac-aarch64
           - platform: mac-x86_64
             os: macos-15-intel
-            javafx-platform: mac
           - platform: win-x86_64
             os: windows-latest
-            javafx-platform: win
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -93,11 +88,20 @@ jobs:
           mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
       - name: Build platform jar
         # shell: bash is required: the Windows runner defaults to pwsh, whose
-        # parser splits dotted -D properties (-Dbuild.number=...,
-        # -Djavafx.platform=...) at the dot, so Maven receives ".number=build-N"
-        # as a lifecycle phase and fails before it compiles anything.
+        # parser splits dotted -D properties (-Dbuild.number=...) at the dot, so
+        # Maven receives ".number=build-N" as a lifecycle phase and fails before
+        # it compiles anything.
+        #
+        # Do NOT add -Djavafx.platform here. OpenJFX picks the platform artifact
+        # from the runner's own OS and CPU through its built-in profiles, which
+        # is exactly what these native jobs need. Passing the property as a user
+        # property activates OpenJFX's "javafx.platform.custom" profile, whose
+        # <javafx.platform>${javafx.platform}</javafx.platform> is a
+        # self-reference that Maven 3.10+ rejects as a "recursive expression
+        # cycle". OpenJFX's POM then counts as invalid, its classified - and only
+        # non-empty - jar is dropped, and every javafx.* import fails to compile.
         shell: bash
-        run: mvn -B package -P${{ matrix.platform }} -DskipTests -Dbuild.number=build-${{ github.run_number }} -Djavafx.platform=${{ matrix.javafx-platform }}
+        run: mvn -B package -P${{ matrix.platform }} -DskipTests -Dbuild.number=build-${{ github.run_number }}
       - uses: actions/upload-artifact@v7
         with:
           name: facesort-${{ matrix.platform }}

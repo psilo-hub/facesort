@@ -1,1 +1,5 @@
-use the -Djavafx.platform=win flag when building on a mobile device.
+The JavaFX platform artifact is chosen by OpenJFX from your OS and CPU, so no
+-Djavafx.platform flag is needed. Passing it makes Maven 3.10+ fail with a
+"recursive expression cycle" in the OpenJFX POM (its "javafx.platform.custom"
+profile references the property itself). Only use it on Maven 3.9 or older when
+you must cross-build for another platform.

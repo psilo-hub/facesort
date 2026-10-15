@@ -163,11 +163,17 @@
         </plugins>
     </build>
 
+    <!-- The <platform.suffix> of each profile only names the shaded jar and
+         filters the native libraries bundled into it. The JavaFX platform
+         artifact itself is selected by OpenJFX's own OS/arch profiles; no
+         -Djavafx.platform flag is needed (and passing it breaks Maven 3.10+,
+         because OpenJFX's "javafx.platform.custom" profile defines
+         <javafx.platform>${javafx.platform}</javafx.platform> as a
+         self-reference, which Maven 3.10+ rejects as a recursive cycle). -->
     <profiles>
         <profile>
             <id>linux-x86_64</id>
             <properties>
-                <javafx.platform>linux</javafx.platform>
                 <platform.suffix>linux-x86_64</platform.suffix>
             </properties>
             <build>
@@ -287,7 +293,6 @@
         <profile>
             <id>linux-aarch64</id>
             <properties>
-                <javafx.platform>linux</javafx.platform>
                 <platform.suffix>linux-aarch64</platform.suffix>
             </properties>
             <build>
@@ -407,7 +412,6 @@
         <profile>
             <id>mac-aarch64</id>
             <properties>
-                <javafx.platform>mac</javafx.platform>
                 <platform.suffix>mac-aarch64</platform.suffix>
             </properties>
             <build>
@@ -505,7 +509,6 @@
         <profile>
             <id>mac-x86_64</id>
             <properties>
-                <javafx.platform>mac</javafx.platform>
                 <platform.suffix>mac-x86_64</platform.suffix>
             </properties>
             <build>
@@ -602,7 +605,6 @@
         <profile>
             <id>win-x86_64</id>
             <properties>
-                <javafx.platform>win</javafx.platform>
                 <platform.suffix>win-x86_64</platform.suffix>
             </properties>
             <build>
