@@ -272,6 +272,11 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Background work no longer cancels unrelated background work in the same tab:
+  starting one action (an export, a tag decision, a name check) used to stop
+  whatever else that tab was doing, so a reload or an export could be silently
+  cut short. Only a newer action of the same kind now replaces the one running
+  (2026-10-15)
 - Fixed the Linux platform build on GitHub Actions: CI no longer passes
   `-Djavafx.platform`, because that flag activates an OpenJFX profile which
   self-references the property and breaks on Maven 3.10+. OpenJFX's OS/arch

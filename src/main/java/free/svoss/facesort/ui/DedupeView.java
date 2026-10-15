@@ -310,12 +310,12 @@ public class DedupeView extends BorderPane {
     }
 
     /**
-     * Stops the session: cancels any running load and hides the pair UI.
+     * Stops the session: cancels any running work and hides the pair UI.
      */
     private void stopSession() {
         sessionActive = false;
         current = null;
-        taskRunner.cancelActive();
+        taskRunner.cancelAll();
         endSession(I18n.get("ui.dedupe.sessionStopped"));
     }
 

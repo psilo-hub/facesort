@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-15. `mvn test` is green: 548 tests / 57 test classes,
+State as of 2026-10-15. `mvn test` is green: 553 tests / 58 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (26 open items, with the
+The detailed backlog lives in `suggestions.md` (25 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,23 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* Improvement (suggestions.md): background work in a tab no longer cancels
+  unrelated background work. `TaskRunner` used to keep a single task slot per
+  view, so starting any action stopped whatever else that tab was running — an
+  export could be silently cut short because the name selection changed, and a
+  name-existence check cancelled a sample reload. The cancellation policy now
+  lives in a new toolkit-free `CancellationSlots` that keeps one cancellable
+  action per key, and `TaskRunner.start(task, threadName)` keys by the thread
+  name, so only a newer task of the same kind replaces the one running.
+  `cancelActive()` became `cancelAll()` (`DedupeView.stopSession`). The
+  extraction was needed to test it: `javafx.concurrent.Task` cannot run without
+  an initialized toolkit, so a `Task`-based test cannot be headless; the new
+  `CancellationSlotsTest` (5 cases) pins the policy and was red against a
+  faithful single-slot extraction before the keyed implementation. Running
+  different kinds concurrently is safe because `SynchronizedConnection`
+  serializes every DAO call behind one monitor and holds it across a whole
+  transaction. 553 tests / 58 test classes green (548 / 57 before).
 
 * New feature (new_features_todo item 5): Windows icon files (`.ico`) are now
   imported like any other image. Decoding uses the new TwelveMonkeys
@@ -463,7 +480,10 @@ Queued next (highest payoff first, all still open in suggestions.md)
     `updateAndGet`) replaces the reference atomically; saved settings still
     apply immediately while each import/clustering run snapshots one config
     (469 tests green)
-  * `TaskRunner`'s single-slot policy cancels unrelated user actions
+  * `TaskRunner`'s single-slot policy cancels unrelated user actions —
+    **done**: the policy moved into a toolkit-free `CancellationSlots` keyed by
+    the thread name, so only a newer task of the same kind replaces the running
+    one and unrelated work keeps going; `cancelActive()` became `cancelAll()`
   * Untracked raw threads and a leaked `HttpClient` on language change
   * Import progress starves the FX thread
 
