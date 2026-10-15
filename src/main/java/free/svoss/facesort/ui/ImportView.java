@@ -41,7 +41,10 @@ import java.nio.file.Path;
  *
  * <p>While an import runs, a Stop button can request cancellation: the shared
  * flag is honored by both phases between files and during folder scanning,
- * and already-imported rows are kept.</p>
+ * and already-imported rows are kept. {@link #dispose()} requests the same
+ * cancellation when the window is rebuilt after a language change, so the tab
+ * that is being replaced does not leave its import running invisibly (see
+ * {@link ImportCancellation}).</p>
  */
 public class ImportView extends BorderPane {
 
@@ -59,7 +62,7 @@ public class ImportView extends BorderPane {
     private final TextArea logArea = new TextArea();
     private final Label statusLabel = new Label(I18n.get("ui.import.ready"));
 
-    private volatile boolean cancelRequested;
+    private final ImportCancellation cancellation = new ImportCancellation();
 
     /**
      * Creates the Import tab.
@@ -183,9 +186,23 @@ public class ImportView extends BorderPane {
      * Requests the running import to stop as soon as the current image is done.
      */
     private void onStop() {
-        cancelRequested = true;
+        cancellation.request();
         stopButton.setDisable(true);
         appendLog(I18n.get("ui.import.stopRequested"));
+    }
+
+    /**
+     * Requests the running import to stop when this tab is replaced by a
+     * rebuild of the main window, for example after a language change.
+     *
+     * <p>The refreshed Import tab cannot show the run of the tab it replaces,
+     * and it would happily start a second import on top of the first — both
+     * would drive the same worker pool. The request stops the run at its next
+     * checkpoint (the folder scan and both phases honor it); the rows imported
+     * so far are kept. Calls on a tab that is not importing do nothing.</p>
+     */
+    public void dispose() {
+        cancellation.request();
     }
 
     /**
@@ -215,7 +232,7 @@ public class ImportView extends BorderPane {
      */
     private void startImport(Path folder) {
         rememberFolder(folder);
-        cancelRequested = false;
+        cancellation.reset();
 
         setBusy(true);
         statusLabel.setText(I18n.get("ui.import.scanning"));
@@ -227,7 +244,7 @@ public class ImportView extends BorderPane {
             protected ImportCoordinator.CombinedImportResult call() throws Exception {
                 return ImportCoordinator.run(importService, videoImportService, folder,
                         message -> Platform.runLater(() -> appendLog(message)),
-                        () -> cancelRequested,
+                        cancellation::isRequested,
                         () -> Platform.runLater(
                                 () -> appendLog(I18n.get("ui.import.videoPhase"))));
             }
@@ -236,7 +253,7 @@ public class ImportView extends BorderPane {
         task.setOnSucceeded(e -> {
             ImportCoordinator.CombinedImportResult result = task.getValue();
             setBusy(false);
-            cancelRequested = false;
+            cancellation.reset();
             if (result.wasCancelled()) {
                 progressBar.setProgress(result.total() > 0
                         ? (double) result.processed() / result.total() : 0);
@@ -254,7 +271,7 @@ public class ImportView extends BorderPane {
 
         task.setOnFailed(e -> {
             setBusy(false);
-            cancelRequested = false;
+            cancellation.reset();
             progressBar.setProgress(0);
             Throwable error = task.getException();
             String detail = error instanceof IOException ? error.getMessage() : String.valueOf(error);

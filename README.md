@@ -170,7 +170,8 @@ The main window is a set of tabs. Work through them roughly in this order:
    see each control's tooltip for details. Changes are applied via **Save** or
    reset with **Reset to defaults**. The **Language** dropdown switches the UI
    language immediately (available languages: English, Deutsch, Français,
-   Español, Русский, 中文).
+   Español, Русский, 中文); because the tabs are rebuilt, switching the language
+   stops an import that is still running (already imported items are kept).
 
 9. **Feedback** — send a bug report or feature request to the developers.
 

@@ -22,6 +22,12 @@ import java.util.Map;
  * for programmatic submissions so that it answers with a JSON payload; a
  * submission is only treated as successful when the endpoint replies with
  * HTTP 200 and a body whose {@code success} flag is {@code true}.</p>
+ *
+ * <p>A service owns one {@link HttpClient}. An {@code HttpClient} cannot be
+ * closed before Java 21, so a service that is dropped without being closed —
+ * for example one built per rebuild of the Feedback tab — keeps its selector
+ * thread alive until the process ends. The application therefore creates a
+ * single instance and hands it to every {@code FeedbackView}.</p>
  */
 public class FeedbackService {
 

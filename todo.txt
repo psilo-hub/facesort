@@ -1,10 +1,10 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-15. `mvn test` is green: 553 tests / 58 test classes,
+State as of 2026-10-15. `mvn test` is green: 559 tests / 60 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (25 open items, with the
+The detailed backlog lives in `suggestions.md` (24 open items, with the
 rationale, the file/line references and the notes for everything already
 done). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
@@ -12,6 +12,27 @@ queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 Just completed
 --------------
+
+* Fix (suggestions.md): background work is now bound to the window that owns
+  it. The Feedback tab built its own `FeedbackService` — and with it its own
+  `HttpClient` — in its constructor, and the tab is rebuilt on every language
+  change, so each change leaked an HTTP client whose selector thread lives
+  until the process ends (an `HttpClient` cannot be closed before Java 21).
+  `FaceSortApp` now owns the single `FeedbackService` and hands it to the
+  view, which can no longer create one; the new `FeedbackViewTest` pins that
+  (it was red while the no-arg constructor existed). The Import tab's
+  untracked worker thread is disposed when the window is rebuilt or when the
+  app quits: `ImportView.dispose()` requests the same cooperative stop the
+  Stop button uses, through a small headless-tested `ImportCancellation`
+  (5 cases) that replaces the raw `volatile boolean`. A language change
+  mid-import therefore no longer leaves the run writing to an invisible tab
+  while the fresh tab could start a second import on top of it — both would
+  drive the same worker pool. The run stops at its next checkpoint and the
+  rows imported so far are kept. The one-off face-rotation pass now reports
+  to whatever Import tab is on screen instead of the tab it started with. The
+  short-lived helper threads (tooltip path lookups, name previews, the
+  feedback submit) stay untracked on purpose: each is a daemon that ends after
+  a single query. 559 tests / 60 test classes green (553 / 58 before).
 
 * Improvement (suggestions.md): background work in a tab no longer cancels
   unrelated background work. `TaskRunner` used to keep a single task slot per
@@ -484,7 +505,11 @@ Queued next (highest payoff first, all still open in suggestions.md)
     **done**: the policy moved into a toolkit-free `CancellationSlots` keyed by
     the thread name, so only a newer task of the same kind replaces the running
     one and unrelated work keeps going; `cancelActive()` became `cancelAll()`
-  * Untracked raw threads and a leaked `HttpClient` on language change
+  * Untracked raw threads and a leaked `HttpClient` on language change —
+    **done**: `FaceSortApp` owns one `FeedbackService`/`HttpClient` and injects
+    it into `FeedbackView` (an `HttpClient` cannot be closed on Java 17, so an
+    instance built per rebuild leaked its selector thread); `ImportView.dispose()`
+    stops the tab's untracked import worker on a window rebuild and on quit
   * Import progress starves the FX thread
 
 §3 Performance — 7 of 10 done (clustering O(n²·k)→O(n·k), dedupe

@@ -50,18 +50,17 @@ public class FeedbackView extends BorderPane {
     private boolean sending;
 
     /**
-     * Creates the Feedback tab.
-     */
-    public FeedbackView() {
-        this(new FeedbackService());
-    }
-
-    /**
      * Creates the Feedback tab backed by the given service.
+     *
+     * <p>The service is handed in rather than created here because the tab is
+     * rebuilt on every language change: a second {@link FeedbackService} would
+     * open a second {@link java.net.http.HttpClient}, and an {@code HttpClient}
+     * cannot be closed before Java 21, so its selector thread would live until
+     * the process ends. The application owns the single instance.</p>
      *
      * @param feedbackService the feedback submission service; must not be null
      */
-    FeedbackView(FeedbackService feedbackService) {
+    public FeedbackView(FeedbackService feedbackService) {
         this.feedbackService = Objects.requireNonNull(feedbackService, "feedbackService");
         typeBox.getItems().addAll(feedbackTypes());
         typeBox.getSelectionModel().selectFirst();

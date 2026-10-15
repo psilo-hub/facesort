@@ -272,6 +272,13 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Changing the UI language no longer leaks an HTTP connection. Every language
+  change rebuilds the tabs, and the Feedback tab used to build its own HTTP
+  client each time; the old client could never be closed and kept its thread
+  alive until the app exited. The app now reuses a single client (2026-10-15)
+- Switching the language while an import is running now stops that import
+  (already imported items are kept) instead of letting it run on invisibly and
+  allowing a second import to be started on top of it (2026-10-15)
 - Background work no longer cancels unrelated background work in the same tab:
   starting one action (an export, a tag decision, a name check) used to stop
   whatever else that tab was doing, so a reload or an export could be silently

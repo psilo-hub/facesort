@@ -19,6 +19,7 @@ import free.svoss.facesort.service.DeduplicationService;
 import free.svoss.facesort.service.FaceAiService;
 import free.svoss.facesort.service.FaceRotationMigration;
 import free.svoss.facesort.service.FaceToNameService;
+import free.svoss.facesort.service.FeedbackService;
 import free.svoss.facesort.service.ImportService;
 import free.svoss.facesort.service.MostSimilarService;
 import free.svoss.facesort.service.NamingService;
@@ -99,7 +100,10 @@ public class FaceSortApp extends Application {
     private DeduplicationService dedupService;
     private ViewService viewService;
     private DataRemovalService dataRemovalService;
+    private FeedbackService feedbackService;
     private FaceRotationMigration faceRotationMigration;
+    /** The Import tab of the window on screen; a rebuild disposes it. */
+    private ImportView importView;
     /** Guards the one-off pass: rebuilding the window after a language change must not start a second one. */
     private boolean faceRotationMigrationStarted;
 
@@ -253,6 +257,9 @@ public class FaceSortApp extends Application {
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
         dataRemovalService = new DataRemovalService(
                 new DataRemovalDao(connection), database.getTransactionRunner());
+        // One instance for the whole process: an HttpClient cannot be closed
+        // before Java 21, so a second one would leak its selector thread.
+        feedbackService = new FeedbackService();
         faceRotationMigration = new FaceRotationMigration(
                 faceDao, new MetaDao(connection), imageDao, videoDao, configStore);
 
@@ -265,8 +272,10 @@ public class FaceSortApp extends Application {
      * language. Must be called on the JavaFX application thread.
      */
     private SettingsView buildMainWindowUi() {
+        disposeCurrentViews();
+
         // 6. Views.
-        ImportView importView = new ImportView(importService, videoImportService,
+        importView = new ImportView(importService, videoImportService,
                 dataRemovalService, configStore);
         NameFaceView nameFaceView = new NameFaceView(namingService);
         RandomNameView randomNameView = new RandomNameView(namingService);
@@ -275,7 +284,7 @@ public class FaceSortApp extends Application {
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);
         SettingsView settingsView = new SettingsView(configStore, configPath, this::changeLanguage);
-        FeedbackView feedbackView = new FeedbackView();
+        FeedbackView feedbackView = new FeedbackView(feedbackService);
 
         // 7. Main window with the nine tabs.
         MainWindow mainWindow = new MainWindow(
@@ -305,8 +314,26 @@ public class FaceSortApp extends Application {
             mainWindow.getSelectionModel().select(selected);
         }
         primaryStage.show();
-        startFaceRotationMigration(importView);
+        startFaceRotationMigration();
         return settingsView;
+    }
+
+    /**
+     * Stops the background work of the window that is about to be replaced.
+     *
+     * <p>Rebuilding the window on a language change discards every view, so an
+     * import that is still running would keep writing to a tab nobody can see
+     * while the fresh Import tab would happily start a second import on top of
+     * it — both would drive the same worker pool. Disposing the tab being
+     * replaced requests cancellation of its run; the rows imported so far are
+     * kept.</p>
+     */
+    private void disposeCurrentViews() {
+        ImportView previous = importView;
+        importView = null;
+        if (previous != null) {
+            previous.dispose();
+        }
     }
 
     /**
@@ -320,15 +347,15 @@ public class FaceSortApp extends Application {
      * the duration of the pass, because face models are not thread-safe and
      * the shared service belongs to the open tabs.</p>
      *
-     * <p>Rebuilding the window after a language change must not start a second
-     * pass, hence {@link #faceRotationMigrationStarted}. The thread is marked
-     * as a daemon, so a pass that is still going when the application quits
-     * dies with the process instead of keeping it alive.</p>
-     *
-     * @param importView the import tab whose status line reports progress;
-     *                   must not be null
+     * <p>Progress is posted to the Import tab that is on screen at that
+     * moment, not to the one the pass started with, so a language change in
+     * the middle of the pass does not send the messages to a tab that has been
+     * replaced. Rebuilding the window must not start a second pass, hence
+     * {@link #faceRotationMigrationStarted}. The thread is marked as a daemon,
+     * so a pass that is still going when the application quits dies with the
+     * process instead of keeping it alive.</p>
      */
-    private void startFaceRotationMigration(ImportView importView) {
+    private void startFaceRotationMigration() {
         if (faceRotationMigrationStarted) {
             return;
         }
@@ -343,10 +370,10 @@ public class FaceSortApp extends Application {
                 try (FaceAiService migrationService = new FaceAiService(configStore.get())) {
                     FaceRotationMigration.Result result = faceRotationMigration.run(
                             migrationService,
-                            (processed, total) -> Platform.runLater(() -> importView.showStatusMessage(
+                            (processed, total) -> Platform.runLater(() -> showImportStatus(
                                     I18n.format("ui.import.rotateMigration", processed, total))),
                             () -> Thread.currentThread().isInterrupted());
-                    Platform.runLater(() -> importView.showStatusMessage(
+                    Platform.runLater(() -> showImportStatus(
                             I18n.format("ui.import.rotateMigrationDone",
                                     result.rotated(), result.skipped(), result.failed())));
                 }
@@ -356,7 +383,7 @@ public class FaceSortApp extends Application {
         task.setOnFailed(e -> {
             Throwable error = task.getException();
             LOG.log(Level.WARNING, "Face rotation migration failed", error);
-            Platform.runLater(() -> importView.showStatusMessage(
+            Platform.runLater(() -> showImportStatus(
                     I18n.format("ui.import.rotateMigrationFailed",
                             error == null ? "" : String.valueOf(error.getMessage()))));
         });
@@ -364,6 +391,22 @@ public class FaceSortApp extends Application {
         Thread thread = new Thread(task, "face-rotation-migration");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    /**
+     * Shows a background-progress message in the status line of the Import tab
+     * that is currently on screen, ignoring the message when no window is
+     * shown (for example while the application is shutting down).
+     *
+     * <p>Must be called on the JavaFX application thread.</p>
+     *
+     * @param message the localized message to display
+     */
+    private void showImportStatus(String message) {
+        ImportView current = importView;
+        if (current != null) {
+            current.showStatusMessage(message);
+        }
     }
 
     /**
@@ -438,6 +481,11 @@ public class FaceSortApp extends Application {
 
     @Override
     public void stop() throws Exception {
+        // A running import must not outlive the window it reports to: without
+        // this it would keep the SQLite connection busy past the close() calls
+        // below (the import thread is a daemon, so only a cooperative stop can
+        // reach it).
+        disposeCurrentViews();
         // videoImportService shares the import worker FaceAI services with
         // importService, so closing importService releases them exactly once.
         // faceRotationMigration only releases the video file it keeps open while
