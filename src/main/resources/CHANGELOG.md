@@ -273,6 +273,11 @@ All notable changes to Face Sort will be documented in this file.
   so switching between names, samples or tabs re-uses pictures that are already
   decoded. A crop rewritten by the one-time face-rotation pass is decoded afresh
   (2026-10-16)
+- Face grids stay responsive while their thumbnails load: the face crops are
+  now decoded on a small background pool instead of on the UI thread, so a
+  large tagging, review or view grid no longer freezes while it is built. Its
+  thumbnails fill in as they finish decoding, and a face whose crop cannot be
+  decoded is simply shown without a thumbnail (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

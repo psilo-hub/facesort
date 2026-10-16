@@ -63,4 +63,33 @@ final class LruCache<K, V> {
         entries.put(key, value);
         return value;
     }
+
+    /**
+     * Returns the resident value for the given key without computing one, or
+     * {@code null} when the key is not resident. A resident entry counts as a
+     * read, so it survives the next eviction over an entry that was not read.
+     *
+     * <p>Entries are stored non-null (see {@code put}), so a {@code null}
+     * result means the key is not resident.</p>
+     *
+     * @param key the key to look up; must not be null
+     * @return the resident value, or {@code null} when absent
+     */
+    V getIfPresent(K key) {
+        Objects.requireNonNull(key, "key");
+        return entries.get(key);
+    }
+
+    /**
+     * Stores a value under the given key, dropping the least recently read
+     * entry when that puts the cache over capacity.
+     *
+     * @param key   the key to store under; must not be null
+     * @param value the value to store; must not be null
+     */
+    void put(K key, V value) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(value, "value");
+        entries.put(key, value);
+    }
 }

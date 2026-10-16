@@ -2,7 +2,9 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.FaceThumb;
 import free.svoss.facesort.model.NameRecord;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -27,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 /**
@@ -47,18 +50,30 @@ final class FaceUi {
     /** Upper bound of the shared decoded-face-thumbnail cache. */
     private static final int FACE_THUMBNAIL_CACHE_CAPACITY = 256;
 
+    /** Decodes face crops off the JavaFX application thread so grids do not stall. */
+    private static final Executor FACE_THUMBNAIL_DECODES = FaceThumbnailLoader.decoderPool();
+
     /**
      * Decoded face crops shared by every face view, keyed by face id and the
-     * crop bytes, so a crop rewritten by the face-rotation migration is decoded
-     * afresh. Shared so a rebuild in one tab reuses what another already
-     * decoded.
+     * crop bytes, so a decode is reused across grid rebuilds and refreshed when
+     * the stored crop changes. Decoding happens off the JavaFX application
+     * thread and the result is applied on it.
      */
-    private static final FaceThumbnailCache<Image> FACE_THUMBNAILS =
-            new FaceThumbnailCache<>(FACE_THUMBNAIL_CACHE_CAPACITY,
-                    jpg -> new Image(new ByteArrayInputStream(jpg)));
+    private static final FaceThumbnailLoader<Image> FACE_THUMBNAILS =
+            new FaceThumbnailLoader<>(FACE_THUMBNAIL_CACHE_CAPACITY,
+                    FaceUi::decodeCrop, FACE_THUMBNAIL_DECODES, Platform::runLater);
 
     private FaceUi() {
         // Utility class - not instantiable
+    }
+
+    /**
+     * Decodes a crop JPEG; a crop JavaFX reports as an error is treated as
+     * unavailable, so it is shown as no thumbnail and is not cached.
+     */
+    private static Image decodeCrop(byte[] jpg) {
+        Image image = new Image(new ByteArrayInputStream(jpg));
+        return image.isError() ? null : image;
     }
 
     /**
@@ -98,35 +113,47 @@ final class FaceUi {
     }
 
     /**
-     * Shows the face's JPEG thumbnail in the given view, or clears it when the
-     * sub-image is unavailable.
+     * Shows the face's JPEG thumbnail in the given view. The view is cleared at
+     * once and the crop is decoded off the JavaFX application thread and applied
+     * when ready; a crop that is absent is shown as no thumbnail, and only the
+     * latest crop requested for the view is applied, so the view never ends up
+     * showing a previous face.
      *
      * @param view the image view to update
      * @param face the face whose bytes should be shown
      */
     static void setImage(ImageView view, FaceRecord face) {
-        view.setImage(toImage(face));
+        clearImage(view);
+        if (face != null) {
+            FACE_THUMBNAILS.load(view, face.id(), face.subImageJpg(), view::setImage);
+        }
     }
 
-    static void setImage(ImageView view, free.svoss.facesort.model.FaceThumb face) {
-        view.setImage(toImage(face));
+    static void setImage(ImageView view, FaceThumb face) {
+        clearImage(view);
+        if (face != null) {
+            FACE_THUMBNAILS.load(view, face.id(), face.subImageJpg(), view::setImage);
+        }
     }
 
     /**
-     * Decodes a face's JPEG sub-image through the shared thumbnail cache, or
-     * returns {@code null} when no sub-image is available. Entries are keyed
-     * by face id and crop content, so a decode is reused across grid rebuilds
-     * and refreshed when the stored crop changes.
+     * Clears a face thumbnail view and stops any decode still on its way to it.
      *
-     * @param face the face record to render
-     * @return the decoded image, or {@code null} when unavailable
+     * @param view the image view to clear
      */
-    static Image toImage(FaceRecord face) {
-        return face == null ? null : FACE_THUMBNAILS.get(face.id(), face.subImageJpg());
+    static void clearImage(ImageView view) {
+        view.setImage(null);
+        FACE_THUMBNAILS.forget(view);
     }
 
-    static Image toImage(free.svoss.facesort.model.FaceThumb face) {
-        return face == null ? null : FACE_THUMBNAILS.get(face.id(), face.subImageJpg());
+    /** Builds an empty thumbnail view of the given display size. */
+    private static ImageView newThumbView(double size) {
+        ImageView view = new ImageView();
+        view.setFitWidth(size);
+        view.setFitHeight(size);
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        return view;
     }
 
     /**
@@ -138,34 +165,35 @@ final class FaceUi {
      * @return the configured image view
      */
     static ImageView thumb(Image image, double size) {
-        ImageView view = new ImageView();
+        ImageView view = newThumbView(size);
         view.setImage(image);
-        view.setFitWidth(size);
-        view.setFitHeight(size);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
         return view;
     }
 
     /**
-     * Builds a face thumbnail of the given display size.
+     * Builds a face thumbnail of the given display size, filled in off the
+     * JavaFX application thread once the crop is decoded.
      *
      * @param face the face whose sub-image should be shown
      * @param size the display size (width and height)
      * @return the configured image view
      */
     static ImageView thumb(FaceRecord face, double size) {
-        return thumb(toImage(face), size);
+        ImageView view = newThumbView(size);
+        setImage(view, face);
+        return view;
     }
 
-    static ImageView thumb(free.svoss.facesort.model.FaceThumb face, double size) {
-        return thumb(toImage(face), size);
+    static ImageView thumb(FaceThumb face, double size) {
+        ImageView view = newThumbView(size);
+        setImage(view, face);
+        return view;
     }
 
     /**
      * Builds a candidate card for the given face: a styled {@code VBox}
-     * carrying the face id in its user data and prefilled with the face
-     * thumbnail. Callers append the caption and any action controls.
+     * carrying the face id in its user data and whose face thumbnail is filled
+     * in shortly after. Callers append the caption and any action controls.
      *
      * @param face      the face to render
      * @param thumbSize the thumbnail display size
@@ -181,7 +209,7 @@ final class FaceUi {
         return card;
     }
 
-    static VBox faceCard(free.svoss.facesort.model.FaceThumb face, double thumbSize) {
+    static VBox faceCard(FaceThumb face, double thumbSize) {
         VBox card = new VBox(4);
         card.setAlignment(Pos.TOP_CENTER);
         card.setPadding(new Insets(4));
@@ -221,7 +249,7 @@ final class FaceUi {
         installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
     }
 
-    static void installPathTooltip(Node node, free.svoss.facesort.model.FaceThumb face, String threadName,
+    static void installPathTooltip(Node node, FaceThumb face, String threadName,
                                    Lookup<List<String>> lookup) {
         installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
     }
@@ -574,7 +602,7 @@ final class FaceUi {
             installMenu(node, face.imageHash(), extras);
         }
 
-        void installFaceMenu(Node node, free.svoss.facesort.model.FaceThumb face, MenuItem... extras) {
+        void installFaceMenu(Node node, FaceThumb face, MenuItem... extras) {
             if (face == null) {
                 node.setOnContextMenuRequested(null);
                 return;

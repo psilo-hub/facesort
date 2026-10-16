@@ -3,126 +3,109 @@ package free.svoss.facesort.ui;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Tests for {@link FaceThumbnailCache}, the shared cache of decoded face
- * thumbs keyed by face id and crop content. A {@code String} value type with a
- * counting decoder stands in for the decoded thumbnail, because building a
- * {@code javafx.scene.image.Image} needs a JavaFX toolkit.
+ * Tests for {@link FaceThumbnailCache}, the shared store of decoded face thumbs
+ * keyed by face id and crop content. A {@code String} value type stands in for
+ * the decoded thumbnail, because building a {@code javafx.scene.image.Image}
+ * needs a JavaFX toolkit.
  */
 class FaceThumbnailCacheTest {
-
-    private final AtomicInteger decodes = new AtomicInteger();
-
-    private FaceThumbnailCache<String> cache(int capacity) {
-        return new FaceThumbnailCache<>(capacity, bytes -> {
-            decodes.incrementAndGet();
-            return new String(bytes, StandardCharsets.UTF_8);
-        });
-    }
 
     private static byte[] bytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
     }
 
     @Test
-    void sameFaceIdIsDecodedOnlyOnce() {
-        FaceThumbnailCache<String> cache = cache(10);
+    void aStoredDecodeIsReturned() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(10);
 
-        String first = cache.get(1L, bytes("face-1"));
-        String second = cache.get(1L, bytes("face-1"));
+        cache.put(1L, bytes("a"), "decoded");
 
-        assertEquals("face-1", first);
-        assertSame(first, second, "a resident face id must return the decoded thumbnail");
-        assertEquals(1, decodes.get(), "a resident face id must not be decoded twice");
+        assertEquals("decoded", cache.getIfPresent(1L, bytes("a")));
     }
 
     @Test
-    void differentFaceIdsAreDecodedSeparately() {
-        FaceThumbnailCache<String> cache = cache(10);
+    void aChangedCropForTheSameFaceIdIsNotReturned() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(10);
+        cache.put(1L, bytes("rotated"), "rotated-decode");
 
-        assertEquals("face-1", cache.get(1L, bytes("face-1")));
-        assertEquals("face-2", cache.get(2L, bytes("face-2")));
-
-        assertEquals(2, decodes.get(), "each face id must be decoded on its own");
+        assertNull(cache.getIfPresent(1L, bytes("upright")),
+                "a crop rewritten under its existing face id must not reuse the old decode");
+        assertEquals("rotated-decode", cache.getIfPresent(1L, bytes("rotated")),
+                "the original crop must still be resident under its own key");
     }
 
     @Test
-    void nullBytesReturnNullWithoutDecoding() {
-        FaceThumbnailCache<String> cache = cache(10);
+    void differentFaceIdsAreKeptApart() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(10);
+        cache.put(1L, bytes("same"), "first");
+        cache.put(2L, bytes("same"), "second");
 
-        assertNull(cache.get(1L, null), "a face without a crop has no thumbnail");
-
-        assertEquals(0, decodes.get(), "there is nothing to decode for null bytes");
+        assertEquals("first", cache.getIfPresent(1L, bytes("same")));
+        assertEquals("second", cache.getIfPresent(2L, bytes("same")));
     }
 
     @Test
-    void emptyBytesReturnNullWithoutDecoding() {
-        FaceThumbnailCache<String> cache = cache(10);
+    void aNullCropIsNotResident() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(10);
 
-        assertNull(cache.get(1L, new byte[0]), "an empty crop has no thumbnail");
-
-        assertEquals(0, decodes.get(), "there is nothing to decode for empty bytes");
+        assertNull(cache.getIfPresent(1L, null), "a face without a crop has no decode");
     }
 
     @Test
-    void anEvictedEntryIsDecodedAgain() {
-        FaceThumbnailCache<String> cache = cache(2);
-        cache.get(1L, bytes("face-1"));
-        cache.get(2L, bytes("face-2"));
-        cache.get(3L, bytes("face-3"));
-        assertEquals(3, decodes.get());
+    void anEmptyCropIsNotResident() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(10);
 
-        decodes.set(0);
-        assertEquals("face-1", cache.get(1L, bytes("face-1")));
-
-        assertEquals(1, decodes.get(), "the oldest face id must have been evicted");
+        assertNull(cache.getIfPresent(1L, new byte[0]), "an empty crop has no decode");
     }
 
     @Test
-    void aHitRefreshesTheEntrySoItSurvivesTheNextEviction() {
-        FaceThumbnailCache<String> cache = cache(2);
-        cache.get(1L, bytes("face-1"));
-        cache.get(2L, bytes("face-2"));
+    void aNullCropIsNotStored() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(1);
+        cache.put(1L, bytes("a"), "A");
 
-        cache.get(1L, bytes("face-1"));
-        cache.get(3L, bytes("face-3"));
+        cache.put(2L, null, "ignored");
 
-        decodes.set(0);
-        assertEquals("face-1", cache.get(1L, bytes("face-1")));
-        assertEquals(0, decodes.get(), "the re-read face id must still be resident");
-
-        assertEquals("face-2", cache.get(2L, bytes("face-2")));
-        assertEquals(1, decodes.get(), "the untouched face id must be the one evicted");
+        assertEquals("A", cache.getIfPresent(1L, bytes("a")),
+                "an ignored null-crop store must not evict a resident decode");
+        assertNull(cache.getIfPresent(2L, null), "a null crop could never be looked up again");
     }
 
     @Test
-    void aChangedCropForTheSameFaceIdIsDecodedAgain() {
-        FaceThumbnailCache<String> cache = cache(10);
+    void anEmptyCropIsNotStored() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(1);
+        cache.put(1L, bytes("a"), "A");
 
-        assertEquals("rotated", cache.get(1L, bytes("rotated")));
-        assertEquals("upright", cache.get(1L, bytes("upright")));
+        cache.put(2L, new byte[0], "ignored");
 
-        assertEquals(2, decodes.get(),
-                "a crop rewritten by the face-rotation migration must be decoded afresh");
+        assertEquals("A", cache.getIfPresent(1L, bytes("a")),
+                "an ignored empty-crop store must not evict a resident decode");
+        assertNull(cache.getIfPresent(2L, new byte[0]), "an empty crop could never be looked up again");
     }
 
     @Test
-    void nullDecoderIsRejected() {
-        assertThrows(NullPointerException.class, () -> new FaceThumbnailCache<String>(10, null));
+    void theLeastRecentlyUsedEntryIsEvictedAtCapacity() {
+        FaceThumbnailCache<String> cache = new FaceThumbnailCache<>(2);
+        cache.put(1L, bytes("a"), "A");
+        cache.put(2L, bytes("b"), "B");
+
+        cache.getIfPresent(1L, bytes("a"));
+        cache.put(3L, bytes("c"), "C");
+
+        assertEquals("A", cache.getIfPresent(1L, bytes("a")),
+                "the re-read crop must still be resident");
+        assertNull(cache.getIfPresent(2L, bytes("b")),
+                "the untouched crop must be the one evicted");
     }
 
     @Test
     void nonPositiveCapacityIsRejected() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new FaceThumbnailCache<String>(0, bytes -> "x"));
-        assertThrows(IllegalArgumentException.class,
-                () -> new FaceThumbnailCache<String>(-1, bytes -> "x"));
+        assertThrows(IllegalArgumentException.class, () -> new FaceThumbnailCache<String>(0));
+        assertThrows(IllegalArgumentException.class, () -> new FaceThumbnailCache<String>(-1));
     }
 }

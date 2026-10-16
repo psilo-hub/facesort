@@ -331,8 +331,8 @@ public class DedupeView extends BorderPane {
         pairLabel.setText(I18n.get("ui.dedupe.newSessionHint"));
         nameALabel.setText("");
         nameBLabel.setText("");
-        faceAView.setImage(null);
-        faceBView.setImage(null);
+        FaceUi.clearImage(faceAView);
+        FaceUi.clearImage(faceBView);
         faceActions.installFaceMenu(faceAView);
         faceActions.installFaceMenu(faceBView);
         setDecisionEnabled(false);
