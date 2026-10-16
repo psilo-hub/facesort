@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +98,27 @@ class ViewServiceTest {
         videoDao.insert(videoHash, 0L, "{}", 10.0);
         videoDao.addPath(videoHash, videoPath.toString());
         videoDao.linkFrame(frameHash, videoHash, 1000L);
+    }
+
+    /**
+     * Creates {@code count} names (numbered from {@code firstNumber}) with two
+     * faces each, so a summary card is produced for every one of them.
+     */
+    private void addNamesWithFaces(int firstNumber, int count) throws SQLException {
+        for (int i = firstNumber; i < firstNumber + count; i++) {
+            long nameId = nameDao.insert("Name " + i);
+            addFace("img" + i + "a", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, nameId);
+            addFace("img" + i + "b", new float[]{0, 1, 0, 0, 0, 0, 0, 0}, nameId);
+        }
+    }
+
+    /**
+     * A service whose {@code nameDao} and {@code faceDao} are the recording
+     * view, so the queries of one call can be counted.
+     */
+    private ViewService countingService(QueryCountingConnection counting) {
+        return new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+                new FaceDao(counting.connection()), new NameDao(counting.connection()), imageDao, videoDao);
     }
 
     @Test
@@ -201,6 +224,88 @@ class ViewServiceTest {
         assertEquals("Alice", summaries.get(0).name().name());
         assertEquals(1, summaries.get(0).faceCount());
         assertEquals("frame1", summaries.get(0).representative().imageHash());
+    }
+
+    @Test
+    void getNameSummaries_omitsNamesWithoutFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        nameDao.insert("Bob");
+        addFace("img1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        List<ViewService.NameSummary> summaries = service.getNameSummaries();
+
+        assertEquals(1, summaries.size(), "a name without faces must not get a card");
+        assertEquals("Alice", summaries.get(0).name().name());
+        assertEquals(1, summaries.get(0).faceCount());
+    }
+
+    @Test
+    void getNameSummaries_picksTheRepresentativeClosestToTheAverageEmbedding() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long first = addFace("img1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+        addFace("img2", new float[]{0, 1, 0, 0, 0, 0, 0, 0}, alice);
+        addFace("img3", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+
+        List<ViewService.NameSummary> summaries = service.getNameSummaries();
+
+        assertEquals(3, summaries.get(0).faceCount());
+        assertEquals(first, summaries.get(0).representative().id(),
+                "the face closest to the name's average embedding must represent it");
+    }
+
+    @Test
+    void getNameSummaries_hydratesTheRepresentativeCrop() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addFace("img1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+        addFace("img2", new float[]{0, 1, 0, 0, 0, 0, 0, 0}, alice);
+
+        List<ViewService.NameSummary> summaries = service.getNameSummaries();
+
+        assertNotNull(summaries.get(0).representative().subImageJpg(),
+                "the name card renders the representative's thumbnail, so its crop must be loaded");
+    }
+
+    @Test
+    void getNameSummaries_usesAConstantNumberOfQueriesRegardlessOfTheNumberOfNames() throws SQLException {
+        addNamesWithFaces(0, 5);
+        QueryCountingConnection countingFiveNames = QueryCountingConnection.around(db.getConnection());
+
+        List<ViewService.NameSummary> fiveSummaries = countingService(countingFiveNames).getNameSummaries();
+
+        addNamesWithFaces(5, 15);
+        QueryCountingConnection countingTwentyNames = QueryCountingConnection.around(db.getConnection());
+
+        List<ViewService.NameSummary> twentySummaries = countingService(countingTwentyNames).getNameSummaries();
+
+        assertEquals(5, fiveSummaries.size());
+        assertEquals(20, twentySummaries.size());
+        assertEquals(3, countingFiveNames.statements().size(),
+                "five names must be summarized with exactly three queries — names, slim faces, representatives: "
+                        + countingFiveNames.statements());
+        assertEquals(countingFiveNames.statements().size(), countingTwentyNames.statements().size(),
+                "raising the name count must not raise the query count: " + countingTwentyNames.statements());
+    }
+
+    @Test
+    void getNameSummaries_keepsTheSlimRepresentativeWhenItsFullRowVanishedBeforeHydration() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addFace("img1", new float[]{1, 0, 0, 0, 0, 0, 0, 0}, alice);
+        FaceDao vanishingDao = new FaceDao(db.getConnection()) {
+            @Override
+            public List<FaceRecord> findNamedByIds(List<Long> ids) {
+                return List.of();
+            }
+        };
+        ViewService degradedService = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+                vanishingDao, nameDao, imageDao, videoDao);
+
+        List<ViewService.NameSummary> summaries = degradedService.getNameSummaries();
+
+        assertEquals(1, summaries.size(), "the name must still be summarized");
+        assertEquals("Alice", summaries.get(0).name().name());
+        assertEquals(1, summaries.get(0).faceCount());
+        assertNull(summaries.get(0).representative().subImageJpg(),
+                "without the full row the slim representative is kept, so it carries no crop");
     }
 
     @Test

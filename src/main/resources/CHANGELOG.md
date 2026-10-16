@@ -258,6 +258,11 @@ All notable changes to Face Sort will be documented in this file.
   the app runs, and the newest changes live in the `-wal` file until the app
   closes cleanly. To back up your library, close the app first and copy the
   `config` folder (2026-09-28)
+- Opening the View tab is faster on large libraries (internal, no visible
+  behavior change): the name overview now loads every person's faces in a
+  couple of batch queries instead of one query per name, and reads the crop
+  image only for the representative face it actually shows instead of
+  hydrating it for every face of every name (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -13,7 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -58,20 +60,50 @@ public class ViewService {
      * the name's average embedding. Names without faces (or without usable
      * embeddings) are omitted.</p>
      *
+     * <p>The work is done in a constant number of queries, independent of the
+     * number of names: the names, the embeddings of every name's faces (loaded
+     * without the per-face crops the summary never reads), and then the full
+     * rows of just the selected representatives, whose crops the card renders.
+     * A name added to the library costs no additional query.</p>
+     *
      * @return summaries in name order, without names that have no faces
      * @throws SQLException on database access failure
      */
     public List<NameSummary> getNameSummaries() throws SQLException {
-        List<NameSummary> summaries = new ArrayList<>();
-        for (NameRecord name : nameDao.findAll()) {
-            List<FaceRecord> faces = faceDao.findByNameId(name.id());
+        List<NameRecord> names = nameDao.findAll();
+        if (names.isEmpty()) {
+            return List.of();
+        }
+        List<Long> nameIds = new ArrayList<>(names.size());
+        for (NameRecord name : names) {
+            nameIds.add(name.id());
+        }
+        Map<Long, List<FaceRecord>> facesByName = faceDao.findSlimByNameIds(nameIds);
+
+        List<NameSummary> summaries = new ArrayList<>(names.size());
+        List<Long> representativeIds = new ArrayList<>(names.size());
+        for (NameRecord name : names) {
+            List<FaceRecord> faces = facesByName.get(name.id());
             if (faces.isEmpty()) {
                 continue;
             }
             FaceRecord representative = faceSelector.representativeOf(faces);
             summaries.add(new NameSummary(name, faces.size(), representative));
+            representativeIds.add(representative.id());
         }
-        return summaries;
+
+        Map<Long, FaceRecord> hydrated = new LinkedHashMap<>();
+        for (FaceRecord face : faceDao.findNamedByIds(representativeIds)) {
+            hydrated.put(face.id(), face);
+        }
+        List<NameSummary> result = new ArrayList<>(summaries.size());
+        for (NameSummary summary : summaries) {
+            FaceRecord full = hydrated.get(summary.representative().id());
+            result.add(full == null
+                    ? summary
+                    : new NameSummary(summary.name(), summary.faceCount(), full));
+        }
+        return result;
     }
 
     /**

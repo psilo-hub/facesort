@@ -606,6 +606,150 @@ class FaceDaoTest {
     }
 
     @Test
+    void selectSlimColumns_listTheColumnsTheProjectionReads() {
+        assertEquals(List.of("id", "image_hash", "embedding", "name_id"),
+                Arrays.asList(FaceDao.SELECT_SLIM_COLUMNS.split(",\\s*")),
+                "the slim projection must read identity and embedding, but not the crop");
+    }
+
+    @Test
+    void selectSlimColumns_areASubsetOfTheFullProjection() {
+        List<String> full = Arrays.asList(FaceDao.SELECT_COLUMNS.split(",\\s*"));
+        for (String column : FaceDao.SELECT_SLIM_COLUMNS.split(",\\s*")) {
+            assertTrue(full.contains(column),
+                    "the slim projection must only read columns the full projection also reads: " + column);
+        }
+    }
+
+    @Test
+    void findSlimByNameIds_groupsSlimFacesByNameWithoutHydratingTheCrop() throws Exception {
+        insertImage("imgA");
+        insertImage("imgB");
+        insertImage("imgC");
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long ghost = nameDao.insert("Ghost");
+        long firstAlice = insertFace("imgA", 0, 0, new float[]{1.0f, 0.0f}, alice);
+        insertFace("imgB", 20, 0, new float[]{2.0f, 0.0f}, alice);
+        insertFace("imgC", 0, 0, new float[]{3.0f, 0.0f}, bob);
+
+        Map<Long, List<FaceRecord>> grouped = faceDao.findSlimByNameIds(List.of(alice, bob, ghost));
+
+        assertEquals(new ArrayList<>(List.of(alice, bob, ghost)), new ArrayList<>(grouped.keySet()),
+                "every requested name must be a key, in request order");
+        assertEquals(List.of("imgA", "imgB"),
+                grouped.get(alice).stream().map(FaceRecord::imageHash).toList());
+        FaceRecord slim = grouped.get(alice).get(0);
+        assertEquals(firstAlice, slim.id());
+        assertArrayEquals(new float[]{1.0f, 0.0f}, slim.embedding(),
+                "the embedding must stay hydrated so representatives can be picked");
+        assertTrue(slim.subImageJpg() == null,
+                "the slim projection must not hydrate the per-face crop");
+        assertEquals(List.of(), grouped.get(ghost), "a name with no faces maps to an empty list");
+    }
+
+    @Test
+    void findSlimByNameIds_ignoresDuplicateAndUnknownIds() throws Exception {
+        insertImage("imgA");
+        long alice = nameDao.insert("Alice");
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+
+        Map<Long, List<FaceRecord>> grouped = faceDao.findSlimByNameIds(List.of(alice, alice, 999L));
+
+        assertEquals(List.of("imgA"),
+                grouped.get(alice).stream().map(FaceRecord::imageHash).toList(),
+                "a repeated id must not duplicate its faces");
+        assertEquals(List.of(), grouped.get(999L), "an unknown id maps to an empty list");
+    }
+
+    @Test
+    void findSlimByNameIds_emptyInputYieldsEmptyMap() throws Exception {
+        assertEquals(Map.of(), faceDao.findSlimByNameIds(List.of()));
+    }
+
+    @Test
+    void findSlimByNameIds_doesNotProjectTheCropColumn() throws Exception {
+        insertImage("imgA");
+        long alice = nameDao.insert("Alice");
+        insertFace("imgA", 0, 0, new float[]{1.0f}, alice);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        countingDao.findSlimByNameIds(List.of(alice));
+
+        String sql = String.join("; ", counting.statements());
+        assertFalse(sql.contains("sub_image_jpg"),
+                "representative selection must not hydrate the per-face JPEG: " + sql);
+        assertTrue(sql.contains("embedding"),
+                "representative selection needs the embedding: " + sql);
+    }
+
+    @Test
+    void findSlimByNameIds_chunksTheIdListToStayBelowSqlitesVariableLimit() throws Exception {
+        // 501 ids cannot be bound in one statement, so the DAO must chunk them.
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i < 501; i++) {
+            long nameId = nameDao.insert("Name " + i);
+            insertImage("img" + i);
+            insertFace("img" + i, 0, 0, new float[]{1.0f}, nameId);
+            ids.add(nameId);
+        }
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        Map<Long, List<FaceRecord>> grouped = countingDao.findSlimByNameIds(ids);
+
+        assertEquals(501, grouped.size());
+        assertEquals(2, counting.queriesMatching("FROM faces"),
+                "501 ids must be split into chunks, not bound in one oversized statement");
+    }
+
+    @Test
+    void findNamedByIds_preservesIdOrderAndSkipsMissingIds() throws Exception {
+        insertImage("img1");
+        long alice = nameDao.insert("Alice");
+        long first = insertFace("img1", 0, 0, new float[]{1.0f}, alice);
+        long second = insertFace("img1", 20, 0, new float[]{2.0f}, alice);
+
+        List<FaceRecord> loaded = faceDao.findNamedByIds(List.of(second, 999L, first));
+
+        assertEquals(List.of(second, first), loaded.stream().map(FaceRecord::id).toList(),
+                "the requested id order is kept and unknown ids are skipped");
+    }
+
+    @Test
+    void findNamedByIds_deduplicatesRepeatedIds() throws Exception {
+        insertImage("img1");
+        long alice = nameDao.insert("Alice");
+        long face = insertFace("img1", 0, 0, new float[]{1.0f}, alice);
+
+        List<FaceRecord> loaded = faceDao.findNamedByIds(List.of(face, face));
+
+        assertEquals(List.of(face), loaded.stream().map(FaceRecord::id).toList(),
+                "a repeated id must be loaded once");
+    }
+
+    @Test
+    void findNamedByIds_hydratesTheCropAndExcludesUnnamedFaces() throws Exception {
+        insertImage("img1");
+        long alice = nameDao.insert("Alice");
+        long named = insertFace("img1", 0, 0, new float[]{1.0f}, alice);
+        long unnamed = insertFace("img1", 20, 0, new float[]{2.0f}, null);
+
+        List<FaceRecord> loaded = faceDao.findNamedByIds(List.of(named, unnamed));
+
+        assertEquals(List.of(named), loaded.stream().map(FaceRecord::id).toList(),
+                "only named faces are returned");
+        assertArrayEquals(JPEG, loaded.get(0).subImageJpg(),
+                "the representative's crop must be hydrated");
+    }
+
+    @Test
+    void findNamedByIds_emptyInputYieldsEmptyList() throws Exception {
+        assertEquals(List.of(), faceDao.findNamedByIds(List.of()));
+    }
+
+    @Test
     void reassignAll_movesAllFacesFromOneNameToAnother() throws Exception {
         insertImage("img1");
         long alice = nameDao.insert("Alice");

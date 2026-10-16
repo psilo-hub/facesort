@@ -4,7 +4,7 @@
 
 - [ ] Throttle import progress callbacks to avoid FX thread starvation and stop synchronizing on the caller-owned listener (ImportWorkerPool.reportProgress fires one callback per file, ImportWorkerPool.java:95-120, ImportView.java:246)
 - [ ] Optimize NamingService.findSimilarUnnamed to avoid loading the entire unnamed corpus - extract SimilarityRanker and reuse the HNSW index already used by ClusteringService (NamingService.java:302-326)
-- [ ] Remove the N+1 blob hydration in ViewService.getNameSummaries - it calls faceDao.findByNameId per name and loads embeddings/crops the summary never uses; NameDao.findAll already carries face_count (ViewService.java:64-75)
+- [x] Remove the N+1 blob hydration in ViewService.getNameSummaries - it calls faceDao.findByNameId per name and loads embeddings/crops the summary never uses; NameDao.findAll already carries face_count (ViewService.java:64-75)
 - [ ] Stop issuing one thumbnail query per image in ViewService.getImagesForName - add a batch ImageDao.getThumbnails and pin the query count with QueryCountingConnection (ViewService.java:92-99, ImageDao.java:127-129)
 - [ ] Bound MostSimilarService.findBestSuggestion's per-name scan - it issues two queries per name on every tab refresh; add early exit or per-name caching and a query-count cap test (MostSimilarService.java:74-94)
 - [ ] Decode face thumbnails off the JavaFX application thread and share an LruCache for FaceUi.toImage - it synchronously decodes JPEG bytes on every face-card rebuild (FaceUi.java:109-123)

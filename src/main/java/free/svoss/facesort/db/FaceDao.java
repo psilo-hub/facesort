@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -28,6 +29,14 @@ public class FaceDao {
      */
     static final String SELECT_COLUMNS =
             "id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, embedding, sub_image_jpg, name_id";
+
+    /**
+     * The columns {@link #findSlimByNameIds} projects: identity plus the
+     * embedding needed to pick a name's representative face, without the
+     * heavy {@code sub_image_jpg} crop (and without the bounding box and
+     * confidence, which representative selection does not read).
+     */
+    static final String SELECT_SLIM_COLUMNS = "id, image_hash, embedding, name_id";
 
     /**
      * The predicate every query that offers unnamed faces for tagging appends,
@@ -309,14 +318,75 @@ public class FaceDao {
     }
 
     /**
-     * Maximum number of ids fetched per {@code WHERE id IN (...)} lookup, kept
+     * Maximum number of ids fetched per {@code WHERE ... IN (...)} lookup, kept
      * well below SQLite's variable-number limit so a large {@code limit} cannot
      * exhaust it.
      */
     private static final int MAX_IN_IDS = 500;
 
     /**
-     * Loads the faces with the given ids by primary key.
+     * Maps one row of a {@code faces} query, so the chunked batch lookups can
+     * reuse the ordinary {@code mapRow}-style mappers as method references.
+     *
+     * @param <T> the mapped type
+     */
+    @FunctionalInterface
+    private interface RowMapper<T> {
+        T map(ResultSet rs) throws SQLException;
+    }
+
+    /**
+     * Runs {@code SELECT <columns> FROM faces WHERE <keyColumn> IN (?...)}
+     * once per chunk of at most {@link #MAX_IN_IDS} keys, mapping every row and
+     * grouping it under the key {@code rowKey} reports.
+     *
+     * <p>This is the single chunk loop behind every batched lookup in this DAO:
+     * the callers differ only in the projection, the key column, the extra
+     * predicate and the mapper. Keys are de-duplicated, so a repeated key is
+     * queried once; the returned map holds every requested key, in
+     * first-appearance order, mapping to an empty list when nothing matches.
+     * Callers that must keep repeated keys (the id-ordered {@link #findByIds}
+     * and {@link #findThumbsByIds}) re-expand the map over their id list.</p>
+     *
+     * @param columns        the projection
+     * @param keyColumn      the {@code faces} column the keys are matched against
+     * @param extraPredicate SQL appended after the {@code IN (...)} clause, or {@code ""}
+     * @param keys           the ids to load; must not be {@code null}
+     * @param rowKey         extracts the grouping key from a mapped row
+     * @param mapper         maps a result row
+     * @param <T>            the mapped type
+     * @return the mapped rows grouped by key, in key request order
+     * @throws SQLException on database error
+     */
+    private <T> Map<Long, List<T>> queryGroupedByKey(
+            String columns, String keyColumn, String extraPredicate, List<Long> keys,
+            Function<T, Long> rowKey, RowMapper<T> mapper) throws SQLException {
+        List<Long> distinctKeys = new ArrayList<>(new LinkedHashSet<>(keys));
+        Map<Long, List<T>> byKey = new LinkedHashMap<>();
+        for (Long key : distinctKeys) {
+            byKey.put(key, new ArrayList<>());
+        }
+        for (int from = 0; from < distinctKeys.size(); from += MAX_IN_IDS) {
+            List<Long> chunk = distinctKeys.subList(from, Math.min(distinctKeys.size(), from + MAX_IN_IDS));
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT " + columns + " FROM faces WHERE " + keyColumn + " IN ("
+                            + placeholders(chunk.size()) + ")" + extraPredicate)) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setLong(i + 1, chunk.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    T row = mapper.map(rs);
+                    byKey.get(rowKey.apply(row)).add(row);
+                }
+            }
+        }
+        return byKey;
+    }
+
+    /**
+     * Loads the faces with the given ids by primary key, keeping the requested
+     * id order and repeating an id that was requested twice.
      *
      * @param ids the ids to load; must not be {@code null}
      * @return the matching faces, in the given id order; ids that no longer
@@ -324,66 +394,49 @@ public class FaceDao {
      * @throws SQLException on database error
      */
     private List<FaceRecord> findByIds(List<Long> ids) throws SQLException {
-        if (ids.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, FaceRecord> byId = new LinkedHashMap<>();
-        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
-            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE id IN ("
-                            + placeholders(chunk.size()) + ") AND name_id IS NULL" + NOT_A_FACE_CLAUSE)) {
-                for (int i = 0; i < chunk.size(); i++) {
-                    ps.setLong(i + 1, chunk.get(i));
-                }
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    FaceRecord face = mapRow(rs);
-                    byId.put(face.id(), face);
-                }
-            }
-        }
-        List<FaceRecord> faces = new ArrayList<>(ids.size());
-        for (Long id : ids) {
-            FaceRecord face = byId.get(id);
-            if (face != null) {
-                faces.add(face);
-            }
-        }
-        return faces;
+        Map<Long, List<FaceRecord>> byId = queryGroupedByKey(
+                SELECT_COLUMNS, "id", " AND name_id IS NULL" + NOT_A_FACE_CLAUSE,
+                ids, FaceRecord::id, this::mapRow);
+        return ids.stream().flatMap(id -> byId.get(id).stream()).toList();
     }
 
     /**
-     * Loads face thumbnails with the given ids by primary key (no embeddings).
+     * Loads the named faces with the given ids by primary key, with the full
+     * row including the {@code sub_image_jpg} crop.
+     *
+     * <p>This is the named-only sibling of the private {@link #findByIds} and of
+     * {@link #findById(long)}, which return named <em>and</em> unnamed faces:
+     * the representatives picked from {@link #findSlimByNameIds} are always
+     * tagged, so hydrating them needs a batch that keeps only named rows.</p>
+     *
+     * <p>Ids are de-duplicated and issued in chunks of at most
+     * {@link #MAX_IN_IDS}, so a long id list cannot exhaust SQLite's
+     * variable-number limit. The result keeps the requested id order, and ids
+     * that no longer exist (a row deleted between the id pick and this fetch)
+     * are skipped rather than returned as {@code null}.</p>
+     *
+     * @param ids the ids to load; must not be {@code null}
+     * @return the matching named faces, in the given id order; unknown ids are
+     *         skipped
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findNamedByIds(List<Long> ids) throws SQLException {
+        Map<Long, List<FaceRecord>> byId = queryGroupedByKey(
+                SELECT_COLUMNS, "id", " AND name_id IS NOT NULL",
+                ids, FaceRecord::id, this::mapRow);
+        return byId.keySet().stream().flatMap(id -> byId.get(id).stream()).toList();
+    }
+
+    /**
+     * Loads face thumbnails with the given ids by primary key (no embeddings),
+     * keeping the requested id order.
      */
     private List<free.svoss.facesort.model.FaceThumb> findThumbsByIds(List<Long> ids) throws SQLException {
-        if (ids.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, free.svoss.facesort.model.FaceThumb> byId = new LinkedHashMap<>();
-        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
-            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, sub_image_jpg, name_id"
-                            + " FROM faces WHERE id IN (" + placeholders(chunk.size()) + ") AND name_id IS NULL"
-                            + NOT_A_FACE_CLAUSE)) {
-                for (int i = 0; i < chunk.size(); i++) {
-                    ps.setLong(i + 1, chunk.get(i));
-                }
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    byId.put(rs.getLong("id"), mapThumbRow(rs));
-                }
-            }
-        }
-        List<free.svoss.facesort.model.FaceThumb> faces = new ArrayList<>(ids.size());
-        for (Long id : ids) {
-            free.svoss.facesort.model.FaceThumb face = byId.get(id);
-            if (face != null) {
-                faces.add(face);
-            }
-        }
-        return faces;
+        Map<Long, List<free.svoss.facesort.model.FaceThumb>> byId = queryGroupedByKey(
+                "id, image_hash, bbox_x, bbox_y, bbox_w, bbox_h, confidence, sub_image_jpg, name_id",
+                "id", " AND name_id IS NULL" + NOT_A_FACE_CLAUSE,
+                ids, free.svoss.facesort.model.FaceThumb::id, this::mapThumbRow);
+        return ids.stream().flatMap(id -> byId.get(id).stream()).toList();
     }
 
     /**
@@ -422,27 +475,43 @@ public class FaceDao {
      * @throws SQLException on database error
      */
     public Map<Long, List<FaceRecord>> findByNameIds(List<Long> nameIds) throws SQLException {
-        List<Long> ids = new ArrayList<>(new LinkedHashSet<>(nameIds));
-        Map<Long, List<FaceRecord>> byName = new LinkedHashMap<>();
-        for (Long nameId : ids) {
-            byName.put(nameId, new ArrayList<>());
-        }
-        for (int from = 0; from < ids.size(); from += MAX_IN_IDS) {
-            List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + MAX_IN_IDS));
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT " + SELECT_COLUMNS + " FROM faces WHERE name_id IN ("
-                            + placeholders(chunk.size()) + ")")) {
-                for (int i = 0; i < chunk.size(); i++) {
-                    ps.setLong(i + 1, chunk.get(i));
-                }
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    FaceRecord face = mapRow(rs);
-                    byName.get(face.nameId()).add(face);
-                }
-            }
-        }
-        return byName;
+        return queryGroupedByKey(
+                SELECT_COLUMNS, "name_id", "", nameIds, FaceRecord::nameId, this::mapRow);
+    }
+
+    /**
+     * Loads the faces of every given name in one grouped query set, projecting
+     * only what representative selection needs: the face id, its image hash,
+     * its embedding and its name id.
+     *
+     * <p>This is the batch form of {@link #findByNameId} for a caller that
+     * needs each name's embeddings — picking the face closest to the name's
+     * average embedding, for instance — but not the crops: a name can have
+     * thousands of faces, so hydrating {@code sub_image_jpg} for each of them
+     * is pure waste. Every requested id is a key of the returned map, mapping
+     * to an empty list when the name has no faces, so callers never have to
+     * null-check.</p>
+     *
+     * <p>The returned records are a projection: {@code subImageJpg} is
+     * {@code null} and the bounding box and confidence are zero because those
+     * columns are not read. The embedding is always hydrated and non-null,
+     * exactly as in {@link #findByNameId}, so the records can be fed straight
+     * to similarity math. To get the full row of a chosen representative, load
+     * its id through {@link #findNamedByIds}.</p>
+     *
+     * <p>Ids are de-duplicated and issued in chunks of at most
+     * {@link #MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
+     * variable-number limit. Within a name the faces keep their stored
+     * (rowid) order, exactly as {@link #findByNameId} returns them.</p>
+     *
+     * @param nameIds the name ids to load; must not be {@code null}
+     * @return the slim faces per name id, keyed in the order the ids were
+     *         requested
+     * @throws SQLException on database error
+     */
+    public Map<Long, List<FaceRecord>> findSlimByNameIds(List<Long> nameIds) throws SQLException {
+        return queryGroupedByKey(
+                SELECT_SLIM_COLUMNS, "name_id", "", nameIds, FaceRecord::nameId, this::mapSlimRow);
     }
 
     /**
@@ -656,6 +725,22 @@ public class FaceDao {
         Long nameId = rs.wasNull() ? null : nameIdRaw;
 
         return new FaceRecord(id, imageHash, bboxX, bboxY, bboxW, bboxH, confidence, embedding, subImageJpg, nameId);
+    }
+
+    /**
+     * Maps a {@link #SELECT_SLIM_COLUMNS} row. Only the id, image hash,
+     * embedding and name id are read; the bounding box and confidence are left
+     * at zero and the crop is {@code null}, because the projection does not
+     * load them.
+     */
+    private FaceRecord mapSlimRow(ResultSet rs) throws SQLException {
+        long id = rs.getLong("id");
+        String imageHash = rs.getString("image_hash");
+        float[] embedding = EmbeddingUtils.bytesToFloatArray(rs.getBytes("embedding"));
+        long nameIdRaw = rs.getLong("name_id");
+        Long nameId = rs.wasNull() ? null : nameIdRaw;
+
+        return new FaceRecord(id, imageHash, 0, 0, 0, 0, 0.0, embedding, null, nameId);
     }
 
     private free.svoss.facesort.model.FaceThumb mapThumbRow(ResultSet rs) throws SQLException {
