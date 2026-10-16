@@ -252,19 +252,69 @@ class DatabaseTest {
     }
 
     @Test
-    void newerSchemaVersion_isToleratedWithoutDroppingAnything() throws Exception {
+    void newerSchemaVersion_isRefused() throws Exception {
         Path dbFile = tempDir.resolve("newer.db");
         try (Database db = new Database(dbFile)) {
             db.getConnection().createStatement().execute("PRAGMA user_version = 99");
         }
 
-        try (Database reopened = new Database(dbFile)) {
-            assertEquals(99, userVersion(reopened), "a newer version must not be downgraded");
-            try (Statement stmt = reopened.getConnection().createStatement()) {
-                assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'images'"),
-                        "existing tables must survive opening a newer database");
-            }
+        try {
+            new Database(dbFile);
+        } catch (SchemaVersionTooNewException ex) {
+            assertEquals(99, ex.foundVersion());
+            assertEquals(Database.SCHEMA_VERSION, ex.supportedVersion());
         }
+
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbFile);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
+            assertTrue(rs.next());
+            assertEquals(99, rs.getInt(1));
+        }
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbFile);
+             Statement stmt = conn.createStatement()) {
+            assertEquals(1, countRows(stmt, "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'images'"));
+        }
+        Files.delete(dbFile);
+    }
+
+    @Test
+    void migrationRollsBackOnFailure_andKeepsPreviousSchemaVersion() throws Exception {
+        Path dbFile = tempDir.resolve("rollback.db");
+        // Create v1 schema manually
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbFile);
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE videos (" +
+                    "hash TEXT PRIMARY KEY, detection_ts INTEGER, criteria_json TEXT, duration_secs REAL, " +
+                    "frame_count INTEGER DEFAULT 0, face_count INTEGER DEFAULT 0)");
+            stmt.execute("CREATE TABLE video_frames (" +
+                    "frame_hash TEXT PRIMARY KEY, video_hash TEXT NOT NULL, timestamp_ms INTEGER NOT NULL, " +
+                    "face_count INTEGER DEFAULT 0, " +
+                    "FOREIGN KEY (frame_hash) REFERENCES images(hash) ON DELETE CASCADE, " +
+                    "FOREIGN KEY (video_hash) REFERENCES videos(hash) ON DELETE CASCADE)");
+            // Add minimal tables referenced by FKs if needed for schema sanity
+            stmt.execute("CREATE TABLE images (hash TEXT PRIMARY KEY, detection_ts INTEGER, criteria_json TEXT, face_count INTEGER DEFAULT 0)");
+            stmt.execute("CREATE INDEX idx_videos_face_count ON videos(face_count)");
+            stmt.execute("PRAGMA user_version = 1");
+        }
+
+        try {
+            new Database(dbFile);
+        } catch (Exception ex) {
+            // Expected
+        }
+
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbFile);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+        }
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dbFile);
+             Statement stmt = conn.createStatement()) {
+            assertEquals(1, countRows(stmt, "SELECT count(*) FROM pragma_table_info('videos') WHERE name='face_count'"));
+        }
+        Files.delete(dbFile);
     }
 
     @Test

@@ -201,7 +201,13 @@ public class FaceSortApp extends Application {
         Path configDir = Path.of(AppConfig.DEFAULT_CONFIG_DIR);
         Files.createDirectories(configDir);
         Path dbPath = configDir.resolve(Path.of(config.dbName()));
-        database = new Database(dbPath);
+        try {
+            database = new Database(dbPath);
+        } catch (free.svoss.facesort.db.SchemaVersionTooNewException ex) {
+            showStartupError(I18n.format("app.databaseTooNew", ex.foundVersion(), ex.supportedVersion()), ex);
+            Platform.exit();
+            return;
+        }
         Connection connection = database.getConnection();
 
         // 3. DAO layer.

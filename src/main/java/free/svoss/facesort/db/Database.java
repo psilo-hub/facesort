@@ -42,12 +42,24 @@ public class Database implements AutoCloseable {
      */
     public Database(Path dbPath) throws SQLException {
         String url = "jdbc:sqlite:" + dbPath.toAbsolutePath();
-        this.connection = DriverManager.getConnection(url);
-        configure(connection);
-        initializeSchema();
-        SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
-        this.sharedConnection = synchronizing.proxy();
-        this.transactionRunner = new TransactionRunner(synchronizing);
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(url);
+            this.connection = conn;
+            configure(connection);
+            initializeSchema();
+            SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
+            this.sharedConnection = synchronizing.proxy();
+            this.transactionRunner = new TransactionRunner(synchronizing);
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException ignored) {
+                }
+            }
+            throw e;
+        }
     }
 
     /**
@@ -59,12 +71,24 @@ public class Database implements AutoCloseable {
     }
 
     private Database() throws SQLException {
-        this.connection = DriverManager.getConnection("jdbc:sqlite::memory:");
-        configure(connection);
-        initializeSchema();
-        SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
-        this.sharedConnection = synchronizing.proxy();
-        this.transactionRunner = new TransactionRunner(synchronizing);
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection("jdbc:sqlite::memory:");
+            this.connection = conn;
+            configure(connection);
+            initializeSchema();
+            SynchronizedConnection synchronizing = new SynchronizedConnection(connection);
+            this.sharedConnection = synchronizing.proxy();
+            this.transactionRunner = new TransactionRunner(synchronizing);
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException ignored) {
+                }
+            }
+            throw e;
+        }
     }
 
     /**
@@ -122,13 +146,9 @@ public class Database implements AutoCloseable {
         try (Statement stmt = connection.createStatement()) {
             int version = userVersion(stmt);
             if (version > SCHEMA_VERSION) {
-                LOG.log(Level.WARNING,
-                        "Database schema version {0} is newer than the version this build supports "
-                                + "({1}); opening without migrating",
-                        new Object[]{version, SCHEMA_VERSION});
+                throw new SchemaVersionTooNewException(version, SCHEMA_VERSION);
             } else if (version < SCHEMA_VERSION) {
-                migrate(stmt, version);
-                stmt.execute("PRAGMA user_version = " + SCHEMA_VERSION);
+                migrate(version);
             }
             // Refresh query planner statistics after schema changes/open
             try {
@@ -152,54 +172,70 @@ public class Database implements AutoCloseable {
     /**
      * Brings the schema from {@code fromVersion} up to the current schema
      * version. Version 0 means either a brand-new database or an unversioned
-     * database created by an older build, so the baseline DDL is applied; as
-     * the DDL is written with {@code IF NOT EXISTS} throughout it safely
-     * covers both cases. Further changes append their own versioned statements
-     * here, chained from the version they start at.
+     * database created by an older build, so the baseline DDL is applied.
+     * Each migration step runs in its own transaction.
      */
-    private static void migrate(Statement stmt, int fromVersion) throws SQLException {
-        if (fromVersion <= 0) {
-            createBaselineSchema(stmt);
+    private void migrate(int fromVersion) throws SQLException {
+        if (fromVersion < 1) {
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createBaselineSchema(stmt);
+                stmt.execute("PRAGMA user_version = " + 1);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
+
         if (fromVersion < 2) {
-            // Version 2 drops the stored count columns on videos /
-            // video_frames; they were written but never read (frame and face
-            // counts are computed live in VideoDao.findByHash). Drop them only
-            // when present so a brand-new baseline (which no longer declares
-            // them) is a no-op.
-            dropColumnIfPresent(stmt, "videos", "frame_count");
-            dropColumnIfPresent(stmt, "videos", "face_count");
-            dropColumnIfPresent(stmt, "video_frames", "face_count");
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                dropColumnIfPresent(stmt, "videos", "frame_count");
+                dropColumnIfPresent(stmt, "videos", "face_count");
+                dropColumnIfPresent(stmt, "video_frames", "face_count");
+                stmt.execute("PRAGMA user_version = " + 2);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
+
         if (fromVersion < 3) {
-            // Version 3 indexes the path column of both path tables, which the
-            // path filter of the tagging views and the removal by path prefix
-            // read as a lexicographic range. A brand-new baseline already
-            // declares them, so there the IF NOT EXISTS makes this a no-op.
-            createPathIndexes(stmt);
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createPathIndexes(stmt);
+                stmt.execute("PRAGMA user_version = " + 3);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
+
         if (fromVersion < 4) {
-            // Version 4 records the faces the user dismissed as "not a face"
-            // so the unnamed-face queries can leave them out. A brand-new
-            // baseline already declares the table, so there the IF NOT EXISTS
-            // makes this a no-op.
-            createNotFacesTable(stmt);
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createNotFacesTable(stmt);
+                stmt.execute("PRAGMA user_version = " + 4);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
+
         if (fromVersion < 5) {
-            // Version 5 adds the meta key/value table used for bookkeeping
-            // flags that are not part of the user's data, such as whether the
-            // one-time face-rotation migration already ran. A brand-new
-            // baseline already declares the table, so there the IF NOT EXISTS
-            // makes this a no-op.
-            createMetaTable(stmt);
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createMetaTable(stmt);
+                stmt.execute("PRAGMA user_version = " + 5);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
+
         if (fromVersion < 6) {
-            // Version 6 records the face/name combinations the user rejected
-            // as "not the same person" in the "Most similar" tab, so both that
-            // tab and the "Add faces to a name" tab stop offering them. A
-            // brand-new baseline already declares the table, so there the
-            // IF NOT EXISTS makes this a no-op.
-            createNotMatchesTable(stmt);
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createNotMatchesTable(stmt);
+                stmt.execute("PRAGMA user_version = " + 6);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
         }
     }
 
