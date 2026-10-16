@@ -4,9 +4,9 @@ FaceSort — project todo
 State as of 2026-10-15. `mvn test` is green: 559 tests / 60 test classes,
 0 failures, 0 skipped.
 
-The detailed backlog lives in `suggestions.md` (24 open items, with the
-rationale, the file/line references and the notes for everything already
-done). This file is the short version: what just landed, and what is
+The detailed backlog lives in `suggestions.md` (36 open items, with the
+rationale and the file/line references; items already done are removed
+from it). This file is the short version: what just landed, and what is
 queued next. Keep both in sync in the same commit (see `AGENTS.md`).
 
 
