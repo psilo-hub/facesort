@@ -263,6 +263,10 @@ All notable changes to Face Sort will be documented in this file.
   couple of batch queries instead of one query per name, and reads the crop
   image only for the representative face it actually shows instead of
   hydrating it for every face of every name (2026-10-16)
+- Opening a name's image grid in the View tab is faster on large libraries
+  (internal, no visible behavior change): the thumbnails are now loaded in a
+  single batch query instead of one query per image, so the work no longer
+  grows with the number of images a person appears in (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

@@ -60,11 +60,11 @@ public class ViewService {
      * the name's average embedding. Names without faces (or without usable
      * embeddings) are omitted.</p>
      *
-     * <p>The work is done in a constant number of queries, independent of the
-     * number of names: the names, the embeddings of every name's faces (loaded
-     * without the per-face crops the summary never reads), and then the full
-     * rows of just the selected representatives, whose crops the card renders.
-     * A name added to the library costs no additional query.</p>
+     * <p>Three queries cover up to 500 names — the names, the embeddings of
+     * every name's faces (loaded without the per-face crops the summary never
+     * reads), and then the full rows of just the selected representatives,
+     * whose crops the card renders — and only one extra query per further 500 is
+     * added, so the count does not grow with the number of names.</p>
      *
      * @return summaries in name order, without names that have no faces
      * @throws SQLException on database access failure
@@ -110,9 +110,12 @@ public class ViewService {
      * Returns the distinct images that contain at least one face with the given
      * name, together with their stored thumbnails.
      *
-     * <p>Only the images are read, not the faces: the grid shows image
-     * thumbnails, so the per-face embedding and sub-image JPEG are never
-     * hydrated.</p>
+     * <p>Two queries load the grid for up to 500 images — the distinct image
+     * hashes, then all their thumbnails in one batched lookup — and only one
+     * extra thumbnail query per further 500 is added, so the query count does
+     * not grow with the number of images. Only the images are read, not the
+     * faces: the grid shows image thumbnails, so the per-face embedding and
+     * sub-image JPEG are never hydrated.</p>
      *
      * <p>Thumbnail data may be {@code null} for an image when none is stored yet;
      * the UI decides how to render that case.</p>
@@ -123,9 +126,10 @@ public class ViewService {
      */
     public List<NamedImage> getImagesForName(long nameId) throws SQLException {
         List<String> hashes = faceDao.findImageHashesByNameId(nameId);
+        Map<String, byte[]> thumbnails = imageDao.getThumbnails(hashes);
         List<NamedImage> images = new ArrayList<>(hashes.size());
         for (String hash : hashes) {
-            images.add(new NamedImage(hash, imageDao.getThumbnail(hash)));
+            images.add(new NamedImage(hash, thumbnails.get(hash)));
         }
         return images;
     }

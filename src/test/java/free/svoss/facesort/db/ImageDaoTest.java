@@ -7,8 +7,11 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -102,6 +105,70 @@ class ImageDaoTest {
         byte[] jpeg2 = new byte[]{9, 9};
         dao.saveThumbnail("hash1", jpeg2);
         assertTrue(java.util.Arrays.equals(jpeg2, dao.getThumbnail("hash1")));
+    }
+
+    @Test
+    void getThumbnails_returnsStoredBytesForEveryHashWithOne() throws Exception {
+        insertImage("h1", 0);
+        insertImage("h2", 0);
+        dao.saveThumbnail("h1", new byte[]{1, 2, 3});
+        dao.saveThumbnail("h2", new byte[]{9, 8});
+
+        Map<String, byte[]> thumbnails = dao.getThumbnails(List.of("h1", "h2"));
+
+        assertArrayEquals(new byte[]{1, 2, 3}, thumbnails.get("h1"));
+        assertArrayEquals(new byte[]{9, 8}, thumbnails.get("h2"));
+    }
+
+    @Test
+    void getThumbnails_omitsHashesWithoutAStoredThumbnail() throws Exception {
+        insertImage("withThumb", 0);
+        insertImage("withoutThumb", 0);
+        dao.saveThumbnail("withThumb", new byte[]{7});
+
+        Map<String, byte[]> thumbnails = dao.getThumbnails(List.of("withThumb", "withoutThumb"));
+
+        assertArrayEquals(new byte[]{7}, thumbnails.get("withThumb"));
+        assertFalse(thumbnails.containsKey("withoutThumb"),
+                "a hash without a stored thumbnail must be absent from the map");
+        assertNull(thumbnails.get("withoutThumb"),
+                "an absent hash resolves to null, like the single getThumbnail does");
+    }
+
+    @Test
+    void getThumbnails_ignoresDuplicateAndUnknownHashes() throws Exception {
+        insertImage("h1", 0);
+        dao.saveThumbnail("h1", new byte[]{5});
+
+        Map<String, byte[]> thumbnails = dao.getThumbnails(List.of("h1", "h1", "missing"));
+
+        assertEquals(1, thumbnails.size(), "a repeated hash is loaded once; unknown hashes add nothing");
+        assertArrayEquals(new byte[]{5}, thumbnails.get("h1"));
+    }
+
+    @Test
+    void getThumbnails_emptyInputYieldsEmptyMap() throws Exception {
+        assertTrue(dao.getThumbnails(List.of()).isEmpty());
+    }
+
+    @Test
+    void getThumbnails_chunksTheHashListToStayBelowSqlitesVariableLimit() throws Exception {
+        // 501 hashes cannot be bound in one statement, so the DAO must chunk them.
+        List<String> hashes = new ArrayList<>();
+        for (int i = 0; i < 501; i++) {
+            String hash = "h" + i;
+            insertImage(hash, 0);
+            dao.saveThumbnail(hash, new byte[]{(byte) i});
+            hashes.add(hash);
+        }
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        ImageDao countingDao = new ImageDao(counting.connection());
+
+        Map<String, byte[]> thumbnails = countingDao.getThumbnails(hashes);
+
+        assertEquals(501, thumbnails.size());
+        assertEquals(2, counting.queriesMatching("FROM thumbnails"),
+                "501 hashes must be split into chunks, not bound in one oversized statement");
     }
 
     @Test

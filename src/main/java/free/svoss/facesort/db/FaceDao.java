@@ -13,8 +13,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Data access object for the faces table.
@@ -318,13 +316,6 @@ public class FaceDao {
     }
 
     /**
-     * Maximum number of ids fetched per {@code WHERE ... IN (...)} lookup, kept
-     * well below SQLite's variable-number limit so a large {@code limit} cannot
-     * exhaust it.
-     */
-    private static final int MAX_IN_IDS = 500;
-
-    /**
      * Maps one row of a {@code faces} query, so the chunked batch lookups can
      * reuse the ordinary {@code mapRow}-style mappers as method references.
      *
@@ -337,8 +328,8 @@ public class FaceDao {
 
     /**
      * Runs {@code SELECT <columns> FROM faces WHERE <keyColumn> IN (?...)}
-     * once per chunk of at most {@link #MAX_IN_IDS} keys, mapping every row and
-     * grouping it under the key {@code rowKey} reports.
+     * once per chunk of at most {@link SqlIdChunks#MAX_IN_IDS} keys, mapping
+     * every row and grouping it under the key {@code rowKey} reports.
      *
      * <p>This is the single chunk loop behind every batched lookup in this DAO:
      * the callers differ only in the projection, the key column, the extra
@@ -366,11 +357,10 @@ public class FaceDao {
         for (Long key : distinctKeys) {
             byKey.put(key, new ArrayList<>());
         }
-        for (int from = 0; from < distinctKeys.size(); from += MAX_IN_IDS) {
-            List<Long> chunk = distinctKeys.subList(from, Math.min(distinctKeys.size(), from + MAX_IN_IDS));
+        for (List<Long> chunk : SqlIdChunks.partition(distinctKeys)) {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT " + columns + " FROM faces WHERE " + keyColumn + " IN ("
-                            + placeholders(chunk.size()) + ")" + extraPredicate)) {
+                            + SqlIdChunks.placeholders(chunk.size()) + ")" + extraPredicate)) {
                 for (int i = 0; i < chunk.size(); i++) {
                     ps.setLong(i + 1, chunk.get(i));
                 }
@@ -410,7 +400,7 @@ public class FaceDao {
      * tagged, so hydrating them needs a batch that keeps only named rows.</p>
      *
      * <p>Ids are de-duplicated and issued in chunks of at most
-     * {@link #MAX_IN_IDS}, so a long id list cannot exhaust SQLite's
+     * {@link SqlIdChunks#MAX_IN_IDS}, so a long id list cannot exhaust SQLite's
      * variable-number limit. The result keeps the requested id order, and ids
      * that no longer exist (a row deleted between the id pick and this fetch)
      * are skipped rather than returned as {@code null}.</p>
@@ -466,7 +456,7 @@ public class FaceDao {
      * no faces, so callers never have to null-check.</p>
      *
      * <p>Ids are de-duplicated and issued in chunks of at most
-     * {@link #MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
+     * {@link SqlIdChunks#MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
      * variable-number limit. Within a name the faces keep their stored
      * (rowid) order, exactly as {@link #findByNameId} returns them.</p>
      *
@@ -500,7 +490,7 @@ public class FaceDao {
      * its id through {@link #findNamedByIds}.</p>
      *
      * <p>Ids are de-duplicated and issued in chunks of at most
-     * {@link #MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
+     * {@link SqlIdChunks#MAX_IN_IDS}, so a large name list cannot exhaust SQLite's
      * variable-number limit. Within a name the faces keep their stored
      * (rowid) order, exactly as {@link #findByNameId} returns them.</p>
      *
@@ -512,13 +502,6 @@ public class FaceDao {
     public Map<Long, List<FaceRecord>> findSlimByNameIds(List<Long> nameIds) throws SQLException {
         return queryGroupedByKey(
                 SELECT_SLIM_COLUMNS, "name_id", "", nameIds, FaceRecord::nameId, this::mapSlimRow);
-    }
-
-    /**
-     * Returns a comma-separated list of {@code count} bind placeholders.
-     */
-    private static String placeholders(int count) {
-        return IntStream.range(0, count).mapToObj(i -> "?").collect(Collectors.joining(","));
     }
 
     /**

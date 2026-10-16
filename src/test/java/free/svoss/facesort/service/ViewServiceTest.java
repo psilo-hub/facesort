@@ -121,6 +121,25 @@ class ViewServiceTest {
                 new FaceDao(counting.connection()), new NameDao(counting.connection()), imageDao, videoDao);
     }
 
+    /**
+     * A service whose {@code faceDao} and {@code imageDao} both record through
+     * the given counter, so every query of a name's image grid is counted.
+     */
+    private ViewService countingImageService(QueryCountingConnection counting) {
+        return new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+                new FaceDao(counting.connection()), nameDao, new ImageDao(counting.connection()), videoDao);
+    }
+
+    /**
+     * Tags {@code count} distinct images (numbered from {@code firstNumber}) with
+     * the given name, one face each, so the grid has one entry per image.
+     */
+    private void addImagesWithNamedFace(long nameId, int firstNumber, int count) throws SQLException {
+        for (int i = firstNumber; i < firstNumber + count; i++) {
+            addFace("grid" + i, new float[]{1, 0, 0, 0, 0, 0, 0, 0}, nameId);
+        }
+    }
+
     @Test
     void untagFacesFromImage_clearsNameFromFacesOfThatImageOnly() throws SQLException {
         long alice = nameDao.insert("Alice");
@@ -188,12 +207,13 @@ class ViewServiceTest {
         faceDao.insert(new FaceRecord(0, "imgB", 0, 0, 80, 80, 0.9,
                 new float[]{1, 0, 0, 0, 0, 0, 0, 0}, new byte[]{1}, alice));
         QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
-        ViewService countingService = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
-                new FaceDao(counting.connection()), nameDao, imageDao, videoDao);
+        ViewService countingService = countingImageService(counting);
 
         assertEquals(2, countingService.getImagesForName(alice).size());
 
         String sql = String.join("; ", counting.statements());
+        assertTrue(sql.contains("FROM thumbnails"),
+                "the grid's thumbnails must go through the counting connection too, or this test cannot see them: " + sql);
         assertFalse(sql.contains("sub_image_jpg"),
                 "the View tab renders image thumbnails, so it must not read a per-face JPEG: " + sql);
         assertFalse(sql.contains("embedding"),
@@ -211,6 +231,30 @@ class ViewServiceTest {
         assertEquals("frame1", images.get(0).hash());
         assertArrayEquals(new byte[]{9, 8, 7}, images.get(0).thumbnailJpg(),
                 "the frame thumbnail must be presented");
+    }
+
+    @Test
+    void getImagesForName_usesAConstantNumberOfQueriesRegardlessOfTheNumberOfImages() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImagesWithNamedFace(alice, 0, 5);
+        QueryCountingConnection countingFiveImages = QueryCountingConnection.around(db.getConnection());
+
+        List<ViewService.NamedImage> fiveImages =
+                countingImageService(countingFiveImages).getImagesForName(alice);
+
+        addImagesWithNamedFace(alice, 5, 15);
+        QueryCountingConnection countingTwentyImages = QueryCountingConnection.around(db.getConnection());
+
+        List<ViewService.NamedImage> twentyImages =
+                countingImageService(countingTwentyImages).getImagesForName(alice);
+
+        assertEquals(5, fiveImages.size());
+        assertEquals(20, twentyImages.size());
+        assertEquals(2, countingFiveImages.statements().size(),
+                "the image grid must load with exactly two queries — the hashes, then the thumbnails: "
+                        + countingFiveImages.statements());
+        assertEquals(countingFiveImages.statements().size(), countingTwentyImages.statements().size(),
+                "raising the image count must not raise the query count: " + countingTwentyImages.statements());
     }
 
     @Test

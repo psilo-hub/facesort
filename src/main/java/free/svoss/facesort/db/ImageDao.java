@@ -4,7 +4,10 @@ import free.svoss.facesort.model.ImageRecord;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -134,6 +137,52 @@ public class ImageDao {
             }
             return null;
         }
+    }
+
+    /**
+     * Returns the stored JPEG thumbnails of every given image hash, loaded in
+     * batched queries.
+     *
+     * <p>This is the batch form of {@link #getThumbnail(String)}: a caller that
+     * needs the thumbnails of many images — the grid of images a name appears
+     * in, for instance — would otherwise issue one query per image. Here a
+     * single statement loads up to {@link SqlIdChunks#MAX_IN_IDS} hashes and
+     * only one extra statement is added per further
+     * {@link SqlIdChunks#MAX_IN_IDS}, so the query count no longer grows with
+     * the image count one for one.</p>
+     *
+     * <p>Every requested hash that has a stored thumbnail is a key of the
+     * returned map, carrying its bytes. A requested hash with no stored
+     * thumbnail is simply <em>absent</em> from the map, so {@code get} on it
+     * yields {@code null} — the same result {@link #getThumbnail(String)}
+     * returns for a missing thumbnail. A caller therefore cannot tell a missing
+     * thumbnail from an unknown hash, and does not need to: both mean "no
+     * thumbnail".</p>
+     *
+     * <p>Hashes are de-duplicated and chunked at {@link SqlIdChunks#MAX_IN_IDS}
+     * — the SQLite-safe bind batch size — before they are issued.</p>
+     *
+     * @param hashes the image hashes to load; must not be {@code null}
+     * @return the stored thumbnails by hash; a hash without one is absent
+     * @throws SQLException on database error
+     */
+    public Map<String, byte[]> getThumbnails(List<String> hashes) throws SQLException {
+        List<String> distinct = new ArrayList<>(new LinkedHashSet<>(hashes));
+        Map<String, byte[]> thumbnails = new LinkedHashMap<>();
+        for (List<String> chunk : SqlIdChunks.partition(distinct)) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT hash, jpg_data FROM thumbnails WHERE hash IN ("
+                            + SqlIdChunks.placeholders(chunk.size()) + ")")) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setString(i + 1, chunk.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    thumbnails.put(rs.getString("hash"), rs.getBytes("jpg_data"));
+                }
+            }
+        }
+        return thumbnails;
     }
 
     /**
