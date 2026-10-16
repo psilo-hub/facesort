@@ -227,6 +227,7 @@ public class ImportView extends BorderPane {
                 removal.thumbnails(), removal.faceSubImages());
         statusLabel.setText(summary);
         appendLog(summary);
+        FaceUi.invalidatePathCache(); // the hovered paths may have changed
     }
 
     /**
@@ -283,6 +284,7 @@ public class ImportView extends BorderPane {
                 statusLabel.setText(formatSummaries(result));
                 appendLog(I18n.get("ui.import.finished"));
             }
+            FaceUi.invalidatePathCache(); // the hovered paths may have changed
         });
 
         task.setOnFailed(e -> {

@@ -283,6 +283,11 @@ All notable changes to Face Sort will be documented in this file.
   so importing thousands of photos no longer queues a UI update for every
   single file. The newest progress is always shown, including the last one
   (2026-10-16)
+- Face path tooltips are resolved on one shared background thread and each
+  photo's stored paths are looked up only once, so building a large face grid
+  no longer starts a background thread and a database lookup per face. The
+  remembered paths are dropped after an import or a removal by path prefix
+  (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

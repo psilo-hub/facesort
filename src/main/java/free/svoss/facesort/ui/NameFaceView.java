@@ -210,7 +210,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
                 clusterIndex + 1, clusters.size(), cluster.faces().size()));
         FaceUi.setImage(representativeView, cluster.representative());
         FaceUi.installPathTooltip(representativeView, cluster.representative(),
-                "nameface-path-tooltip-", namingService::findImagePaths);
+                namingService::findImagePaths);
         faceActions.installFaceMenu(representativeView, cluster.representative());
         nameField.clear();
         candidatesPane.getChildren().clear();

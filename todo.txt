@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-16. `mvn test` is green: 623 tests / 64 test classes,
+State as of 2026-10-16. `mvn test` is green: 636 tests / 65 test classes,
 0 failures, 0 skipped.
 
 All work is tracked in `suggestions.md` (36 items, with the rationale and the

@@ -15,8 +15,8 @@ import java.util.function.Supplier;
  * once per rebuild. The loader runs at most once per key while the entry is
  * resident.</p>
  *
- * <p>Instances are not thread-safe; they are meant to be read on the UI
- * thread.</p>
+ * <p>Instances are not thread-safe; any shared use must synchronize externally.
+ * The UI-side caches read it on the UI thread.</p>
  *
  * @param <K> the key type
  * @param <V> the value type
@@ -69,8 +69,9 @@ final class LruCache<K, V> {
      * {@code null} when the key is not resident. A resident entry counts as a
      * read, so it survives the next eviction over an entry that was not read.
      *
-     * <p>Entries are stored non-null (see {@code put}), so a {@code null}
-     * result means the key is not resident.</p>
+     * <p>{@link #put} rejects null values, but {@link #get} stores whatever its
+     * loader returns, so a {@code null} result does not prove the key is
+     * absent.</p>
      *
      * @param key the key to look up; must not be null
      * @return the resident value, or {@code null} when absent
@@ -91,5 +92,13 @@ final class LruCache<K, V> {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
         entries.put(key, value);
+    }
+
+    /**
+     * Removes every entry, so a stale value cannot outlive the data it was
+     * derived from.
+     */
+    void clear() {
+        entries.clear();
     }
 }

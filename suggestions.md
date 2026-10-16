@@ -8,7 +8,7 @@
 - [x] Stop issuing one thumbnail query per image in ViewService.getImagesForName - add a batch ImageDao.getThumbnails and pin the query count with QueryCountingConnection (ViewService.java:92-99, ImageDao.java:127-129)
 - [ ] Bound MostSimilarService.findBestSuggestion's per-name scan - it issues two queries per name on every tab refresh; add early exit or per-name caching and a query-count cap test (MostSimilarService.java:74-94)
 - [x] Decode face thumbnails off the JavaFX application thread and share an LruCache for FaceUi.toImage - it synchronously decodes JPEG bytes on every face-card rebuild (FaceUi.java:109-123)
-- [ ] Replace the thread-per-tooltip in FaceUi.installPathTooltip with a small shared executor and cache resolved paths per face (FaceUi.java:222-242)
+- [x] Replace the thread-per-tooltip in FaceUi.installPathTooltip with a small shared executor and cache resolved paths per image hash, invalidated when the stored paths change (FaceUi.java:222-242)
 
 ## Clean code
 

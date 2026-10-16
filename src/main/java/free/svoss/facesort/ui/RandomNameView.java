@@ -209,7 +209,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
         for (FaceThumb face : faces) {
             VBox card = FaceUi.faceCard(face, THUMBNAIL_SIZE);
 
-            FaceUi.installPathTooltip(card, face, "randomname-path-tooltip-",
+            FaceUi.installPathTooltip(card, face,
                     namingService::findImagePaths);
 
             Label idLabel = new Label(I18n.format("ui.randomName.idPrefix", face.id()));

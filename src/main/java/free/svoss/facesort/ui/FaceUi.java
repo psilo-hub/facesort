@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -50,6 +51,12 @@ final class FaceUi {
     /** Upper bound of the shared decoded-face-thumbnail cache. */
     private static final int FACE_THUMBNAIL_CACHE_CAPACITY = 256;
 
+    /**
+     * Upper bound of the shared stored-path cache: enough image hashes that the
+     * visible faces of a typical grid and their photos stay resident.
+     */
+    private static final int PATH_CACHE_CAPACITY = 512;
+
     /** Decodes face crops off the JavaFX application thread so grids do not stall. */
     private static final Executor FACE_THUMBNAIL_DECODES = FaceThumbnailLoader.decoderPool();
 
@@ -63,8 +70,28 @@ final class FaceUi {
             new FaceThumbnailLoader<>(FACE_THUMBNAIL_CACHE_CAPACITY,
                     FaceUi::decodeCrop, FACE_THUMBNAIL_DECODES, Platform::runLater);
 
+    /**
+     * Stored image paths shared by every face view and resolved on one daemon
+     * thread, so a grid does not start a thread and a lookup per face card and
+     * the faces of the same photo share the result.
+     */
+    private static final PathLookupCache PATH_LOOKUPS =
+            new PathLookupCache(pathLookupExecutor(), PATH_CACHE_CAPACITY);
+
     private FaceUi() {
         // Utility class - not instantiable
+    }
+
+    /**
+     * Returns the executor for path lookups: a single daemon thread, because
+     * database access is serialized anyway, so one thread is enough.
+     */
+    private static Executor pathLookupExecutor() {
+        return Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "face-path-tooltip");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     /**
@@ -234,46 +261,51 @@ final class FaceUi {
 
     /**
      * Installs a hover tooltip showing the on-disk paths of the face's source
-     * image. The paths are looked up asynchronously on a daemon thread so the
-     * UI stays responsive; the tooltip shows progress and fallback states. The
-     * thread is not routed through the view's {@link TaskRunner}, so the
+     * image. The paths are resolved through a shared background thread (see
+     * {@link PathLookupCache}) and remembered per image hash, so a grid does not
+     * start a thread per face card and the faces of the same photo share the
+     * result. The tooltip shows progress and fallback states.
+     * The lookup is not routed through the view's {@link TaskRunner}, so the
      * tooltip check never cancels the view's active task.
      *
-     * @param node       the node to attach the tooltip to
-     * @param face       the face whose source image paths should be shown
-     * @param threadName base name of the daemon thread (the face id is appended)
-     * @param lookup     resolves the stored paths for an image hash
+     * @param node   the node to attach the tooltip to
+     * @param face   the face whose source image paths should be shown
+     * @param lookup resolves the stored paths for an image hash
      */
-    static void installPathTooltip(Node node, FaceRecord face, String threadName,
-                                   Lookup<List<String>> lookup) {
-        installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
+    static void installPathTooltip(Node node, FaceRecord face, Lookup<List<String>> lookup) {
+        installPathTooltip(node, face.imageHash(), lookup);
     }
 
-    static void installPathTooltip(Node node, FaceThumb face, String threadName,
-                                   Lookup<List<String>> lookup) {
-        installPathTooltip(node, face.imageHash(), face.id(), threadName, lookup);
+    static void installPathTooltip(Node node, FaceThumb face, Lookup<List<String>> lookup) {
+        installPathTooltip(node, face.imageHash(), lookup);
     }
 
-    private static void installPathTooltip(Node node, String imageHash, long faceId, String threadName,
-                                         Lookup<List<String>> lookup) {
+    private static void installPathTooltip(Node node, String imageHash,
+                                           Lookup<List<String>> lookup) {
         Tooltip tooltip = new Tooltip(I18n.get("common.loadingPath"));
         Tooltip.install(node, tooltip);
-        Task<List<String>> paths = new Task<>() {
-            @Override
-            protected List<String> call() throws SQLException {
-                return lookup.byHash(imageHash);
-            }
-        };
-        paths.setOnSucceeded(e -> {
-            List<String> result = paths.getValue();
-            tooltip.setText(result.isEmpty()
-                    ? I18n.get("common.noStoredPath")
-                    : String.join(System.lineSeparator(), result));
-        });
-        paths.setOnFailed(e -> tooltip.setText(I18n.get("common.pathUnavailable")));
-        Thread thread = new Thread(paths, threadName + faceId);
-        thread.setDaemon(true);
-        thread.start();
+        PATH_LOOKUPS.lookup(imageHash, lookup,
+                paths -> Platform.runLater(() -> tooltip.setText(tooltipText(paths))),
+                failure -> Platform.runLater(
+                        () -> tooltip.setText(I18n.get("common.pathUnavailable"))));
+    }
+
+    /**
+     * Forgets the remembered stored paths; call when the stored image paths
+     * change, so the next hover reflects the new rows instead of a stale answer.
+     */
+    static void invalidatePathCache() {
+        PATH_LOOKUPS.clear();
+    }
+
+    /**
+     * Formats the stored paths for a tooltip, or the "nothing stored" hint when
+     * the image has no rows.
+     */
+    private static String tooltipText(List<String> paths) {
+        return paths.isEmpty()
+                ? I18n.get("common.noStoredPath")
+                : String.join(System.lineSeparator(), paths);
     }
 
     /**

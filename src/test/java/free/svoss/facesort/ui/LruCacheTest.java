@@ -104,4 +104,19 @@ class LruCacheTest {
         assertThrows(NullPointerException.class, () -> cache.get(null, () -> "x"));
         assertThrows(NullPointerException.class, () -> cache.get("face:1", null));
     }
+
+    @Test
+    void clearDropsEveryEntry() {
+        LruCache<String, String> cache = cache(10);
+        cache.get("face:1", () -> load("face:1"));
+        cache.get("face:2", () -> load("face:2"));
+        loads.set(0);
+
+        cache.clear();
+
+        assertNull(cache.getIfPresent("face:1"), "a cleared key must not be resident");
+        assertNull(cache.getIfPresent("face:2"), "a cleared key must not be resident");
+        assertEquals("FACE:1", cache.get("face:1", () -> load("face:1")));
+        assertEquals(1, loads.get(), "a cleared key must be loaded again");
+    }
 }
