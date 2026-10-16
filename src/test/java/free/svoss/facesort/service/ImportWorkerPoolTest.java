@@ -3,11 +3,17 @@ package free.svoss.facesort.service;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -107,5 +113,76 @@ class ImportWorkerPoolTest {
 
         assertTrue(result.stopped());
         assertEquals(2, result.processed());
+    }
+
+    @Test
+    void progressIsDeliveredOneAtATime() throws Exception {
+        AtomicInteger inside = new AtomicInteger();
+        AtomicBoolean concurrentEntry = new AtomicBoolean();
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ImportService.ProgressListener listener = new ImportService.ProgressListener() {
+            @Override
+            public void onProgress(String message) {
+                if (inside.incrementAndGet() > 1) {
+                    concurrentEntry.set(true);
+                }
+                if (firstEntered.getCount() > 0) {
+                    // Hold the first callback open until the releaser fires, so
+                    // a missing lock would let the other worker enter here too.
+                    firstEntered.countDown();
+                    try {
+                        releaseFirst.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                inside.decrementAndGet();
+            }
+        };
+
+        Thread releaser = new Thread(() -> {
+            try {
+                if (firstEntered.await(5, TimeUnit.SECONDS)) {
+                    Thread.sleep(10);   // let any unsynchronized caller pile up inside
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                releaseFirst.countDown();
+            }
+        });
+        releaser.setDaemon(true);
+        releaser.start();
+
+        ImportWorkerPool.Result result = ImportWorkerPool.run(2,
+                List.of(service(), service()), "progress-", files(3), listener, null,
+                (s, file) -> 0);
+
+        assertEquals(3, result.processed());
+        assertFalse(concurrentEntry.get(), "the pool must deliver progress one callback at a time");
+    }
+
+    @Test
+    void progressDoesNotLockTheListenersMonitor() {
+        List<String> messages = Collections.synchronizedList(new ArrayList<>());
+        AtomicBoolean heldListenerLock = new AtomicBoolean();
+        ImportService.ProgressListener listener = new ImportService.ProgressListener() {
+            @Override
+            public void onProgress(String message) {
+                if (Thread.holdsLock(this)) {
+                    heldListenerLock.set(true);
+                }
+                messages.add(message);
+            }
+        };
+
+        ImportWorkerPool.Result result = ImportWorkerPool.run(2,
+                List.of(service(), service()), "progress-", files(3), listener, null,
+                (s, file) -> 0);
+
+        assertEquals(3, result.processed());
+        assertFalse(messages.isEmpty(), "the listener must be called");
+        assertFalse(heldListenerLock.get(), "the pool must not lock the caller's listener");
     }
 }

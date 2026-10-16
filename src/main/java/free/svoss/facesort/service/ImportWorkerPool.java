@@ -31,13 +31,21 @@ final class ImportWorkerPool {
     private static final Logger LOG = Logger.getLogger(ImportWorkerPool.class.getName());
 
     /**
+     * Serializes progress callbacks across the workers. The lock is private so a
+     * caller's own synchronization on its listener cannot block the import.
+     */
+    private static final Object PROGRESS_LOCK = new Object();
+
+    /**
      * Runs {@code task} over every file in {@code files}.
      *
      * @param maxImportThreads the configured maximum number of import threads
      * @param faceAiServices   one face service per parallel worker (must not be empty)
      * @param threadNamePrefix prefix for the daemon worker threads
      * @param files            the files to process
-     * @param progress         listener for progress messages (may be {@code null})
+     * @param progress         listener for progress messages; callbacks are
+     *                         delivered one at a time (in some order), or not at
+     *                         all when the listener is {@code null}
      * @param cancelled        supplier consulted before each file; when it returns
      *                         {@code true} the run stops (may be {@code null})
      * @param task             per-file work; return the number of faces dropped so
@@ -113,7 +121,7 @@ final class ImportWorkerPool {
 
     private static void reportProgress(ImportService.ProgressListener progress, String message) {
         if (progress != null) {
-            synchronized (progress) {
+            synchronized (PROGRESS_LOCK) {
                 progress.onProgress(message);
             }
         }

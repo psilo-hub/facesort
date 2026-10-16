@@ -48,6 +48,12 @@ import java.nio.file.Path;
  */
 public class ImportView extends BorderPane {
 
+    /**
+     * The import log is refreshed at most every 100 ms so a huge import does not
+     * queue one FX update per file.
+     */
+    private static final long PROGRESS_INTERVAL_NANOS = 100_000_000L;
+
     private final ImportService importService;
     private final VideoImportService videoImportService;
     private final DataRemovalService dataRemovalService;
@@ -226,7 +232,9 @@ public class ImportView extends BorderPane {
     /**
      * Runs the combined photo + video import pipeline on a background thread,
      * streaming progress messages from both phases to the log area and showing
-     * the combined summary when complete.
+     * the combined summary when complete. Progress is throttled before it
+     * reaches the log so a large import does not queue one FX update per file;
+     * the last progress of the run is always flushed.
      *
      * @param folder the root directory to scan
      */
@@ -239,14 +247,22 @@ public class ImportView extends BorderPane {
         progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
         appendLog(I18n.format("ui.import.importingFrom", folder.toAbsolutePath()));
 
+        ProgressThrottle progress = new ProgressThrottle(
+                message -> Platform.runLater(() -> appendLog(message)),
+                PROGRESS_INTERVAL_NANOS, System::nanoTime);
+
         Task<ImportCoordinator.CombinedImportResult> task = new Task<>() {
             @Override
             protected ImportCoordinator.CombinedImportResult call() throws Exception {
-                return ImportCoordinator.run(importService, videoImportService, folder,
-                        message -> Platform.runLater(() -> appendLog(message)),
-                        cancellation::isRequested,
-                        () -> Platform.runLater(
-                                () -> appendLog(I18n.get("ui.import.videoPhase"))));
+                try {
+                    return ImportCoordinator.run(importService, videoImportService, folder,
+                            progress,
+                            cancellation::isRequested,
+                            () -> Platform.runLater(
+                                    () -> appendLog(I18n.get("ui.import.videoPhase"))));
+                } finally {
+                    progress.flush();
+                }
             }
         };
 

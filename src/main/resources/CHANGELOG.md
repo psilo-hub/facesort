@@ -278,6 +278,11 @@ All notable changes to Face Sort will be documented in this file.
   large tagging, review or view grid no longer freezes while it is built. Its
   thumbnails fill in as they finish decoding, and a face whose crop cannot be
   decoded is simply shown without a thumbnail (2026-10-16)
+- Importing a large library keeps the window responsive: the import log now
+  shows at most about ten progress lines per second instead of one per file,
+  so importing thousands of photos no longer queues a UI update for every
+  single file. The newest progress is always shown, including the last one
+  (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and
