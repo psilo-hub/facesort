@@ -1,5 +1,7 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.FaceThumb;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
@@ -9,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -17,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>The view helpers themselves need a JavaFX toolkit, so the shared "not a
  * face" success handler is a package-private static method driven through an
  * injected presenter, and the shared card selection works on plain nodes that
- * can be built without a running toolkit.</p>
+ * can be built without a running toolkit. The thumbnail helpers are covered for
+ * the cases that return null before any JavaFX image is built.</p>
  */
 class FaceUiTest {
 
@@ -133,6 +137,40 @@ class FaceUiTest {
 
         assertEquals(List.of(2), selected(reloaded),
                 "a range cannot be built from a card that is no longer shown");
+    }
+
+    @Test
+    void toImageOfNullFaceRecordIsNull() {
+        assertNull(FaceUi.toImage((FaceRecord) null),
+                "a missing face has no thumbnail to show");
+    }
+
+    @Test
+    void toImageOfFaceRecordWithoutCropIsNull() {
+        assertNull(FaceUi.toImage(faceRecord(null)),
+                "a face without a stored crop has no thumbnail to show");
+    }
+
+    @Test
+    void toImageOfFaceRecordWithEmptyCropIsNull() {
+        assertNull(FaceUi.toImage(faceRecord(new byte[0])),
+                "an empty crop must not be decoded");
+    }
+
+    @Test
+    void toImageOfFaceThumbWithoutCropIsNull() {
+        assertNull(FaceUi.toImage(faceThumb(null)),
+                "a face thumb without a stored crop has no thumbnail to show");
+    }
+
+    /** A face record whose crop is the given bytes, or none when null. */
+    private static FaceRecord faceRecord(byte[] subImageJpg) {
+        return new FaceRecord(1L, "hash", 0, 0, 10, 10, 0.9, new float[0], subImageJpg, null);
+    }
+
+    /** A lightweight face whose crop is the given bytes, or none when null. */
+    private static FaceThumb faceThumb(byte[] subImageJpg) {
+        return new FaceThumb(1L, "hash", 0, 0, 10, 10, 0.9, subImageJpg, null);
     }
 
     /** Cards only need to carry the {@code selected} style class. */

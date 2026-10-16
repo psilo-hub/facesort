@@ -9,10 +9,11 @@ import java.util.function.Supplier;
  * A bounded memoizer: values are kept at most until the capacity is exceeded,
  * then the least recently read entry is dropped.
  *
- * <p>The View tab uses it to keep decoded thumbnails keyed by a stable
- * identity (an image hash, a face id), so re-rendering a grid decodes each
- * JPEG once instead of once per rebuild. The loader runs at most once per
- * key while the entry is resident.</p>
+ * <p>The View tab and the shared face-thumbnail cache use it to keep decoded
+ * thumbnails keyed by a stable identity (an image hash; a face id plus the
+ * crop's content), so re-rendering a grid decodes each JPEG once instead of
+ * once per rebuild. The loader runs at most once per key while the entry is
+ * resident.</p>
  *
  * <p>Instances are not thread-safe; they are meant to be read on the UI
  * thread.</p>

@@ -267,6 +267,12 @@ All notable changes to Face Sort will be documented in this file.
   (internal, no visible behavior change): the thumbnails are now loaded in a
   single batch query instead of one query per image, so the work no longer
   grows with the number of images a person appears in (2026-10-16)
+- Rebuilding a face grid is faster across the tagging and review tabs
+  (internal, no visible behavior change): the decoded face thumbnails now live
+  in one shared, bounded cache instead of being decoded again on every rebuild,
+  so switching between names, samples or tabs re-uses pictures that are already
+  decoded. A crop rewritten by the one-time face-rotation pass is decoded afresh
+  (2026-10-16)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

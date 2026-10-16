@@ -44,6 +44,19 @@ final class FaceUi {
     /** Style class that marks a face card as selected for a bulk action. */
     static final String SELECTED = "selected";
 
+    /** Upper bound of the shared decoded-face-thumbnail cache. */
+    private static final int FACE_THUMBNAIL_CACHE_CAPACITY = 256;
+
+    /**
+     * Decoded face crops shared by every face view, keyed by face id and the
+     * crop bytes, so a crop rewritten by the face-rotation migration is decoded
+     * afresh. Shared so a rebuild in one tab reuses what another already
+     * decoded.
+     */
+    private static final FaceThumbnailCache<Image> FACE_THUMBNAILS =
+            new FaceThumbnailCache<>(FACE_THUMBNAIL_CACHE_CAPACITY,
+                    jpg -> new Image(new ByteArrayInputStream(jpg)));
+
     private FaceUi() {
         // Utility class - not instantiable
     }
@@ -100,26 +113,20 @@ final class FaceUi {
     }
 
     /**
-     * Decodes a face's JPEG sub-image, or returns {@code null} when no
-     * sub-image is available.
+     * Decodes a face's JPEG sub-image through the shared thumbnail cache, or
+     * returns {@code null} when no sub-image is available. Entries are keyed
+     * by face id and crop content, so a decode is reused across grid rebuilds
+     * and refreshed when the stored crop changes.
      *
      * @param face the face record to render
      * @return the decoded image, or {@code null} when unavailable
      */
     static Image toImage(FaceRecord face) {
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg == null || jpg.length == 0) {
-            return null;
-        }
-        return new Image(new ByteArrayInputStream(jpg));
+        return face == null ? null : FACE_THUMBNAILS.get(face.id(), face.subImageJpg());
     }
 
     static Image toImage(free.svoss.facesort.model.FaceThumb face) {
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg == null || jpg.length == 0) {
-            return null;
-        }
-        return new Image(new ByteArrayInputStream(jpg));
+        return face == null ? null : FACE_THUMBNAILS.get(face.id(), face.subImageJpg());
     }
 
     /**

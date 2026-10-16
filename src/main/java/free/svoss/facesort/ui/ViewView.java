@@ -1,7 +1,6 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
-import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.service.ViewService;
 import javafx.animation.PauseTransition;
@@ -52,7 +51,7 @@ public class ViewView extends BorderPane implements Refreshable {
     /** Quiet period after the last keystroke before the name grid is filtered. */
     private static final long FILTER_DEBOUNCE_MS = 300;
 
-    /** Thumbnails kept across grid rebuilds, keyed by image hash or face id. */
+    /** Thumbnails kept across grid rebuilds, keyed by image hash. */
     private static final int THUMBNAIL_CACHE_CAPACITY = 256;
 
     private final ViewService viewService;
@@ -315,7 +314,7 @@ public class ViewView extends BorderPane implements Refreshable {
         countLabel.getStyleClass().add("count-label");
 
         card.getChildren().addAll(
-                FaceUi.thumb(representativeThumbnail(summary.representative()), NAME_THUMBNAIL_SIZE),
+                FaceUi.thumb(summary.representative(), NAME_THUMBNAIL_SIZE),
                 nameLabel, countLabel);
         card.setOnMouseClicked(e -> openNameImages(summary.name().id(), name));
         return card;
@@ -367,24 +366,10 @@ public class ViewView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Returns the decoded thumbnail of a representative face, or {@code null}
-     * when there is no face or no sub-image to show.
-     *
-     * @param face the representative face, possibly null
-     * @return the decoded thumbnail, or {@code null}
-     */
-    private Image representativeThumbnail(FaceRecord face) {
-        if (face == null) {
-            return null;
-        }
-        return cachedThumbnail("face:" + face.id(), face.subImageJpg());
-    }
-
-    /**
      * Returns the decoded thumbnail stored under the given key, decoding
      * {@code jpg} on the first read and re-using the cached image afterwards.
-     * The keys are content identities (an image hash, a face id), so a cached
-     * entry cannot go stale.
+     * The keys are content identities (an image hash), so a cached entry cannot
+     * go stale.
      *
      * @param key stable identity of the picture
      * @param jpg the encoded thumbnail, possibly null or empty
