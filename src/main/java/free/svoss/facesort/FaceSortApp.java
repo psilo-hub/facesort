@@ -57,6 +57,7 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
@@ -79,6 +80,18 @@ import java.util.logging.Logger;
 public class FaceSortApp extends Application {
 
     private static final Logger LOG = Logger.getLogger(FaceSortApp.class.getName());
+
+    static {
+        try (InputStream in = FaceSortApp.class.getClassLoader().getResourceAsStream("logging.properties")) {
+            if (in != null) {
+                LogManager.getLogManager().readConfiguration(in);
+            } else {
+                LOG.warning("logging.properties not found in classpath");
+            }
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Failed to load logging configuration", e);
+        }
+    }
 
     private static final String APP_TITLE = "Face Sort";
     private static final double DOWNLOAD_SCENE_WIDTH = 680;

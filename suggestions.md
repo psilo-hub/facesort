@@ -24,7 +24,7 @@
 
 - [ ] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - the confirmation exists, but the dialog disables its own Cancel while DataRemovalService runs with no progress callbacks (RemoveByPrefixDialog.java:132-170, DataRemovalService.java:28)
 - [x] Refuse to open a database newer than SCHEMA_VERSION with a user-facing error and run each migration step in a transaction - today a newer DB is opened after only a WARNING and a crash mid-migration leaves a half-migrated schema (Database.java:24,121-140,160-204)
-- [ ] Surface background-task failures and ship a logging configuration - FaceUi.java:315-317 and TagWithNameDialog.java:178-180 attach empty onFailed handlers, and there is no logging.properties/FileHandler so packaged-app warnings vanish without a console
+- [x] Surface background-task failures and ship a logging configuration - FaceUi.java:315-317 and TagWithNameDialog.java:178-180 attach empty onFailed handlers, and there is no logging.properties/FileHandler so packaged-app warnings vanish without a console
 
 ## Testing / TDD
 

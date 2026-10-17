@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Shared face-grid plumbing used by every face-related view: decoding a face's
@@ -44,6 +46,8 @@ final class FaceUi {
     /** Status styles for the name-existence check (see {@code css/styles.css}). */
     static final String NAME_STATUS_EXISTS = "name-status-exists";
     static final String NAME_STATUS_NEW = "name-status-new";
+
+    private static final Logger LOG = Logger.getLogger(FaceUi.class.getName());
 
     /** Style class that marks a face card as selected for a bulk action. */
     static final String SELECTED = "selected";
@@ -380,7 +384,7 @@ final class FaceUi {
         });
 
         task.setOnFailed(e -> {
-            // name lookup failing should not block tagging
+            LOG.log(Level.WARNING, "Name existence check failed", e.getSource() == null ? null : ((Task<?>) e.getSource()).getException());
         });
 
         runner.start(task, threadName);

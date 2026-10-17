@@ -23,6 +23,8 @@ import java.io.ByteArrayInputStream;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Modal dialog for tagging a face with a name other than the one it was offered
@@ -50,6 +52,8 @@ public class TagWithNameDialog extends Dialog<String> {
     private final VBox previewBox;
     private final ImageView previewThumb = new ImageView();
     private final Label previewSimilarityLabel = new Label("");
+
+    private static final Logger LOG = Logger.getLogger(TagWithNameDialog.class.getName());
 
     private long lookupGeneration;
 
@@ -176,7 +180,8 @@ public class TagWithNameDialog extends Dialog<String> {
             }
         });
         task.setOnFailed(e -> {
-            // the lookup failing should not block tagging; keep the last state
+            Throwable error = e.getSource() instanceof Task<?> t ? t.getException() : null;
+            LOG.log(Level.WARNING, "Different-name lookup failed", error);
         });
         Thread thread = new Thread(task, "facename-different-name-lookup");
         thread.setDaemon(true);
