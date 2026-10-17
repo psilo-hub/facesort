@@ -84,10 +84,13 @@ public class MostSimilarService {
             }
             if (best == null || candidate.similarity() > best.nameSimilarity()) {
                 FaceRecord taggedFace = tagged.get(0).faceRecord();
+                double faceSim = faceAiService.calcSimilarity(taggedFace.embedding(),
+                        candidate.faceRecord().embedding());
                 best = new Suggestion(name, taggedFace, candidate.faceRecord(),
-                        candidate.similarity(),
-                        faceAiService.calcSimilarity(taggedFace.embedding(),
-                                candidate.faceRecord().embedding()));
+                        candidate.similarity(), faceSim);
+                if (best.nameSimilarity() >= 0.99) {
+                    return Optional.of(best);
+                }
             }
         }
         return Optional.ofNullable(best);
