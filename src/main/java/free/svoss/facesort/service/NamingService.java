@@ -306,23 +306,18 @@ public final class NamingService {
         FaceRecord reference = faceDao.findById(faceId)
                 .orElseThrow(() -> new IllegalArgumentException("Face not found: " + faceId));
 
-        List<SimilarityResult> results = new ArrayList<>();
+        List<FaceRecord> candidates = new ArrayList<>();
         for (FaceRecord candidate : faceDao.findUnnamed()) {
-            if (candidate.id() == faceId) {
-                continue;
+            if (candidate.id() != faceId) {
+                candidates.add(candidate);
             }
-            double similarity = faceAiService.calcSimilarity(
-                    reference.embedding(), candidate.embedding());
-            results.add(new SimilarityResult(candidate, similarity));
         }
-
-        // SimilarityResult sorts by descending similarity.
-        Collections.sort(results);
-
-        if (results.size() <= limit) {
-            return results;
+        List<SimilarityRanker.Candidate> ranked = SimilarityRanker.rankBySimilarityLinear(reference, candidates, limit);
+        List<SimilarityResult> results = new ArrayList<>(ranked.size());
+        for (SimilarityRanker.Candidate c : ranked) {
+            results.add(new SimilarityResult(c.face(), c.similarity()));
         }
-        return new ArrayList<>(results.subList(0, limit));
+        return results;
     }
 
     /**

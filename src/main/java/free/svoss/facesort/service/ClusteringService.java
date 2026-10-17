@@ -231,4 +231,12 @@ public class ClusteringService {
             return vector.length;
         }
     }
+
+    /** A lightweight item view suitable for similarity ranking against a fixed set. */
+    static record SimilarityEmbeddingItem(Long id, float[] vector) implements Item<Long, float[]> {
+        @Override
+        public int dimensions() {
+            return vector.length;
+        }
+    }
 }
