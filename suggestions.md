@@ -39,7 +39,7 @@
 ## UI / UX
 
 - [ ] Add keyboard shortcuts, mnemonics and accessible text - no accelerator, mnemonic or setAccessibleText call exists anywhere in the UI today
-- [ ] Add sorting to ViewView and FaceNameView by name, count or recency - no sort control exists in either view
+- [x] Add sorting to ViewView and FaceNameView by name, count or recency - sort dropdown added to both views (name ascending via Collator, face count ascending/descending); recency not available since NameRecord has no timestamp field
 
 ## Features
 

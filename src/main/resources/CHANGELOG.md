@@ -305,6 +305,10 @@ All notable changes to Face Sort will be documented in this file.
   place, so a change to path resolution touches a single class instead of six.
   `StoredFaceImageSource.firstReadableFile` now delegates to the resolver too
   (2026-10-21)
+- View and "Add faces to a name" tabs: sort controls added. ViewView can sort
+  the name grid by name (locale-aware) or face count ascending/descending;
+  FaceNameView can sort the name list the same way. Recency sorting is not
+  available since NameRecord stores no timestamp (2026-10-21)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

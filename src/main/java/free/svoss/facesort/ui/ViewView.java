@@ -7,7 +7,9 @@ import javafx.animation.PauseTransition;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.collections.FXCollections;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
@@ -26,7 +28,9 @@ import javafx.util.Duration;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -59,6 +63,7 @@ public class ViewView extends BorderPane implements Refreshable {
     private final Button backButton = new Button(I18n.get("ui.view.backToNames"));
     private final Label titleLabel = new Label(I18n.get("ui.view.names"));
     private final TextField filterField = new TextField();
+    private final ComboBox<String> sortField = new ComboBox<>();
     private final Label statusLabel = new Label("");
     private final ScrollPane scrollPane = new ScrollPane();
     private final FlowPane namesPane = new FlowPane(12, 12);
@@ -127,7 +132,18 @@ public class ViewView extends BorderPane implements Refreshable {
         filterField.textProperty().addListener((obs, oldValue, newValue) -> filterDebounce.trigger());
         HBox.setHgrow(filterField, Priority.NEVER);
 
-        HBox topBar = new HBox(10, backButton, titleLabel, filterField);
+        sortField.getItems().addAll(
+                I18n.get("ui.view.sort.name"),
+                I18n.get("ui.view.sort.countAsc"),
+                I18n.get("ui.view.sort.countDesc"));
+        sortField.getSelectionModel().selectFirst();
+        sortField.setPrefWidth(120);
+        sortField.setMaxWidth(120);
+        sortField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.view.sortTooltip")));
+        sortField.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldValue, newValue) -> applyFilter());
+
+        HBox topBar = new HBox(10, backButton, titleLabel, filterField, sortField);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(10));
         titleLabel.getStyleClass().add("subtitle-label");
@@ -196,6 +212,7 @@ public class ViewView extends BorderPane implements Refreshable {
             return;
         }
         List<ViewService.NameSummary> filtered = filterNames(summaries, filterField.getText());
+        filtered = sortSummaries(filtered, sortField.getValue());
         namesPane.getChildren().clear();
         for (ViewService.NameSummary summary : filtered) {
             namesPane.getChildren().add(buildNameCard(summary));
@@ -231,6 +248,28 @@ public class ViewView extends BorderPane implements Refreshable {
             if (summary.name().name().toLowerCase(Locale.ROOT).contains(needle)) {
                 result.add(summary);
             }
+        }
+        return result;
+    }
+
+    /**
+     * Returns the given summaries sorted according to the selected sort mode.
+     *
+     * @param summaries summaries to sort; must not be null
+     * @param mode      the selected sort display string from {@link #sortField}
+     * @return the summaries in sorted order
+     */
+    static List<ViewService.NameSummary> sortSummaries(
+            List<ViewService.NameSummary> summaries, String mode) {
+        List<ViewService.NameSummary> result = new ArrayList<>(summaries);
+        if (I18n.get("ui.view.sort.countAsc").equals(mode)) {
+            result.sort(Comparator.comparingInt(ViewService.NameSummary::faceCount));
+        } else if (I18n.get("ui.view.sort.countDesc").equals(mode)) {
+            result.sort(Comparator.comparingInt((ViewService.NameSummary s) -> s.faceCount())
+                    .reversed());
+        } else {
+            result.sort(Comparator.comparing(
+                    s -> s.name().name(), Collator.getInstance()));
         }
         return result;
     }

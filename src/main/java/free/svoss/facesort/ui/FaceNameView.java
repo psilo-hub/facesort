@@ -12,6 +12,7 @@ import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -32,7 +33,9 @@ import javafx.stage.Window;
 
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,6 +68,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     private final CheckBox excludeOtherNamesBox =
             new CheckBox(I18n.get("ui.faceName.excludeOtherNames"));
     private final TextField pathFilterField = new TextField();
+    private final ComboBox<String> sortField = new ComboBox<>();
     private final FlowPane candidatesPane = new FlowPane(10, 10);
     private final Button tagSelectedButton = new Button(I18n.get("ui.faceName.tagSelected"));
     private final Button renameButton = new Button(I18n.get("ui.faceName.rename"));
@@ -164,8 +168,20 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
             }
         });
 
+        sortField.getItems().addAll(
+                I18n.get("ui.faceName.sort.name"),
+                I18n.get("ui.faceName.sort.countAsc"),
+                I18n.get("ui.faceName.sort.countDesc"));
+        sortField.getSelectionModel().selectFirst();
+        sortField.setPrefWidth(120);
+        sortField.setMaxWidth(120);
+        sortField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.sortTooltip")));
+        sortField.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldValue, newValue) -> applyNames(new ArrayList<>(nameList.getItems())));
+
         VBox left = new VBox(6,
                 new Label(I18n.get("ui.faceName.names")),
+                sortField,
                 nameList,
                 tagSelectedButton,
                 renameButton,
@@ -241,10 +257,40 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      * @param names the names loaded from the database
      */
     private void applyNames(List<NameRecord> names) {
-        nameList.setItems(FXCollections.observableArrayList(names));
-        statusLabel.setText(names.isEmpty()
+        applyNamesSorted(names);
+    }
+
+    /**
+     * Sorts the names according to the current sort selection and applies them
+     * to the list, updating the status text.
+     *
+     * @param names the names loaded from the database
+     */
+    private void applyNamesSorted(List<NameRecord> names) {
+        List<NameRecord> sorted = sortNames(names, sortField.getValue());
+        nameList.setItems(FXCollections.observableArrayList(sorted));
+        statusLabel.setText(sorted.isEmpty()
                 ? I18n.get("ui.faceName.noNames")
                 : I18n.get("ui.faceName.selectName"));
+    }
+
+    /**
+     * Returns the given names sorted according to the selected sort mode.
+     *
+     * @param names names to sort; must not be null
+     * @param mode  the selected sort display string from {@link #sortField}
+     * @return the names in sorted order
+     */
+    private static List<NameRecord> sortNames(List<NameRecord> names, String mode) {
+        List<NameRecord> result = new ArrayList<>(names);
+        if (I18n.get("ui.faceName.sort.countAsc").equals(mode)) {
+            result.sort(Comparator.comparingInt(NameRecord::faceCount));
+        } else if (I18n.get("ui.faceName.sort.countDesc").equals(mode)) {
+            result.sort(Comparator.comparingInt(NameRecord::faceCount).reversed());
+        } else {
+            result.sort(Comparator.comparing(NameRecord::name, Collator.getInstance()));
+        }
+        return result;
     }
 
     /**
