@@ -51,6 +51,7 @@ public final class NamingService {
     private final ImageDao imageDao;
     private final VideoDao videoDao;
     private final NameService nameService;
+    private final MediaFileResolver resolver;
 
     /**
      * Creates a naming service.
@@ -75,6 +76,7 @@ public final class NamingService {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.nameService = new NameService(nameDao);
+        this.resolver = new MediaFileResolver(imageDao, videoDao);
     }
 
     /**
@@ -120,7 +122,7 @@ public final class NamingService {
      * @throws SQLException         if the database operation fails
      */
     public Optional<Path> resolveFilterPath(String imageHash) throws SQLException {
-        return ViewService.resolveFilterPath(imageDao, videoDao, imageHash);
+        return resolver.resolveFilterPath(imageHash);
     }
 
     /**
@@ -133,7 +135,7 @@ public final class NamingService {
      * @throws SQLException         if the database operation fails
      */
     public boolean isOriginalAvailable(String imageHash) throws SQLException {
-        return ViewService.resolveOriginalFile(imageDao, videoDao, imageHash).isPresent();
+        return resolver.resolveOriginalFile(imageHash).isPresent();
     }
 
     /**
@@ -150,7 +152,7 @@ public final class NamingService {
      * @throws SQLException on database access failure
      */
     public boolean openOriginal(String imageHash) throws IOException, SQLException {
-        return ViewService.openInDefaultViewer(imageDao, videoDao, imageHash);
+        return resolver.openInDefaultViewer(imageHash);
     }
 
     /**
@@ -168,7 +170,7 @@ public final class NamingService {
      * @throws SQLException on database access failure
      */
     public boolean openContainingFolder(String imageHash) throws IOException, SQLException {
-        return ViewService.openContainingFolder(imageDao, videoDao, imageHash);
+        return resolver.openContainingFolder(imageHash);
     }
 
     /**
@@ -181,7 +183,7 @@ public final class NamingService {
      * @throws SQLException         if the database operation fails
      */
     public boolean isContainingFolderAvailable(String imageHash) throws SQLException {
-        return ViewService.resolveContainingFolder(imageDao, videoDao, imageHash).isPresent();
+        return resolver.resolveContainingFolder(imageHash).isPresent();
     }
 
     /**

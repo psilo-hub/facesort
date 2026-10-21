@@ -41,6 +41,7 @@ public class DeduplicationService {
     private final ImageDao imageDao;
     private final VideoDao videoDao;
     private final TransactionRunner transactionRunner;
+    private final MediaFileResolver resolver;
 
     /** Candidate pairs sorted by descending similarity; built lazily. */
     private List<DupeCandidate> candidates;
@@ -73,6 +74,7 @@ public class DeduplicationService {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
+        this.resolver = new MediaFileResolver(imageDao, videoDao);
     }
 
     /**
@@ -175,7 +177,7 @@ public class DeduplicationService {
      * @throws SQLException if the database operation fails
      */
     public boolean isOriginalAvailable(String imageHash) throws SQLException {
-        return ViewService.resolveOriginalFile(imageDao, videoDao, imageHash).isPresent();
+        return resolver.resolveOriginalFile(imageHash).isPresent();
     }
 
     /**
@@ -192,7 +194,7 @@ public class DeduplicationService {
      * @throws SQLException on database access failure
      */
     public boolean openOriginal(String imageHash) throws IOException, SQLException {
-        return ViewService.openInDefaultViewer(imageDao, videoDao, imageHash);
+        return resolver.openInDefaultViewer(imageHash);
     }
 
     /**
@@ -210,7 +212,7 @@ public class DeduplicationService {
      * @throws SQLException on database access failure
      */
     public boolean openContainingFolder(String imageHash) throws IOException, SQLException {
-        return ViewService.openContainingFolder(imageDao, videoDao, imageHash);
+        return resolver.openContainingFolder(imageHash);
     }
 
     /**
@@ -222,7 +224,7 @@ public class DeduplicationService {
      * @throws SQLException if the database operation fails
      */
     public boolean isContainingFolderAvailable(String imageHash) throws SQLException {
-        return ViewService.resolveContainingFolder(imageDao, videoDao, imageHash).isPresent();
+        return resolver.resolveContainingFolder(imageHash).isPresent();
     }
 
     /**

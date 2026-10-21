@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,6 +36,7 @@ final class StoredFaceImageSource implements FaceImageSource {
     private final ImageDao imageDao;
     private final VideoDao videoDao;
     private final VideoFrameSourceOpener opener;
+    private final MediaFileResolver resolver;
 
     private String openVideoHash;
     private Path openVideoFile;
@@ -52,6 +52,7 @@ final class StoredFaceImageSource implements FaceImageSource {
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao must not be null");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao must not be null");
         this.opener = Objects.requireNonNull(opener, "opener must not be null");
+        this.resolver = new MediaFileResolver(imageDao, videoDao);
     }
 
     @Override
@@ -90,7 +91,7 @@ final class StoredFaceImageSource implements FaceImageSource {
         if (timestampMs == null) {
             return null;
         }
-        Path file = firstReadableFile(videoDao.getPaths(videoHash.get()));
+        Path file = resolver.firstReadablePath(videoDao.getPaths(videoHash.get())).orElse(null);
         if (file == null) {
             return null;
         }
@@ -140,22 +141,6 @@ final class StoredFaceImageSource implements FaceImageSource {
             openVideoFile = null;
             lastPositionSeconds = -1.0;
         }
-    }
-
-    private List<Path> readableFiles(List<String> storedPaths) {
-        List<Path> files = new ArrayList<>();
-        for (String storedPath : storedPaths) {
-            Path file = toPath(storedPath);
-            if (file != null && Files.isReadable(file)) {
-                files.add(file);
-            }
-        }
-        return files;
-    }
-
-    private Path firstReadableFile(List<String> storedPaths) {
-        List<Path> files = readableFiles(storedPaths);
-        return files.isEmpty() ? null : files.get(0);
     }
 
     private static Path toPath(String storedPath) {

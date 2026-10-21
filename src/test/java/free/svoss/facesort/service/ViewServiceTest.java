@@ -40,6 +40,7 @@ class ViewServiceTest {
     private ImageDao imageDao;
     private VideoDao videoDao;
     private ViewService service;
+    private MediaFileResolver resolver;
     private Path tempVideo;
     private final Set<String> insertedImages = new HashSet<>();
     private final AtomicInteger bbox = new AtomicInteger();
@@ -53,6 +54,7 @@ class ViewServiceTest {
         videoDao = new VideoDao(db.getConnection());
         service = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
                 faceDao, nameDao, imageDao, videoDao);
+        resolver = new MediaFileResolver(imageDao, videoDao);
         tempVideo = Files.createTempFile("facesort-open-original-", ".mp4");
     }
 
@@ -374,7 +376,7 @@ class ViewServiceTest {
     void resolveOriginalFile_videoFrameResolvesToTheLinkedVideoFile() throws Exception {
         addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
 
-        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "frame1");
+        Optional<Path> resolved = resolver.resolveOriginalFile("frame1");
 
         assertTrue(resolved.isPresent());
         assertEquals(tempVideo, resolved.get().toAbsolutePath(),
@@ -394,7 +396,7 @@ class ViewServiceTest {
         imageDao.insert("img1", 0, "{}", 1);
         imageDao.addPath("img1", tempVideo.toString());
 
-        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "img1");
+        Optional<Path> resolved = resolver.resolveOriginalFile("img1");
 
         assertTrue(resolved.isPresent());
         assertEquals(tempVideo, resolved.get().toAbsolutePath(),
@@ -409,7 +411,7 @@ class ViewServiceTest {
         videoDao.addPath("video1", tempVideo.resolveSibling("missing.mp4").toString());
         videoDao.linkFrame("frame1", "video1", 500L);
 
-        Optional<Path> resolved = ViewService.resolveOriginalFile(imageDao, videoDao, "frame1");
+        Optional<Path> resolved = resolver.resolveOriginalFile("frame1");
 
         assertTrue(resolved.isPresent());
         assertEquals(tempVideo, resolved.get().toAbsolutePath(),
@@ -421,7 +423,7 @@ class ViewServiceTest {
         imageDao.insert("img1", 0, "{}", 1);
         imageDao.addPath("img1", tempVideo.toString());
 
-        Optional<Path> folder = ViewService.resolveFilterPath(imageDao, videoDao, "img1");
+        Optional<Path> folder = resolver.resolveFilterPath("img1");
 
         assertEquals(tempVideo.getParent(), folder.orElse(null),
                 "the photo's folder must be returned for the path filter");
@@ -433,7 +435,7 @@ class ViewServiceTest {
         imageDao.addPath("img1", tempVideo.resolveSibling("missing-photo.jpg").toString());
         imageDao.addPath("img1", tempVideo.toString());
 
-        Optional<Path> folder = ViewService.resolveFilterPath(imageDao, videoDao, "img1");
+        Optional<Path> folder = resolver.resolveFilterPath("img1");
 
         assertEquals(tempVideo.getParent(), folder.orElse(null),
                 "an existing stored path must win over missing ones");
@@ -443,7 +445,7 @@ class ViewServiceTest {
     void resolveFilterPath_videoFrameReturnsTheVideoPath() throws Exception {
         addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
 
-        Optional<Path> folder = ViewService.resolveFilterPath(imageDao, videoDao, "frame1");
+        Optional<Path> folder = resolver.resolveFilterPath("frame1");
 
         assertEquals(tempVideo, folder.orElse(null),
                 "a video frame must resolve to its source video's full path");
@@ -453,7 +455,7 @@ class ViewServiceTest {
     void resolveFilterPath_withoutAnyStoredPathReturnsEmpty() throws Exception {
         imageDao.insert("img1", 0, "{}", 1);
 
-        assertTrue(ViewService.resolveFilterPath(imageDao, videoDao, "img1").isEmpty());
+        assertTrue(resolver.resolveFilterPath("img1").isEmpty());
     }
 
     @Test
@@ -461,7 +463,7 @@ class ViewServiceTest {
         imageDao.insert("img1", 0, "{}", 1);
         imageDao.addPath("img1", tempVideo.toString());
 
-        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "img1");
+        Optional<Path> folder = resolver.resolveContainingFolder("img1");
 
         assertEquals(tempVideo.getParent(), folder.orElse(null),
                 "the folder of the existing original must be returned");
@@ -471,7 +473,7 @@ class ViewServiceTest {
     void resolveContainingFolder_videoFrameReturnsTheVideoFolder() throws Exception {
         addFrameLinkedToExistingVideo("frame1", "video1", tempVideo);
 
-        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "frame1");
+        Optional<Path> folder = resolver.resolveContainingFolder("frame1");
 
         assertEquals(tempVideo.getParent(), folder.orElse(null),
                 "a video frame's containing folder is the source video's folder");
@@ -482,7 +484,7 @@ class ViewServiceTest {
         imageDao.insert("img1", 0, "{}", 1);
         imageDao.addPath("img1", tempVideo.resolveSibling("missing-photo.jpg").toString());
 
-        Optional<Path> folder = ViewService.resolveContainingFolder(imageDao, videoDao, "img1");
+        Optional<Path> folder = resolver.resolveContainingFolder("img1");
 
         assertTrue(folder.isEmpty(),
                 "without an existing original there is no folder to open");

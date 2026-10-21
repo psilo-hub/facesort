@@ -297,6 +297,14 @@ All notable changes to Face Sort will be documented in this file.
   runs, reports progress in the result label, and rolls back the whole
   transaction if the user cancels — a long deletion no longer looks hung and
   cannot leave a half-deleted library behind (2026-10-21)
+- Path resolution consolidated into a `MediaFileResolver` shared by
+  `ViewService`, `DeduplicationService`, `FaceToNameService`, `NamingService`
+  and `StoredFaceImageSource`. The duplicated `resolveOriginalFile`,
+  `resolveFilterPath`, `openInDefaultViewer`, `openContainingFolder`,
+  `resolveContainingFolder` and `firstExistingPath` methods now live in one
+  place, so a change to path resolution touches a single class instead of six.
+  `StoredFaceImageSource.firstReadableFile` now delegates to the resolver too
+  (2026-10-21)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

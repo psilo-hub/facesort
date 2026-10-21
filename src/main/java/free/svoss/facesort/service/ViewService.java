@@ -7,9 +7,7 @@ import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 
-import java.awt.Desktop;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -34,6 +32,7 @@ public class ViewService {
     private final NameDao nameDao;
     private final ImageDao imageDao;
     private final VideoDao videoDao;
+    private final MediaFileResolver resolver;
 
     /**
      * Creates a view service.
@@ -51,6 +50,7 @@ public class ViewService {
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
         this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
+        this.resolver = new MediaFileResolver(imageDao, videoDao);
     }
 
     /**
@@ -149,93 +149,6 @@ public class ViewService {
     }
 
     /**
-     * Resolves the file that represents the "original" of an image: for a video
-     * frame the source video, otherwise the image itself. The first still-existing
-     * stored path is used; when the linked video file is gone the stored
-     * frame/photo paths are considered as a fallback.
-     *
-     * @param imageDao  DAO for the images and image_paths tables
-     * @param videoDao  DAO for the videos, video_paths and video_frames tables
-     * @param imageHash content hash of the image
-     * @return the first stored path that still exists, if any
-     * @throws SQLException on database access failure
-     */
-    public static Optional<Path> resolveOriginalFile(
-            ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
-        Objects.requireNonNull(imageDao, "imageDao");
-        Objects.requireNonNull(videoDao, "videoDao");
-        Optional<String> videoHash = videoDao.findVideoHash(
-                Objects.requireNonNull(imageHash, "imageHash"));
-        if (videoHash.isPresent()) {
-            Optional<Path> video = firstExistingPath(videoDao.getPaths(videoHash.get()));
-            if (video.isPresent()) {
-                return video;
-            }
-        }
-        return firstExistingPath(imageDao.getPaths(imageHash));
-    }
-
-    /**
-     * Resolves the path to filter by for the media file behind an image: for a
-     * video frame the full path of its source video (including the file name),
-     * otherwise the folder of the image itself. When several paths are stored
-     * the first one that still exists on disk is preferred, otherwise the first
-     * recorded path is used.
-     *
-     * @param imageDao  DAO for the images and image_paths tables
-     * @param videoDao  DAO for the videos, video_paths and video_frames tables
-     * @param imageHash content hash of the image
-     * @return the path to filter by, or empty when no path is stored at all
-     * @throws SQLException on database access failure
-     */
-    public static Optional<Path> resolveFilterPath(
-            ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
-        Objects.requireNonNull(imageDao, "imageDao");
-        Objects.requireNonNull(videoDao, "videoDao");
-        Optional<String> videoHash = videoDao.findVideoHash(
-                Objects.requireNonNull(imageHash, "imageHash"));
-        List<String> paths = videoHash.isPresent()
-                ? videoDao.getPaths(videoHash.get())
-                : imageDao.getPaths(imageHash);
-        if (paths.isEmpty()) {
-            return Optional.empty();
-        }
-        Path chosen = firstExistingPath(paths).orElseGet(() -> Path.of(paths.get(0)));
-        return videoHash.isPresent()
-                ? Optional.of(chosen)
-                : Optional.ofNullable(chosen.getParent());
-    }
-
-    /**
-     * Opens the original file of an image — or, for a video frame, its source
-     * video — in the operating system default viewer.
-     *
-     * <p>Returns {@code false} without side effects when no stored path exists
-     * on disk or when the desktop platform does not support opening files.</p>
-     *
-     * @param imageDao  DAO for the images and image_paths tables
-     * @param videoDao  DAO for the videos, video_paths and video_frames tables
-     * @param imageHash content hash of the image
-     * @return {@code true} if the file was handed to the default viewer
-     * @throws IOException  if the default viewer cannot open the file
-     * @throws SQLException on database access failure
-     */
-    public static boolean openInDefaultViewer(
-            ImageDao imageDao, VideoDao videoDao, String imageHash)
-            throws IOException, SQLException {
-        Optional<Path> existing = resolveOriginalFile(imageDao, videoDao, imageHash);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        if (!Desktop.isDesktopSupported()
-                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-            return false;
-        }
-        Desktop.getDesktop().open(existing.get().toFile());
-        return true;
-    }
-
-    /**
      * Opens the original file of an image in the operating system default
      * viewer. For video frames this is the source video the frame came from.
      *
@@ -245,7 +158,7 @@ public class ViewService {
      * @throws SQLException on database access failure
      */
     public boolean openOriginal(String hash) throws IOException, SQLException {
-        return openInDefaultViewer(imageDao, videoDao, hash);
+        return resolver.openInDefaultViewer(hash);
     }
 
     /**
@@ -257,57 +170,7 @@ public class ViewService {
      * @throws SQLException on database access failure
      */
     public boolean isOriginalAvailable(String hash) throws SQLException {
-        return resolveOriginalFile(imageDao, videoDao, hash).isPresent();
-    }
-
-    /**
-     * Resolves the folder that contains the original media file behind an
-     * image: for a video frame the folder of its source video, otherwise the
-     * folder of the image itself. Only folders of files that still exist on
-     * disk are returned.
-     *
-     * @param imageDao  DAO for the images and image_paths tables
-     * @param videoDao  DAO for the videos, video_paths and video_frames tables
-     * @param imageHash content hash of the image
-     * @return the containing folder, or empty when no original exists on disk
-     * @throws SQLException on database access failure
-     */
-    public static Optional<Path> resolveContainingFolder(
-            ImageDao imageDao, VideoDao videoDao, String imageHash) throws SQLException {
-        return resolveOriginalFile(imageDao, videoDao, imageHash).map(Path::getParent);
-    }
-
-    /**
-     * Opens the folder that contains the original media file behind an image —
-     * or, for a video frame, the folder of its source video — in the operating
-     * system file manager.
-     *
-     * <p>Returns {@code false} without side effects when no original file
-     * exists on disk or when the desktop platform does not support opening
-     * folders.</p>
-     *
-     * @param imageDao  DAO for the images and image_paths tables
-     * @param videoDao  DAO for the videos, video_paths and video_frames tables
-     * @param imageHash content hash of the image
-     * @return {@code true} if the folder was handed to the file manager
-     * @throws IOException  if the file manager cannot open the folder
-     * @throws SQLException on database access failure
-     */
-    public static boolean openContainingFolder(
-            ImageDao imageDao, VideoDao videoDao, String imageHash)
-            throws IOException, SQLException {
-        Optional<Path> original = resolveOriginalFile(imageDao, videoDao, imageHash);
-        if (original.isEmpty()) {
-            return false;
-        }
-        Path folder = original.get().getParent();
-        if (folder == null
-                || !Desktop.isDesktopSupported()
-                || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-            return false;
-        }
-        Desktop.getDesktop().open(folder.toFile());
-        return true;
+        return resolver.resolveOriginalFile(hash).isPresent();
     }
 
     /**
@@ -321,7 +184,7 @@ public class ViewService {
      * @throws SQLException on database access failure
      */
     public boolean openContainingFolder(String hash) throws IOException, SQLException {
-        return openContainingFolder(imageDao, videoDao, hash);
+        return resolver.openContainingFolder(hash);
     }
 
     /**
@@ -334,25 +197,7 @@ public class ViewService {
      * @throws SQLException on database access failure
      */
     public boolean isContainingFolderAvailable(String hash) throws SQLException {
-        return resolveContainingFolder(imageDao, videoDao, hash).isPresent();
-    }
-
-    /**
-     * Returns the first path in the list that still exists on disk.
-     *
-     * <p>Package-private for unit testing.</p>
-     *
-     * @param paths stored paths for an image, in priority order
-     * @return the first existing path, or empty when none exists
-     */
-    static Optional<Path> firstExistingPath(List<String> paths) {
-        for (String p : paths) {
-            Path path = Path.of(p);
-            if (Files.exists(path)) {
-                return Optional.of(path);
-            }
-        }
-        return Optional.empty();
+        return resolver.resolveContainingFolder(hash).isPresent();
     }
 
     /**
