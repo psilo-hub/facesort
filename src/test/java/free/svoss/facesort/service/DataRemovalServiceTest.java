@@ -10,8 +10,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -134,5 +138,38 @@ class DataRemovalServiceTest {
 
         assertTrue(imageDao.exists("photo1"));
         assertTrue(videoDao.exists("video1"));
+    }
+
+    // ---- cancellation ----
+
+    @Test
+    void remove_cancelledBeforeStart_throwsAndRollsBack() throws Exception {
+        addPhoto("gone", "/media/vacation/a.jpg");
+        addVideo("gone-video", "/media/vacation/movie.mp4", "orphan-frame");
+
+        // Cancelled from the very first check.
+        assertThrows(CancellationException.class, () ->
+                service.remove("/media/vacation", msg -> {}, () -> true));
+
+        // Transaction rolled back: nothing was deleted.
+        assertTrue(imageDao.exists("gone"), "image must survive rollback");
+        assertTrue(videoDao.exists("gone-video"), "video must survive rollback");
+    }
+
+    @Test
+    void remove_cancelledMidRemoval_throwsAndRollsBack() throws Exception {
+        addPhoto("gone", "/media/vacation/a.jpg");
+        addVideo("gone-video", "/media/vacation/movie.mp4", "orphan-frame");
+
+        // First two checks pass (before start, before deletion), the third
+        // (after deleteAffectedImages) cancels.
+        AtomicInteger checks = new AtomicInteger();
+        assertThrows(CancellationException.class, () ->
+                service.remove("/media/vacation", msg -> {},
+                        () -> checks.getAndIncrement() >= 2));
+
+        // Transaction rolled back: neither images nor videos were deleted.
+        assertTrue(imageDao.exists("gone"), "image must survive rollback");
+        assertTrue(videoDao.exists("gone-video"), "video must survive rollback");
     }
 }

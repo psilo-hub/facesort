@@ -3,11 +3,13 @@ package free.svoss.facesort.ui;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.service.DataRemovalService;
 
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -16,6 +18,7 @@ import javafx.stage.Modality;
 import javafx.stage.Window;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Modal dialog for removing imported images and videos by path prefix.
@@ -25,6 +28,10 @@ import java.util.Objects;
  * sub-images would be removed and shows the numbers. Only after the user
  * confirms with <em>Remove</em> is anything deleted. Editing the prefix
  * invalidates the preview until it is scanned again.</p>
+ *
+ * <p>While a removal runs the <em>Cancel</em> button is enabled and can stop the
+ * removal; progress is reported in the result label. The removal runs in one
+ * database transaction, so cancelling rolls back any partial deletion.</p>
  *
  * <p>Results: {@code showAndWait()} returns the {@link DataRemovalService.Removal}
  * that was executed, or {@code null} when the dialog was cancelled or closed
@@ -39,9 +46,12 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
     private final Button scanButton = new Button(I18n.get("ui.import.removeByPrefix.scan"));
     private final Button removeButton = new Button(I18n.get("ui.import.removeByPrefix.remove"));
     private final Button cancelButton = new Button(I18n.get("ui.import.removeByPrefix.cancel"));
+    private final ProgressBar progressBar = new ProgressBar();
 
     private final TaskRunner taskRunner = new TaskRunner();
     private DataRemovalService.Removal performed;
+    private final AtomicBoolean cancelled = new AtomicBoolean();
+    private Task<DataRemovalService.Removal> removalTask;
 
     /**
      * @param owner   the parent window, or {@code null} for a standalone dialog
@@ -70,17 +80,18 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
         prefixRow.setPadding(new Insets(0, 0, 8, 0));
 
         resultLabel.setWrapText(true);
+        progressBar.setVisible(false);
 
         scanButton.setDisable(true);
         scanButton.setOnAction(e -> onScan());
         removeButton.setDisable(true);
         removeButton.setOnAction(e -> onRemove());
-        cancelButton.setOnAction(e -> close());
+        cancelButton.setOnAction(e -> onCancel());
 
         HBox buttons = new HBox(8, scanButton, removeButton, cancelButton);
         buttons.setPadding(new Insets(10, 0, 0, 0));
 
-        VBox content = new VBox(8, header, prefixRow, resultLabel, buttons);
+        VBox content = new VBox(8, header, prefixRow, resultLabel, progressBar, buttons);
         content.setPrefWidth(460);
         getDialogPane().setContent(content);
 
@@ -127,37 +138,67 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
 
     /**
      * Deletes the scanned rows after the user confirmed. The dialog closes with
-     * the executed removal as its result.
+     * the executed removal as its result. Progress is reported in the result
+     * label and the user can cancel the removal while it runs.
      */
     private void onRemove() {
         String prefix = prefixField.getText() == null ? "" : prefixField.getText().trim();
         if (prefix.isEmpty()) {
             return;
         }
+        cancelled.set(false);
         setBusy(true);
         resultLabel.setText(I18n.get("ui.import.removeByPrefix.removing"));
+        progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+        progressBar.setVisible(true);
 
-        Task<DataRemovalService.Removal> task = taskRunner.start(new Task<>() {
+        removalTask = taskRunner.start(new Task<>() {
             @Override
             protected DataRemovalService.Removal call() throws Exception {
-                return service.remove(prefix);
+                return service.remove(prefix,
+                        message -> Platform.runLater(() -> resultLabel.setText(message)),
+                        cancelled::get);
             }
         }, "removal-run");
 
-        task.setOnSucceeded(e -> {
-            performed = task.getValue();
+        removalTask.setOnSucceeded(e -> {
+            performed = removalTask.getValue();
+            progressBar.setVisible(false);
             close();
         });
-        task.setOnFailed(e -> {
+        removalTask.setOnFailed(e -> {
             setBusy(false);
-            resultLabel.setText(I18n.format("ui.import.removeByPrefix.removeFailed",
-                    failureMessage(task)));
+            progressBar.setVisible(false);
+            if (removalTask.isCancelled()) {
+                resultLabel.setText(I18n.get("ui.import.removeByPrefix.cancelled"));
+            } else {
+                resultLabel.setText(I18n.format("ui.import.removeByPrefix.removeFailed",
+                        failureMessage(removalTask)));
+            }
+        });
+        removalTask.setOnCancelled(e -> {
+            setBusy(false);
+            progressBar.setVisible(false);
+            resultLabel.setText(I18n.get("ui.import.removeByPrefix.cancelled"));
         });
     }
 
     /**
+     * Cancels the running removal, if any. The background task observes the
+     * cancellation flag between deletion steps and rolls back; the dialog shows
+     * a "Cancelled" message once the task stops.
+     */
+    private void onCancel() {
+        cancelled.set(true);
+        if (removalTask != null) {
+            removalTask.cancel(true);
+        }
+    }
+
+    /**
      * Disables the whole dialog while a scan or a removal runs in the
-     * background.
+     * background. The Cancel button is enabled while busy so the user can stop
+     * a long-running removal.
      *
      * @param busy {@code true} while a background operation runs
      */
@@ -166,7 +207,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
         prefixField.setDisable(busy);
         scanButton.setDisable(busy || !hasPrefix);
         removeButton.setDisable(true); // invalidate the preview while busy
-        cancelButton.setDisable(busy);
+        cancelButton.setDisable(!busy); // Cancel is available only while busy
     }
 
     private static String failureMessage(Task<?> task) {

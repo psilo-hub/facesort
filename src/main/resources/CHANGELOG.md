@@ -293,6 +293,10 @@ All notable changes to Face Sort will be documented in this file.
   longer requires touching every `with*` method. The public `with*` API is
   unchanged (each now delegates to the builder) and the record stays immutable
   (2026-10-21)
+- Remove by path prefix: the removal dialog now enables Cancel while a removal
+  runs, reports progress in the result label, and rolls back the whole
+  transaction if the user cancels — a long deletion no longer looks hung and
+  cannot leave a half-deleted library behind (2026-10-21)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

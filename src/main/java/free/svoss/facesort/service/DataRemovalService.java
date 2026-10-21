@@ -7,6 +7,8 @@ import free.svoss.facesort.db.TransactionRunner;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /**
  * Removes imported images and videos from the database whose stored file path
@@ -24,6 +26,12 @@ import java.util.Objects;
  *
  * <p>A blank prefix matches nothing, so {@link #estimate} and {@link #remove}
  * are intentionally no-ops for a blank or {@code null} prefix.</p>
+ *
+ * <p>{@link #remove} accepts a {@link ProgressListener} and a
+ * {@link BooleanSupplier} cancellation check. Cancellation is polled between the
+ * major deletion steps; when requested a {@link CancellationException} is thrown
+ * from inside the transaction, so the whole removal rolls back and no partial
+ * deletion is persisted.</p>
  */
 public class DataRemovalService {
 
@@ -71,22 +79,60 @@ public class DataRemovalService {
      * @throws SQLException on database access failure
      */
     public Removal remove(String prefix) throws SQLException {
+        return remove(prefix, null, null);
+    }
+
+    /**
+     * Deletes every image and video whose stored path starts with the prefix,
+     * together with their thumbnails, face sub-images and frame links.
+     *
+     * @param prefix   the photo/video path prefix (trimmed; blank matches nothing)
+     * @param progress receives progress messages from the removal steps (may be
+     *                 {@code null}); callbacks run on the calling thread
+     * @param cancelled polled between deletion steps; when it returns
+     *                  {@code true} the removal stops and rolls back (may be
+     *                 {@code null})
+     * @return the number of rows that were deleted
+     * @throws SQLException on database access failure
+     * @throws CancellationException when cancellation is requested
+     */
+    public Removal remove(String prefix, ProgressListener progress, BooleanSupplier cancelled)
+            throws SQLException {
         String trimmed = trim(prefix);
         Removal result = transactions.inTransaction(() -> {
+            if (cancelled != null && cancelled.getAsBoolean()) {
+                throw new CancellationException("removal cancelled before start");
+            }
             Estimate estimate = survey(trimmed);
+            if (progress != null) {
+                progress.onProgress("Scanning: " + estimate.images() + " images, "
+                        + estimate.videos() + " videos");
+            }
             if (!estimate.hasMatches()) {
                 return estimate.toRemoval();
+            }
+            if (cancelled != null && cancelled.getAsBoolean()) {
+                throw new CancellationException("removal cancelled before deletion");
             }
             // Images first: deleting them cascades their video_frames links, so
             // the orphan frames of a matched video are still matched when the
             // video deletion runs afterwards.
             dao.deleteAffectedImages(trimmed);
+            if (progress != null) {
+                progress.onProgress("Removing images...");
+            }
+            if (cancelled != null && cancelled.getAsBoolean()) {
+                throw new CancellationException("removal cancelled after images");
+            }
             dao.deleteAffectedVideos(trimmed);
+            if (progress != null) {
+                progress.onProgress("Removing videos...");
+            }
             return estimate.toRemoval();
         });
         // Refresh query planner statistics after mass deletions
         if (database != null) {
-            try (java.sql.Statement stmt = database.getConnection().createStatement()) {
+            try (Statement stmt = database.getConnection().createStatement()) {
                 stmt.execute("PRAGMA optimize");
             } catch (SQLException ignored) {
                 // Ignore optimization failures - non-critical
@@ -141,5 +187,13 @@ public class DataRemovalService {
      * @param faceSubImages face sub-images deleted
      */
     public record Removal(int images, int videos, int thumbnails, int faceSubImages) {
+    }
+
+    /**
+     * Callback for reporting removal progress to the UI.
+     */
+    @FunctionalInterface
+    public interface ProgressListener {
+        void onProgress(String message);
     }
 }

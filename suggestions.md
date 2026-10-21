@@ -13,7 +13,7 @@
 ## Robustness
 
 - [ ] Make offline startup work when FaceAI models are already cached - FaceSortApp.start() calls FaceAiService.modelsDownloaded() which internally calls FaceAI.create() and may require network even just to check; on download failure offline, re-check modelsDownloaded() before giving up so a previously downloaded library starts without internet (FaceSortApp.java:144-148, FaceAiService.java:58-81)
-- [ ] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - the confirmation exists, but the dialog disables its own Cancel while DataRemovalService runs with no progress callbacks (RemoveByPrefixDialog.java:132-170, DataRemovalService.java:28)
+- [x] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - Cancel is enabled during removal, progress is reported in the result label, and cancelling rolls back the transaction
 
 ## Testing / TDD
 
