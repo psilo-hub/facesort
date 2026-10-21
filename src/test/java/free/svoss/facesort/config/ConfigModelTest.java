@@ -141,6 +141,28 @@ class ConfigModelTest {
     }
 
     @Test
+    void toBuilder_buildReturnsEqualCopy() {
+        ConfigModel original = AppConfig.getDefault();
+
+        ConfigModel copy = original.toBuilder().build();
+
+        assertNotSame(original, copy, "build must produce a new instance");
+        assertEquals(original, copy, "a round-trip through the builder must be equal");
+    }
+
+    @Test
+    void toBuilder_changesOnlyTheRequestedField() {
+        ConfigModel original = AppConfig.getDefault();
+
+        ConfigModel changed = original.toBuilder().withLanguage("de").build();
+
+        assertEquals("de", changed.language());
+        assertEquals(original.minConfidence(), changed.minConfidence());
+        assertEquals(original.dbName(), changed.dbName());
+        assertNotSame(original, changed);
+    }
+
+    @Test
     void defaults_matchTheDocumentedDefaults() {
         ConfigModel config = AppConfig.getDefault();
 

@@ -7,7 +7,7 @@
 - [ ] Consolidate ViewService's duplicated path resolution and extract MediaFileResolver shared with StoredFaceImageSource.firstReadableFile (resolveOriginalFile/resolveFilterPath, openInDefaultViewer/openOriginal, openContainingFolder/openOriginalFolder - ViewService.java:127-287)
 - [ ] Extract shared UI helpers: TagWithNameDialog.toImage duplicates FaceUi.toImage, SettingsView.tooltip duplicates FaceUi.wrappedTooltip including the magic 420, RandomNameView.java:114 still builds a bare Tooltip, and applyFilterPath is duplicated in FaceNameView.java:541 and RandomNameView.java:312
 - [ ] Clean up small code smells - unused CSS selectors (.grid-of-faces, .candidate-check), modal-error Javadoc copied across six views, misleading getText() == null checks on never-null TextField.getText(), the magic constant 420 in FaceUi/SettingsView, inconsistent constructor null-check styles across services
-- [ ] Reduce ConfigModel's 21 with* copy-method fan-out with a toBuilder() while keeping the record immutable - adding one config field currently touches ~23 places (ConfigModel.java:188-354)
+- [x] Reduce ConfigModel's 21 with* copy-method fan-out with a toBuilder() while keeping the record immutable - adding one config field now touches the Builder once instead of every with* method
 - [ ] Refactor views to depend on narrow service interfaces instead of concrete fat services for testability (DedupeView uses DeduplicationService, NameFaceView/RandomNameView use NamingService, ViewView uses ViewService, FaceNameView uses FaceToNameService)
 
 ## Robustness

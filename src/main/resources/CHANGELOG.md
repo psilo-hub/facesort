@@ -288,6 +288,11 @@ All notable changes to Face Sort will be documented in this file.
   no longer starts a background thread and a database lookup per face. The
   remembered paths are dropped after an import or a removal by path prefix
   (2026-10-16)
+- Config model: replaced the 21 `with*` copy methods that each repeated every
+  field with a `toBuilder()` plus a `Builder`, so adding a config field no
+  longer requires touching every `with*` method. The public `with*` API is
+  unchanged (each now delegates to the builder) and the record stays immutable
+  (2026-10-21)
 
 ### Removed
 - Dead code cleaned up (no behavior change): the unused `FaceThumbnail` and

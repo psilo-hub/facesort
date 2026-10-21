@@ -112,28 +112,7 @@ public record ConfigModel(
      * @return a config populated with the built-in defaults
      */
     public static ConfigModel defaults() {
-        return new ConfigModel(
-                DEFAULT_LAST_IMPORT_FOLDER,
-                DEFAULT_MIN_BOUNDING_BOX_SIZE,
-                DEFAULT_MIN_CONFIDENCE,
-                DEFAULT_MAX_FACES_PER_IMAGE,
-                DEFAULT_MAX_DETECTION_DIMENSION,
-                DEFAULT_THUMBNAIL_QUALITY,
-                DEFAULT_MAX_FRAMES_PER_VIDEO,
-                DEFAULT_FACE_CROP_SIZE,
-                DEFAULT_CLUSTERING_THRESHOLD,
-                DEFAULT_HNSW_M,
-                DEFAULT_HNSW_EF_CONSTRUCTION,
-                DEFAULT_HNSW_EF_SEARCH,
-                DEFAULT_KNN_K,
-                null, // faceaiCacheDir: derived from the platform cache dir when unset
-                DEFAULT_THUMBNAIL_SIZE,
-                DEFAULT_MAX_IMPORT_THREADS,
-                DEFAULT_DB_NAME,
-                DEFAULT_MIN_NAME_SIMILARITY,
-                DEFAULT_FACE_NAME_MAX_IMAGES,
-                DEFAULT_UPDATE_CHECK_ENABLED,
-                DEFAULT_LANGUAGE);
+        return new Builder().build();
     }
 
     /**
@@ -153,28 +132,24 @@ public record ConfigModel(
      * @return this config with every component clamped into its valid range
      */
     public ConfigModel normalized() {
-        return new ConfigModel(
-                lastImportFolder,
-                clamp(minBoundingBoxSize, MIN_BOUNDING_BOX_SIZE, Integer.MAX_VALUE),
-                clamp(minConfidence, 0.0, 1.0),
-                clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE),
-                clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE),
-                (float) clamp(thumbnailQuality, MIN_THUMBNAIL_QUALITY, 1.0),
-                clamp(maxFramesPerVideo, MIN_MAX_FRAMES_PER_VIDEO, Integer.MAX_VALUE),
-                clamp(faceCropSize, MIN_FACE_CROP_SIZE, Integer.MAX_VALUE),
-                clamp(clusteringThreshold, 0.0, 1.0),
-                clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE),
-                clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE),
-                clamp(hnswEfSearch, MIN_HNSW_EF, Integer.MAX_VALUE),
-                clamp(knnK, MIN_KNN_K, Integer.MAX_VALUE),
-                faceaiCacheDir,
-                clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE),
-                clamp(maxImportThreads, 1, MAX_IMPORT_THREADS),
-                dbName,
-                clamp(minNameSimilarity, 0.0, 1.0),
-                clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE),
-                updateCheckEnabled,
-                language);
+        return toBuilder()
+                .withMinBoundingBoxSize(clamp(minBoundingBoxSize, MIN_BOUNDING_BOX_SIZE, Integer.MAX_VALUE))
+                .withMinConfidence(clamp(minConfidence, 0.0, 1.0))
+                .withMaxFacesPerImage(clamp(maxFacesPerImage, MIN_MAX_FACES_PER_IMAGE, Integer.MAX_VALUE))
+                .withMaxDetectionDimension(clamp(maxDetectionDimension, MIN_MAX_DETECTION_DIMENSION, Integer.MAX_VALUE))
+                .withThumbnailQuality((float) clamp(thumbnailQuality, MIN_THUMBNAIL_QUALITY, 1.0))
+                .withMaxFramesPerVideo(clamp(maxFramesPerVideo, MIN_MAX_FRAMES_PER_VIDEO, Integer.MAX_VALUE))
+                .withFaceCropSize(clamp(faceCropSize, MIN_FACE_CROP_SIZE, Integer.MAX_VALUE))
+                .withClusteringThreshold(clamp(clusteringThreshold, 0.0, 1.0))
+                .withHnswM(clamp(hnswM, MIN_HNSW_M, Integer.MAX_VALUE))
+                .withHnswEfConstruction(clamp(hnswEfConstruction, MIN_HNSW_EF, Integer.MAX_VALUE))
+                .withHnswEfSearch(clamp(hnswEfSearch, MIN_HNSW_EF, Integer.MAX_VALUE))
+                .withKnnK(clamp(knnK, MIN_KNN_K, Integer.MAX_VALUE))
+                .withThumbnailSize(clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE))
+                .withMaxImportThreads(clamp(maxImportThreads, 1, MAX_IMPORT_THREADS))
+                .withMinNameSimilarity(clamp(minNameSimilarity, 0.0, 1.0))
+                .withFaceNameMaxImages(clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE))
+                .build();
     }
 
     private static int clamp(int value, int min, int max) {
@@ -185,171 +160,286 @@ public record ConfigModel(
         return Math.max(min, Math.min(max, value));
     }
 
+    /**
+     * Returns a builder initialized from this config's values, so a single
+     * component can be changed without listing every field at the call site.
+     *
+     * @return a builder seeded with this config
+     */
+    public Builder toBuilder() {
+        return new Builder(this);
+    }
+
+    /**
+     * A mutable builder for {@link ConfigModel} copies. Start from
+     * {@link #toBuilder()} to alter one field of an existing config, or
+     * {@code new Builder()} for the documented defaults.
+     *
+     * <p>Centralizing the field list here means adding a config field touches
+     * the builder once instead of every {@code with*} method.</p>
+     */
+    public static final class Builder {
+        private String lastImportFolder = DEFAULT_LAST_IMPORT_FOLDER;
+        private int minBoundingBoxSize = DEFAULT_MIN_BOUNDING_BOX_SIZE;
+        private double minConfidence = DEFAULT_MIN_CONFIDENCE;
+        private int maxFacesPerImage = DEFAULT_MAX_FACES_PER_IMAGE;
+        private int maxDetectionDimension = DEFAULT_MAX_DETECTION_DIMENSION;
+        private float thumbnailQuality = DEFAULT_THUMBNAIL_QUALITY;
+        private int maxFramesPerVideo = DEFAULT_MAX_FRAMES_PER_VIDEO;
+        private int faceCropSize = DEFAULT_FACE_CROP_SIZE;
+        private double clusteringThreshold = DEFAULT_CLUSTERING_THRESHOLD;
+        private int hnswM = DEFAULT_HNSW_M;
+        private int hnswEfConstruction = DEFAULT_HNSW_EF_CONSTRUCTION;
+        private int hnswEfSearch = DEFAULT_HNSW_EF_SEARCH;
+        private int knnK = DEFAULT_KNN_K;
+        private String faceaiCacheDir;
+        private int thumbnailSize = DEFAULT_THUMBNAIL_SIZE;
+        private int maxImportThreads = DEFAULT_MAX_IMPORT_THREADS;
+        private String dbName = DEFAULT_DB_NAME;
+        private double minNameSimilarity = DEFAULT_MIN_NAME_SIMILARITY;
+        private int faceNameMaxImages = DEFAULT_FACE_NAME_MAX_IMAGES;
+        private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK_ENABLED;
+        private String language = DEFAULT_LANGUAGE;
+
+        private Builder() {
+        }
+
+        private Builder(ConfigModel source) {
+            this.lastImportFolder = source.lastImportFolder;
+            this.minBoundingBoxSize = source.minBoundingBoxSize;
+            this.minConfidence = source.minConfidence;
+            this.maxFacesPerImage = source.maxFacesPerImage;
+            this.maxDetectionDimension = source.maxDetectionDimension;
+            this.thumbnailQuality = source.thumbnailQuality;
+            this.maxFramesPerVideo = source.maxFramesPerVideo;
+            this.faceCropSize = source.faceCropSize;
+            this.clusteringThreshold = source.clusteringThreshold;
+            this.hnswM = source.hnswM;
+            this.hnswEfConstruction = source.hnswEfConstruction;
+            this.hnswEfSearch = source.hnswEfSearch;
+            this.knnK = source.knnK;
+            this.faceaiCacheDir = source.faceaiCacheDir;
+            this.thumbnailSize = source.thumbnailSize;
+            this.maxImportThreads = source.maxImportThreads;
+            this.dbName = source.dbName;
+            this.minNameSimilarity = source.minNameSimilarity;
+            this.faceNameMaxImages = source.faceNameMaxImages;
+            this.updateCheckEnabled = source.updateCheckEnabled;
+            this.language = source.language;
+        }
+
+        public Builder withLastImportFolder(String lastImportFolder) {
+            this.lastImportFolder = lastImportFolder;
+            return this;
+        }
+
+        public Builder withMinBoundingBoxSize(int minBoundingBoxSize) {
+            this.minBoundingBoxSize = minBoundingBoxSize;
+            return this;
+        }
+
+        public Builder withMinConfidence(double minConfidence) {
+            this.minConfidence = minConfidence;
+            return this;
+        }
+
+        public Builder withMaxFacesPerImage(int maxFacesPerImage) {
+            this.maxFacesPerImage = maxFacesPerImage;
+            return this;
+        }
+
+        public Builder withMaxDetectionDimension(int maxDetectionDimension) {
+            this.maxDetectionDimension = maxDetectionDimension;
+            return this;
+        }
+
+        public Builder withThumbnailQuality(float thumbnailQuality) {
+            this.thumbnailQuality = thumbnailQuality;
+            return this;
+        }
+
+        public Builder withMaxFramesPerVideo(int maxFramesPerVideo) {
+            this.maxFramesPerVideo = maxFramesPerVideo;
+            return this;
+        }
+
+        public Builder withFaceCropSize(int faceCropSize) {
+            this.faceCropSize = faceCropSize;
+            return this;
+        }
+
+        public Builder withClusteringThreshold(double clusteringThreshold) {
+            this.clusteringThreshold = clusteringThreshold;
+            return this;
+        }
+
+        public Builder withHnswM(int hnswM) {
+            this.hnswM = hnswM;
+            return this;
+        }
+
+        public Builder withHnswEfConstruction(int hnswEfConstruction) {
+            this.hnswEfConstruction = hnswEfConstruction;
+            return this;
+        }
+
+        public Builder withHnswEfSearch(int hnswEfSearch) {
+            this.hnswEfSearch = hnswEfSearch;
+            return this;
+        }
+
+        public Builder withKnnK(int knnK) {
+            this.knnK = knnK;
+            return this;
+        }
+
+        public Builder withFaceaiCacheDir(String faceaiCacheDir) {
+            this.faceaiCacheDir = faceaiCacheDir;
+            return this;
+        }
+
+        public Builder withThumbnailSize(int thumbnailSize) {
+            this.thumbnailSize = thumbnailSize;
+            return this;
+        }
+
+        public Builder withMaxImportThreads(int maxImportThreads) {
+            this.maxImportThreads = maxImportThreads;
+            return this;
+        }
+
+        public Builder withDbName(String dbName) {
+            this.dbName = dbName;
+            return this;
+        }
+
+        public Builder withMinNameSimilarity(double minNameSimilarity) {
+            this.minNameSimilarity = minNameSimilarity;
+            return this;
+        }
+
+        public Builder withFaceNameMaxImages(int faceNameMaxImages) {
+            this.faceNameMaxImages = faceNameMaxImages;
+            return this;
+        }
+
+        public Builder withUpdateCheckEnabled(boolean updateCheckEnabled) {
+            this.updateCheckEnabled = updateCheckEnabled;
+            return this;
+        }
+
+        public Builder withLanguage(String language) {
+            this.language = language;
+            return this;
+        }
+
+        public ConfigModel build() {
+            return new ConfigModel(
+                    lastImportFolder,
+                    minBoundingBoxSize,
+                    minConfidence,
+                    maxFacesPerImage,
+                    maxDetectionDimension,
+                    thumbnailQuality,
+                    maxFramesPerVideo,
+                    faceCropSize,
+                    clusteringThreshold,
+                    hnswM,
+                    hnswEfConstruction,
+                    hnswEfSearch,
+                    knnK,
+                    faceaiCacheDir,
+                    thumbnailSize,
+                    maxImportThreads,
+                    dbName,
+                    minNameSimilarity,
+                    faceNameMaxImages,
+                    updateCheckEnabled,
+                    language);
+        }
+    }
+
     public ConfigModel withLastImportFolder(String lastImportFolder) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withLastImportFolder(lastImportFolder).build();
     }
 
     public ConfigModel withMinBoundingBoxSize(int minBoundingBoxSize) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMinBoundingBoxSize(minBoundingBoxSize).build();
     }
 
     public ConfigModel withMinConfidence(double minConfidence) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMinConfidence(minConfidence).build();
     }
 
     public ConfigModel withMaxFacesPerImage(int maxFacesPerImage) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMaxFacesPerImage(maxFacesPerImage).build();
     }
 
     public ConfigModel withMaxDetectionDimension(int maxDetectionDimension) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMaxDetectionDimension(maxDetectionDimension).build();
     }
 
     public ConfigModel withThumbnailQuality(float thumbnailQuality) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withThumbnailQuality(thumbnailQuality).build();
     }
 
     public ConfigModel withMaxFramesPerVideo(int maxFramesPerVideo) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMaxFramesPerVideo(maxFramesPerVideo).build();
     }
 
     public ConfigModel withFaceCropSize(int faceCropSize) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withFaceCropSize(faceCropSize).build();
     }
 
     public ConfigModel withClusteringThreshold(double clusteringThreshold) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withClusteringThreshold(clusteringThreshold).build();
     }
 
     public ConfigModel withHnswM(int hnswM) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withHnswM(hnswM).build();
     }
 
     public ConfigModel withHnswEfConstruction(int hnswEfConstruction) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withHnswEfConstruction(hnswEfConstruction).build();
     }
 
     public ConfigModel withHnswEfSearch(int hnswEfSearch) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withHnswEfSearch(hnswEfSearch).build();
     }
 
     public ConfigModel withKnnK(int knnK) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withKnnK(knnK).build();
     }
 
     public ConfigModel withFaceaiCacheDir(String faceaiCacheDir) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withFaceaiCacheDir(faceaiCacheDir).build();
     }
 
     public ConfigModel withThumbnailSize(int thumbnailSize) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withThumbnailSize(thumbnailSize).build();
     }
 
     public ConfigModel withMaxImportThreads(int maxImportThreads) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMaxImportThreads(maxImportThreads).build();
     }
 
     public ConfigModel withDbName(String dbName) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withDbName(dbName).build();
     }
 
     public ConfigModel withMinNameSimilarity(double minNameSimilarity) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withMinNameSimilarity(minNameSimilarity).build();
     }
 
     public ConfigModel withFaceNameMaxImages(int faceNameMaxImages) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withFaceNameMaxImages(faceNameMaxImages).build();
     }
 
     public ConfigModel withUpdateCheckEnabled(boolean updateCheckEnabled) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withUpdateCheckEnabled(updateCheckEnabled).build();
     }
 
     public ConfigModel withLanguage(String language) {
-        return new ConfigModel(lastImportFolder, minBoundingBoxSize, minConfidence,
-                maxFacesPerImage, maxDetectionDimension, thumbnailQuality, maxFramesPerVideo,
-                faceCropSize, clusteringThreshold, hnswM, hnswEfConstruction, hnswEfSearch,
-                knnK, faceaiCacheDir, thumbnailSize, maxImportThreads, dbName,
-                minNameSimilarity, faceNameMaxImages, updateCheckEnabled, language);
+        return toBuilder().withLanguage(language).build();
     }
 }
