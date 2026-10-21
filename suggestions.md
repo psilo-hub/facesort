@@ -1,15 +1,5 @@
 # FaceSort — Improvement Todo List
 
-## Performance
-
-- [x] Throttle import progress callbacks to avoid FX thread starvation and stop synchronizing on the caller-owned listener (ImportWorkerPool.reportProgress fires one callback per file, ImportWorkerPool.java:95-120, ImportView.java:246)
-- [x] Optimize NamingService.findSimilarUnnamed to avoid loading the entire unnamed corpus - extract SimilarityRanker and reuse the HNSW index already used by ClusteringService (NamingService.java:302-326)
-- [x] Remove the N+1 blob hydration in ViewService.getNameSummaries - it calls faceDao.findByNameId per name and loads embeddings/crops the summary never uses; NameDao.findAll already carries face_count (ViewService.java:64-75)
-- [x] Stop issuing one thumbnail query per image in ViewService.getImagesForName - add a batch ImageDao.getThumbnails and pin the query count with QueryCountingConnection (ViewService.java:92-99, ImageDao.java:127-129)
-- [x] Bound MostSimilarService.findBestSuggestion's per-name scan - it issues two queries per name on every tab refresh; add early exit or per-name caching and a query-count cap test (MostSimilarService.java:74-94)
-- [x] Decode face thumbnails off the JavaFX application thread and share an LruCache for FaceUi.toImage - it synchronously decodes JPEG bytes on every face-card rebuild (FaceUi.java:109-123)
-- [x] Replace the thread-per-tooltip in FaceUi.installPathTooltip with a small shared executor and cache resolved paths per image hash, invalidated when the stored paths change (FaceUi.java:222-242)
-
 ## Clean code
 
 - [ ] Remove the 8 test-only DAO methods: NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes (keep NotDupeDao.findAll - it is used by DeduplicationService)
@@ -23,12 +13,11 @@
 ## Robustness
 
 - [ ] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - the confirmation exists, but the dialog disables its own Cancel while DataRemovalService runs with no progress callbacks (RemoveByPrefixDialog.java:132-170, DataRemovalService.java:28)
-- [x] Refuse to open a database newer than SCHEMA_VERSION with a user-facing error and run each migration step in a transaction - today a newer DB is opened after only a WARNING and a crash mid-migration leaves a half-migrated schema (Database.java:24,121-140,160-204)
-- [x] Surface background-task failures and ship a logging configuration - FaceUi.java:315-317 and TagWithNameDialog.java:178-180 attach empty onFailed handlers, and there is no logging.properties/FileHandler so packaged-app warnings vanish without a console
 
 ## Testing / TDD
 
 - [ ] Extend headless test seams for SettingsView, DedupeView, NameFaceView and RandomNameView - none of the four has a test class and all build JavaFX controls inline
+- [ ] Add headless test seams for TagWithNameDialog, ImportView, MostSimilarView and MainWindow - none has a test class and all build JavaFX controls inline
 - [ ] Add i18n bundle-consistency tests - every key referenced in source must exist in the base bundle and all five translations must match its key set (I18n.text silently returns the raw key on a miss; the six bundles are at parity today with 297 keys each)
 - [ ] Add a headless TaskRunnerTest with a runLater/executor seam covering success, failure propagation and cancellation before/after start (TaskRunner has no direct test; bugs in this area were found twice already)
 

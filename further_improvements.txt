@@ -1,2 +1,0 @@
-1. On first start the app should download the necessary models. Any later app start should work without an internet connection. 
-2. Marking face sub-images as "Not a face" should also be possible for a selected range.
