@@ -141,7 +141,19 @@ public class FaceSortApp extends Application {
 
             // 2. On the very first start the FaceAI models are not cached yet.
             //    Download them first and show a frame so the user can watch progress.
-            if (FaceAiService.modelsDownloaded(configStore.get())) {
+            //    modelsDownloaded() may itself require network (FaceAI.create() is
+            //    involved), so a failure there is treated as "not yet downloaded"
+            //    and the download path is tried; if that also fails offline we
+            //    re-check once more before giving up, so a previously downloaded
+            //    library starts without an internet connection.
+            boolean modelsReady;
+            try {
+                modelsReady = FaceAiService.modelsDownloaded(configStore.get());
+            } catch (Exception e) {
+                modelsReady = false;
+                LOG.log(Level.WARNING, "Could not determine whether FaceAI models are downloaded; will attempt download", e);
+            }
+            if (modelsReady) {
                 showMainWindow(primaryStage);
             } else {
                 startModelDownload(primaryStage);
@@ -191,6 +203,17 @@ public class FaceSortApp extends Application {
         });
         task.setOnFailed(e -> {
             Throwable error = task.getException();
+            // The download may have failed for a transient reason (no internet)
+            // while the models are actually already cached. Re-check before
+            // giving up so a previously downloaded library starts offline.
+            try {
+                if (FaceAiService.modelsDownloaded(configStore.get())) {
+                    showMainWindow(primaryStage);
+                    return;
+                }
+            } catch (Exception ex) {
+                // fall through to the error dialog below
+            }
             showStartupError(I18n.format("app.modelDownloadFailed",
                     error != null ? error.getMessage() : I18n.get("app.unknownError")), error);
             Platform.exit();

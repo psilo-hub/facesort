@@ -4,7 +4,7 @@ FaceSort — project todo
 State as of 2026-10-16. `mvn test` is green: 637 tests / 65 test classes,
 0 failures, 0 skipped.
 
-All work is tracked in `suggestions.md` (27 items, with the rationale and the
+All work is tracked in `suggestions.md` (28 items, with the rationale and the
 file/line references; finished items have been removed). This file keeps no
 separate backlog: every item it used to carry is done, superseded, or already
 one of those items. Keep the two files in sync in the same commit (see

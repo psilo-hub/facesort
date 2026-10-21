@@ -417,3 +417,8 @@ All notable changes to Face Sort will be documented in this file.
   Noto Emoji font and the tab text the bundled Noto Sans font, so the tabs look
   the same on every system; the View and Settings tabs no longer show a stray
   variation-selector character (their emoji changed to 🔎 and 🔧) (2026-09-21)
+- Starting Face Sort without an internet connection now works when the FaceAI
+  models have already been downloaded once. The startup check no longer fails
+  just because it cannot reach the network, and a failed model download is
+  retried against the local cache before the app gives up, so a previously
+  downloaded library opens offline (2026-10-21)
