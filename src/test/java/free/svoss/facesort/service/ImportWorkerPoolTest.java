@@ -91,6 +91,24 @@ class ImportWorkerPoolTest {
     }
 
     @Test
+    void run_countsTaskErrorsAsErrorsAndContinuesWithRest() {
+        AtomicInteger processedCount = new AtomicInteger();
+        ImportWorkerPool.Result result = ImportWorkerPool.run(1, List.of(service()),
+                "error-continue-", files(3), null, null, (s, file) -> {
+                    int index = processedCount.incrementAndGet();
+                    if (index == 1) {
+                        // An Error from a single file (e.g. a decoder failure
+                        // in VideoImportService) must not abort the import.
+                        throw new InternalError("boom on first file");
+                    }
+                    return 0;
+                });
+
+        assertEquals(3, result.processed(), "all files must be processed even when one throws an Error");
+        assertEquals(1, result.errors(), "the failing file must be counted as an error");
+    }
+
+    @Test
     void run_countsDroppedFacesAsErrors() {
         ImportWorkerPool.Result result = ImportWorkerPool.run(1, List.of(service()),
                 "drop-", files(2), null, null, (s, file) -> 3);

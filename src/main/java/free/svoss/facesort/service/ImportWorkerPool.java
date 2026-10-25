@@ -109,7 +109,11 @@ final class ImportWorkerPool {
                     // the user, while the remaining faces are still stored.
                     errors.incrementAndGet();
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // Catch Throwable (not just Exception) so a failure in one file
+                // — even an Error such as a decoder failure in
+                // VideoImportService — is logged, counted as an error, and
+                // never kills this worker or aborts the import of the rest.
                 LOG.log(Level.WARNING, "Error processing file: " + file, e);
                 errors.incrementAndGet();
             }

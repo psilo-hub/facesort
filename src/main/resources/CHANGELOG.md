@@ -416,6 +416,9 @@ All notable changes to Face Sort will be documented in this file.
   whose faces could not be cropped/embedded/encoded now counts as an error in the
   import summary, while the remaining faces (and the file itself) are still stored
   (2026-09-23)
+- A single file whose import crashes (an `Error`, e.g. a decoder failure in a
+  video) no longer stops the whole import: it is logged, counted as an error, and
+  the remaining photos and videos are still imported (2026-10-25)
 - Similarity percentages are formatted consistently in the "Add faces to a name" and
   "Put a name to a face" tabs, rounded to a whole percent with the active locale
   (2026-09-23)
