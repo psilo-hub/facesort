@@ -1,3 +1,5 @@
-1. When tagging an image or images with a name (in the "Put a name to a face" and the "Tag random face" tab) than name should be selected or jumped to when switching to the "add faces to a name" tab.
+1. When tagging an image or images with a name (in the "Put a name to a face" and the "Tag random face" tab) that name should be selected or jumped to when switching to the "add faces to a name" tab.
 
 2. Whenever a path filter is set in a tab, that path is stored somewhere in a global variable. When switching to a tab with a path filter, the stored value is set as the path filter.
+
+3. Switching tabs shouldn't interrupt running tasks. For example, if I switch from the "Import images" tab to another tab, a running import task should keep running until it's finished.
