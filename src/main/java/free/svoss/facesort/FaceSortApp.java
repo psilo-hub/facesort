@@ -149,7 +149,13 @@ public class FaceSortApp extends Application {
             boolean modelsReady;
             try {
                 modelsReady = FaceAiService.modelsDownloaded(configStore.get());
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // FaceAI.create() (native library loading) is involved in the
+                // check and may fail even just to determine whether the models
+                // are cached, for example offline. Treat any failure —
+                // Exception or Error — as "not yet confirmed" and fall through
+                // to the download path, which re-checks the local cache before
+                // giving up so a previously downloaded library starts offline.
                 modelsReady = false;
                 LOG.log(Level.WARNING, "Could not determine whether FaceAI models are downloaded; will attempt download", e);
             }
@@ -211,7 +217,7 @@ public class FaceSortApp extends Application {
                     showMainWindow(primaryStage);
                     return;
                 }
-            } catch (Exception ex) {
+            } catch (Throwable ex) {
                 // fall through to the error dialog below
             }
             showStartupError(I18n.format("app.modelDownloadFailed",
