@@ -1,6 +1,5 @@
 package free.svoss.facesort.db;
 
-import free.svoss.facesort.model.ImageRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,9 +65,8 @@ class SynchronizedConnectionTest {
 
         dao.insert("hash-wrapped", 123L, "{}", 1);
 
-        ImageRecord record = dao.findByHash("hash-wrapped").orElseThrow();
-        assertEquals("hash-wrapped", record.hash());
-        assertEquals(123L, record.detectionTs());
+        assertTrue(dao.exists("hash-wrapped"),
+                "the insert issued through the wrapped connection must be stored");
     }
 
     @Test

@@ -134,7 +134,8 @@ class FaceDaoTest {
 
         assertTrue(faceDao.findById(dismissed).isPresent(),
                 "a dismissed detection is hidden from the tagging views, not deleted");
-        assertEquals(1, faceDao.findAll().size(), "the face row must survive its dismissal");
+        assertEquals(1, countRows("SELECT count(*) FROM faces"),
+                "the face row must survive its dismissal");
     }
 
     @Test
@@ -795,17 +796,6 @@ class FaceDaoTest {
     }
 
     @Test
-    void delete_removesFace() throws Exception {
-        insertImage("img1");
-        long faceId = insertFace("img1", 0, 0, new float[]{1.0f}, null);
-
-        faceDao.delete(faceId);
-
-        assertTrue(faceDao.findById(faceId).isEmpty());
-        assertTrue(faceDao.findAll().isEmpty());
-    }
-
-    @Test
     void deleteName_setsFaceNameToNull() throws Exception {
         insertImage("img1");
         long alice = nameDao.insert("Alice");
@@ -821,9 +811,9 @@ class FaceDaoTest {
     void insert_embeddingRoundTripsViaEmbeddingUtils() throws Exception {
         insertImage("img1");
         float[] embedding = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f};
-        insertFace("img1", 0, 0, embedding, null);
+        long faceId = insertFace("img1", 0, 0, embedding, null);
 
-        FaceRecord loaded = faceDao.findAll().get(0);
+        FaceRecord loaded = faceDao.findById(faceId).orElseThrow();
         assertArrayEquals(embedding, loaded.embedding(), 0.0f,
                 "embedding floats must survive the DB round-trip");
         assertArrayEquals(JPEG, loaded.subImageJpg());
@@ -840,17 +830,6 @@ class FaceDaoTest {
     @Test
     void insert_nullFace_throws() throws Exception {
         assertThrows(IllegalArgumentException.class, () -> faceDao.insert(null));
-    }
-
-    @Test
-    void findAll_returnsAllFaces() throws Exception {
-        insertImage("img1");
-        insertImage("img2");
-        insertFace("img1", 0, 0, new float[]{1.0f}, null);
-        insertFace("img1", 20, 0, new float[]{2.0f}, null);
-        insertFace("img2", 0, 0, new float[]{3.0f}, null);
-
-        assertEquals(3, faceDao.findAll().size());
     }
 
     @Test

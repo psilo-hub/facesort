@@ -8,11 +8,13 @@ import free.svoss.facesort.db.NotDupeDao;
 import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.model.NamePair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -132,8 +134,8 @@ class DeduplicationServiceTest {
         service.markNotDupes(alice, bob);
 
         assertTrue(service.nextPair().isEmpty());
-        assertTrue(notDupeDao.isNotDupe(alice, bob));
-        assertTrue(notDupeDao.isNotDupe(bob, alice));
+        assertEquals(List.of(new NamePair(alice, bob)), notDupeDao.findAll(),
+                "the confirmed pair is stored once in normalized form");
     }
 
     @Test

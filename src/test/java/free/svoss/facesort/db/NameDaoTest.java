@@ -101,7 +101,8 @@ class NameDaoTest {
         FaceRecord face = faceDao.findById(faceId).orElseThrow();
         assertNull(face.nameId(),
                 "faces keep their image but must lose the deleted name reference");
-        assertEquals(1, imageDao.getAllHashes().size(), "the image itself must survive");
+        assertEquals(1, DbTestQueries.allImageHashes(db.getConnection()).size(),
+                "the image itself must survive");
     }
 
     @Test

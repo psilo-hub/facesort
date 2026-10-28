@@ -540,21 +540,6 @@ public class FaceDao {
     }
 
     /**
-     * Returns all faces (for clustering, etc.).
-     */
-    public List<FaceRecord> findAll() throws SQLException {
-        List<FaceRecord> faces = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                "SELECT " + SELECT_COLUMNS + " FROM faces")) {
-            while (rs.next()) {
-                faces.add(mapRow(rs));
-            }
-        }
-        return faces;
-    }
-
-    /**
      * Returns a face by its id.
      */
     public Optional<FaceRecord> findById(long id) throws SQLException {
@@ -635,17 +620,6 @@ public class FaceDao {
     public void markNotAFace(long faceId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT OR IGNORE INTO not_faces (face_id) VALUES (?)")) {
-            ps.setLong(1, faceId);
-            ps.executeUpdate();
-        }
-    }
-
-    /**
-     * Deletes a face by id.
-     */
-    public void delete(long faceId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM faces WHERE id = ?")) {
             ps.setLong(1, faceId);
             ps.executeUpdate();
         }

@@ -1,7 +1,6 @@
 package free.svoss.facesort.db;
 
 import free.svoss.facesort.model.VideoFrameLinkRecord;
-import free.svoss.facesort.model.VideoRecord;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -66,38 +65,6 @@ public class VideoDao {
                 "SELECT 1 FROM videos WHERE hash = ?")) {
             ps.setString(1, hash);
             return ps.executeQuery().next();
-        }
-    }
-
-    /**
-     * Returns a {@link VideoRecord} by hash, or empty when not found.
-     * Linked-frame counts are computed live: {@code frameCount} counts the
-     * {@code video_frames} rows, {@code faceCount} sums the faces stored on the
-     * linked frame images.
-     */
-    public Optional<VideoRecord> findByHash(String hash) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("""
-                SELECT v.hash, v.detection_ts, v.criteria_json, v.duration_secs,
-                       (SELECT COUNT(*) FROM video_frames vf
-                         WHERE vf.video_hash = v.hash) AS frame_count,
-                       (SELECT COALESCE(SUM(i.face_count), 0) FROM video_frames vf
-                         JOIN images i ON i.hash = vf.frame_hash
-                         WHERE vf.video_hash = v.hash) AS face_count
-                FROM videos v WHERE v.hash = ?
-                """)) {
-            ps.setString(1, hash);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new VideoRecord(
-                        rs.getString("hash"),
-                        rs.getLong("detection_ts"),
-                        rs.getString("criteria_json"),
-                        rs.getDouble("duration_secs"),
-                        rs.getInt("frame_count"),
-                        rs.getInt("face_count")));
-            }
         }
     }
 

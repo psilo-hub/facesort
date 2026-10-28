@@ -34,37 +34,6 @@ public class NotDupeDao {
     }
 
     /**
-     * Checks if two names are marked as not-duplicates.
-     */
-    public boolean isNotDupe(long nameIdA, long nameIdB) throws SQLException {
-        long a = Math.min(nameIdA, nameIdB);
-        long b = Math.max(nameIdA, nameIdB);
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT 1 FROM not_dupes WHERE name_id_a = ? AND name_id_b = ?")) {
-            ps.setLong(1, a);
-            ps.setLong(2, b);
-            return ps.executeQuery().next();
-        }
-    }
-
-    /**
-     * Returns all not-dupe pairs involving the given name.
-     */
-    public List<NamePair> findByNameId(long nameId) throws SQLException {
-        List<NamePair> pairs = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT name_id_a, name_id_b FROM not_dupes WHERE name_id_a = ? OR name_id_b = ?")) {
-            ps.setLong(1, nameId);
-            ps.setLong(2, nameId);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                pairs.add(new NamePair(rs.getLong("name_id_a"), rs.getLong("name_id_b")));
-            }
-        }
-        return pairs;
-    }
-
-    /**
      * Returns all not-dupe pairs.
      */
     public List<NamePair> findAll() throws SQLException {
@@ -76,17 +45,5 @@ public class NotDupeDao {
             }
         }
         return pairs;
-    }
-
-    /**
-     * Removes all not-dupe entries involving the given name (used during merge).
-     */
-    public void deleteForName(long nameId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM not_dupes WHERE name_id_a = ? OR name_id_b = ?")) {
-            ps.setLong(1, nameId);
-            ps.setLong(2, nameId);
-            ps.executeUpdate();
-        }
     }
 }

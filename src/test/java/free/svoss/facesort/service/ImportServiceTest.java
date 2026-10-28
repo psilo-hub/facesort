@@ -3,6 +3,7 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
+import free.svoss.facesort.db.DbTestQueries;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.model.FaceRecord;
@@ -94,10 +95,14 @@ class ImportServiceTest {
      */
     private boolean importedAtLeast(int count) {
         try {
-            return imageDao.getAllHashes().size() >= count;
+            return allImageHashes().size() >= count;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private List<String> allImageHashes() throws SQLException {
+        return DbTestQueries.allImageHashes(db.getConnection());
     }
 
     private void writePng(Path file, int width, int height, Color color) throws Exception {
@@ -357,9 +362,9 @@ class ImportServiceTest {
             assertEquals(0, result.skipped());
             assertEquals(0, result.errors());
 
-            assertEquals(2, imageDao.getAllHashes().size());
+            assertEquals(2, allImageHashes().size());
             assertEquals(2, faceDao.findUnnamed().size());
-            for (String hash : imageDao.getAllHashes()) {
+            for (String hash : allImageHashes()) {
                 assertTrue(imageDao.hasThumbnail(hash));
                 assertNotNull(imageDao.getThumbnail(hash));
             }
@@ -389,9 +394,9 @@ class ImportServiceTest {
             assertEquals(0, result.errors());
 
             // Already-imported data must survive the cancellation.
-            assertEquals(3, imageDao.getAllHashes().size());
+            assertEquals(3, allImageHashes().size());
             assertEquals(3, faceDao.findUnnamed().size());
-            for (String hash : imageDao.getAllHashes()) {
+            for (String hash : allImageHashes()) {
                 assertTrue(imageDao.hasThumbnail(hash));
                 assertNotNull(imageDao.getThumbnail(hash));
             }
@@ -420,9 +425,9 @@ class ImportServiceTest {
             assertFalse(second.wasCancelled());
             assertEquals(5, second.processed());
 
-            assertEquals(5, imageDao.getAllHashes().size());
+            assertEquals(5, allImageHashes().size());
             assertEquals(5, faceDao.findUnnamed().size());
-            for (String hash : imageDao.getAllHashes()) {
+            for (String hash : allImageHashes()) {
                 assertTrue(imageDao.hasThumbnail(hash));
                 assertNotNull(imageDao.getThumbnail(hash));
             }
@@ -462,7 +467,7 @@ class ImportServiceTest {
             assertEquals(1, result.newPaths());
             assertEquals(0, result.newFaces());
             assertEquals(0, result.errors());
-            assertEquals(1, imageDao.getAllHashes().size());
+            assertEquals(1, allImageHashes().size());
         }
     }
 
@@ -493,8 +498,8 @@ class ImportServiceTest {
             assertEquals(1, result.newImages());
             assertEquals(1, result.newFaces());
             assertEquals(0, result.errors());
-            assertEquals(1, imageDao.getAllHashes().size());
-            String hash = imageDao.getAllHashes().iterator().next();
+            assertEquals(1, allImageHashes().size());
+            String hash = allImageHashes().iterator().next();
             assertTrue(imageDao.hasThumbnail(hash));
         }
     }
@@ -522,9 +527,9 @@ class ImportServiceTest {
             assertEquals(0, result.skipped());
             assertEquals(0, result.errors());
 
-            assertEquals(6, imageDao.getAllHashes().size());
+            assertEquals(6, allImageHashes().size());
             assertEquals(6, faceDao.findUnnamed().size());
-            for (String hash : imageDao.getAllHashes()) {
+            for (String hash : allImageHashes()) {
                 assertTrue(imageDao.hasThumbnail(hash));
                 assertNotNull(imageDao.getThumbnail(hash));
             }
@@ -551,7 +556,7 @@ class ImportServiceTest {
             assertEquals(2, result.processed());
             assertEquals(2, result.newImages());
             assertEquals(0, result.errors());
-            assertEquals(2, imageDao.getAllHashes().size());
+            assertEquals(2, allImageHashes().size());
         }
     }
 
@@ -576,9 +581,9 @@ class ImportServiceTest {
             assertEquals(0, result.errors());
 
             // Whatever was committed before cancellation must be consistent.
-            assertEquals(result.processed(), imageDao.getAllHashes().size());
+            assertEquals(result.processed(), allImageHashes().size());
             assertEquals(result.processed(), faceDao.findUnnamed().size());
-            for (String hash : imageDao.getAllHashes()) {
+            for (String hash : allImageHashes()) {
                 assertTrue(imageDao.hasThumbnail(hash));
                 assertNotNull(imageDao.getThumbnail(hash));
             }
@@ -604,7 +609,7 @@ class ImportServiceTest {
             assertEquals(1, result.newPaths());
             assertEquals(0, result.newFaces());
             assertEquals(0, result.errors());
-            assertEquals(1, imageDao.getAllHashes().size());
+            assertEquals(1, allImageHashes().size());
         }
     }
 
@@ -638,9 +643,9 @@ class ImportServiceTest {
                 "no worker may still run after importFolder returns");
         assertEquals(2, sharedMaxActive.get(),
                 "the two workers must really overlap (parallel, not serialized)");
-        assertEquals(6, imageDao.getAllHashes().size());
+        assertEquals(6, allImageHashes().size());
         assertEquals(6, faceDao.findUnnamed().size());
-        for (String hash : imageDao.getAllHashes()) {
+        for (String hash : allImageHashes()) {
             assertTrue(imageDao.hasThumbnail(hash));
         }
     }
@@ -675,8 +680,8 @@ class ImportServiceTest {
         assertEquals(1, result.newImages());
         assertEquals(1, result.newFaces());
         assertEquals(0, result.errors());
-        assertEquals(1, imageDao.getAllHashes().size());
-        assertTrue(imageDao.hasThumbnail(imageDao.getAllHashes().get(0)));
+        assertEquals(1, allImageHashes().size());
+        assertTrue(imageDao.hasThumbnail(allImageHashes().get(0)));
 
         // Detection ran on the scaled-down image (1000x800 -> 500x400).
         assertEquals(500, engine.detectionWidth());
@@ -772,7 +777,7 @@ class ImportServiceTest {
             assertEquals(1, result.newPaths(), "this file's path is the new part");
             assertEquals(1, result.processed());
 
-            assertEquals(1, imageDao.getAllHashes().size(), "still exactly one image row");
+            assertEquals(1, allImageHashes().size(), "still exactly one image row");
             List<String> paths = imageDao.getPaths(hash);
             assertEquals(2, paths.size());
             assertTrue(paths.contains(competitorPath));
@@ -815,7 +820,7 @@ class ImportServiceTest {
             assertEquals(0, result.newImages());
             assertEquals(1, result.processed());
 
-            assertEquals(1, imageDao.getAllHashes().size(), "only the competing worker's row");
+            assertEquals(1, allImageHashes().size(), "only the competing worker's row");
             assertFalse(imageDao.getPaths(hash).contains(absolutePath),
                     "the failed import must not have recorded its path");
         }

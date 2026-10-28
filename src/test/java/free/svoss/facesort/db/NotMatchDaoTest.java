@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.Statement;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,7 +96,9 @@ class NotMatchDaoTest {
         long face = insertUnnamedFace("img1");
         dao.insert(face, alice);
 
-        faceDao.delete(face);
+        try (Statement stmt = db.getConnection().createStatement()) {
+            stmt.executeUpdate("DELETE FROM faces WHERE id = " + face);
+        }
 
         assertFalse(dao.isNotMatch(face, alice),
                 "the rejection must not outlive the face it belongs to");

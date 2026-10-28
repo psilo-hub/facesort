@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.PreparedStatement;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,17 @@ class NotDupeDaoTest {
         return nameDao.insert(name);
     }
 
+    private boolean isNotDupe(long nameIdA, long nameIdB) throws Exception {
+        long a = Math.min(nameIdA, nameIdB);
+        long b = Math.max(nameIdA, nameIdB);
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "SELECT 1 FROM not_dupes WHERE name_id_a = ? AND name_id_b = ?")) {
+            ps.setLong(1, a);
+            ps.setLong(2, b);
+            return ps.executeQuery().next();
+        }
+    }
+
     @Test
     void insert_isNotDupe_orderInsensitive() throws Exception {
         long a = insertName("Alice");
@@ -43,9 +55,9 @@ class NotDupeDaoTest {
 
         dao.insert(a, b);
 
-        assertTrue(dao.isNotDupe(a, b), "forward order must be detected");
-        assertTrue(dao.isNotDupe(b, a), "reverse order must be detected (normalized storage)");
-        assertFalse(dao.isNotDupe(a, insertName("Carol")), "untracked pair must not be a not-dupe");
+        assertTrue(isNotDupe(a, b), "forward order must be detected");
+        assertTrue(isNotDupe(b, a), "reverse order must be detected (normalized storage)");
+        assertFalse(isNotDupe(a, insertName("Carol")), "untracked pair must not be a not-dupe");
     }
 
     @Test
@@ -62,24 +74,6 @@ class NotDupeDaoTest {
     }
 
     @Test
-    void findByNameId_returnsPairsInvolvingName() throws Exception {
-        long a = insertName("Alice");
-        long b = insertName("Bob");
-        long c = insertName("Carol");
-        dao.insert(a, b);
-        dao.insert(a, c);
-
-        List<NamePair> pairs = dao.findByNameId(a);
-        assertEquals(2, pairs.size(), "both pairs involving Alice are returned");
-
-        // a pair not involving Alice must not appear
-        long d = insertName("Dave");
-        long e = insertName("Erin");
-        dao.insert(d, e);
-        assertEquals(2, dao.findByNameId(a).size());
-    }
-
-    @Test
     void findAll_returnsAllPairs() throws Exception {
         long a = insertName("Alice");
         long b = insertName("Bob");
@@ -88,22 +82,6 @@ class NotDupeDaoTest {
         dao.insert(a, c);
 
         assertEquals(2, dao.findAll().size());
-    }
-
-    @Test
-    void deleteForName_removesPairsInvolvingName() throws Exception {
-        long a = insertName("Alice");
-        long b = insertName("Bob");
-        long c = insertName("Carol");
-        dao.insert(a, b);
-        dao.insert(a, c);
-        dao.insert(b, c);
-
-        dao.deleteForName(a);
-
-        assertFalse(dao.isNotDupe(a, b));
-        assertFalse(dao.isNotDupe(a, c));
-        assertTrue(dao.isNotDupe(b, c), "pair not involving the deleted name survives");
     }
 
     @Test
@@ -119,9 +97,9 @@ class NotDupeDaoTest {
 
         // Rows referencing Alice must be cascade-deleted; the (b, c) row
         // references only Bob and Carol and must survive.
-        assertFalse(dao.isNotDupe(a, b));
-        assertFalse(dao.isNotDupe(a, c));
-        assertTrue(dao.isNotDupe(b, c), "pair not involving the deleted name survives");
+        assertFalse(isNotDupe(a, b));
+        assertFalse(isNotDupe(a, c));
+        assertTrue(isNotDupe(b, c), "pair not involving the deleted name survives");
         assertEquals(1, dao.findAll().size());
     }
 

@@ -3,12 +3,12 @@ package free.svoss.facesort.service;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
+import free.svoss.facesort.db.DbTestQueries;
 import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.VideoFrameLinkRecord;
-import free.svoss.facesort.model.VideoRecord;
 import free.svoss.facesort.util.HashUtils;
 import free.svoss.facesort.util.ImageUtils;
 import free.svoss.tools.faceai.DetectedFace;
@@ -23,6 +23,9 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -276,6 +279,36 @@ class VideoImportServiceTest {
         return Integer.parseInt(parts[1].substring(0, parts[1].indexOf('/')));
     }
 
+    private List<String> allImageHashes() throws SQLException {
+        return DbTestQueries.allImageHashes(db.getConnection());
+    }
+
+    private int storedFrameCount(String videoHash) throws SQLException {
+        return videoDao.findFramesForVideo(videoHash).size();
+    }
+
+    private int storedFaceCount(String videoHash) throws SQLException {
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "SELECT COALESCE(SUM(i.face_count), 0) FROM video_frames vf "
+                        + "JOIN images i ON i.hash = vf.frame_hash WHERE vf.video_hash = ?")) {
+            ps.setString(1, videoHash);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    private double storedDurationSecs(String videoHash) throws SQLException {
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "SELECT duration_secs FROM videos WHERE hash = ?")) {
+            ps.setString(1, videoHash);
+            try (ResultSet rs = ps.executeQuery()) {
+                assertTrue(rs.next(), "the video row must be stored");
+                return rs.getDouble(1);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Tests
     // ------------------------------------------------------------------
@@ -300,10 +333,9 @@ class VideoImportServiceTest {
         assertEquals(1, result.processed());
 
         String videoHash = HashUtils.hashFile(file);
-        VideoRecord video = videoDao.findByHash(videoHash).orElseThrow();
-        assertEquals(3.0, video.durationSecs(), 0.001);
-        assertEquals(3, video.frameCount());
-        assertEquals(3, video.faceCount());
+        assertEquals(3.0, storedDurationSecs(videoHash), 0.001);
+        assertEquals(3, storedFrameCount(videoHash));
+        assertEquals(3, storedFaceCount(videoHash));
         assertTrue(videoDao.getPaths(videoHash).contains(file.toAbsolutePath().toString()),
                 "the video file path must be recorded");
 
@@ -313,7 +345,7 @@ class VideoImportServiceTest {
                 links.stream().map(VideoFrameLinkRecord::timestampMs).toList(),
                 "frame timestamps follow the sampled positions");
 
-        assertEquals(3, imageDao.getAllHashes().size());
+        assertEquals(3, allImageHashes().size());
         for (VideoFrameLinkRecord link : links) {
             assertTrue(imageDao.hasThumbnail(link.frameHash()), "every frame keeps a thumbnail");
             assertNotNull(imageDao.getThumbnail(link.frameHash()));
@@ -339,7 +371,7 @@ class VideoImportServiceTest {
             assertEquals(0, second.newFaces());
             assertEquals(1, second.skipped());
             assertEquals(0, second.errors());
-            assertEquals(3, imageDao.getAllHashes().size(),
+            assertEquals(3, allImageHashes().size(),
                     "the three frame rows from the first import are untouched");
             assertEquals(3, faceDao.findUnnamed().size());
         }
@@ -365,7 +397,7 @@ class VideoImportServiceTest {
             assertEquals(0, second.newFaces());
             assertEquals(0, second.skipped(), "a new path was recorded, so the copy is not a plain skip");
             assertEquals(0, second.errors());
-            assertEquals(3, imageDao.getAllHashes().size(),
+            assertEquals(3, allImageHashes().size(),
                     "the copy introduces no duplicate frames");
         }
         assertEquals(2, videoDao.getPaths(HashUtils.hashFile(original)).size(),
@@ -388,13 +420,13 @@ class VideoImportServiceTest {
         assertEquals(0, result.newFaces());
         assertEquals(0, result.errors());
 
-        VideoRecord video = videoDao.findByHash(HashUtils.hashFile(file)).orElseThrow();
-        assertEquals(2, video.frameCount());
-        assertEquals(0, video.faceCount());
+        String videoHash = HashUtils.hashFile(file);
+        assertEquals(2, storedFrameCount(videoHash));
+        assertEquals(0, storedFaceCount(videoHash));
 
-        assertEquals(2, imageDao.getAllHashes().size());
+        assertEquals(2, allImageHashes().size());
         assertTrue(faceDao.findUnnamed().isEmpty(), "no faces were detected");
-        for (String hash : imageDao.getAllHashes()) {
+        for (String hash : allImageHashes()) {
             assertTrue(imageDao.hasThumbnail(hash), "the frame thumbnail is kept even without faces");
             assertTrue(faceDao.findByImageHash(hash).isEmpty(),
                     "no faces qualified on this frame");
@@ -433,7 +465,7 @@ class VideoImportServiceTest {
             assertEquals(frames, result.newFrames());
             assertEquals(frames, result.newFaces());
             assertEquals(frames, videoDao.findFramesForVideo(imported).size());
-            assertEquals(frames, imageDao.getAllHashes().size(),
+            assertEquals(frames, allImageHashes().size(),
                     "whatever was committed before cancellation must be consistent");
             assertEquals(frames, faceDao.findUnnamed().size());
         }
@@ -459,7 +491,7 @@ class VideoImportServiceTest {
             // The good video is fully imported; the broken one left no rows behind.
             assertTrue(videoDao.exists(HashUtils.hashFile(dir.resolve("good.mp4"))));
             assertFalse(videoDao.exists(HashUtils.hashFile(dir.resolve("broken.mp4"))));
-            assertEquals(3, imageDao.getAllHashes().size());
+            assertEquals(3, allImageHashes().size());
             assertEquals(3, faceDao.findUnnamed().size());
         }
     }
@@ -504,10 +536,10 @@ class VideoImportServiceTest {
         assertEquals(1, faceDao.findByImageHash(photoHash).size(),
                 "the photo's face is not duplicated by the video import");
         assertEquals(3, faceDao.findUnnamed().size(), "photo face + one face per new frame");
-        assertEquals(3, imageDao.getAllHashes().size(),
+        assertEquals(3, allImageHashes().size(),
                 "photo + two new frames, each stored exactly once");
-        assertEquals(3, videoDao.findByHash(videoHash).orElseThrow().frameCount());
-        assertEquals(3, videoDao.findByHash(videoHash).orElseThrow().faceCount());
+        assertEquals(3, storedFrameCount(videoHash));
+        assertEquals(3, storedFaceCount(videoHash));
     }
 
     @Test
@@ -531,7 +563,7 @@ class VideoImportServiceTest {
             assertEquals(14, result.newFrames(), "2 + 3 + 4 + 5 sampled frames");
             assertEquals(14, result.newFaces());
             assertEquals(0, result.errors());
-            assertEquals(14, imageDao.getAllHashes().size());
+            assertEquals(14, allImageHashes().size());
             assertEquals(14, faceDao.findUnnamed().size());
         }
         assertTrue(engineA.detectCalls() > 0, "every configured engine must be used");
@@ -568,7 +600,7 @@ class VideoImportServiceTest {
         try (VideoImportService service = newService(oneFaceService(), 2)) {
             service.importFolder(dir, null);
         }
-        assertEquals(1, imageDao.getAllHashes().size(),
+        assertEquals(1, allImageHashes().size(),
                 "the frame stored before the failure is kept, so the retry can reuse it");
 
         VideoImportService.VideoImportResult retry;
@@ -581,8 +613,8 @@ class VideoImportServiceTest {
         assertEquals(0, retry.errors());
         assertEquals(2, retry.newFrames(),
                 "only the two frames that were never stored are new; the surviving one is reused");
-        assertEquals(3, videoDao.findByHash(videoHash).orElseThrow().frameCount());
-        assertEquals(3, imageDao.getAllHashes().size(), "no duplicate frame images");
+        assertEquals(3, storedFrameCount(videoHash));
+        assertEquals(3, allImageHashes().size(), "no duplicate frame images");
         assertEquals(3, faceDao.findUnnamed().size(), "no duplicate faces");
     }
 

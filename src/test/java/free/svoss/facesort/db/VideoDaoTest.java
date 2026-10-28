@@ -1,7 +1,6 @@
 package free.svoss.facesort.db;
 
 import free.svoss.facesort.model.VideoFrameLinkRecord;
-import free.svoss.facesort.model.VideoRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,23 +55,11 @@ class VideoDaoTest {
     // ---- tests ----
 
     @Test
-    void insert_exists_findByHash_roundTrip() throws Exception {
+    void insert_exists_roundTrip() throws Exception {
         insertVideo("video1", 12.5);
 
         assertTrue(dao.exists("video1"), "inserted video must exist");
         assertFalse(dao.exists("missing"), "unknown hash must not exist");
-
-        VideoRecord video = dao.findByHash("video1").orElseThrow();
-        assertEquals("video1", video.hash());
-        assertEquals(12.5, video.durationSecs(), 0.001);
-        assertEquals("{}", video.criteriaJson());
-        assertEquals(0, video.frameCount(), "no linked frames yet");
-        assertEquals(0, video.faceCount(), "no faces yet");
-    }
-
-    @Test
-    void findByHash_missing_returnsEmpty() throws Exception {
-        assertTrue(dao.findByHash("missing").isEmpty());
     }
 
     @Test
@@ -147,8 +134,8 @@ class VideoDaoTest {
         assertEquals(1000L, dao.findTimestamp("frame1"), "frame timestamp must be retrievable");
         assertNull(dao.findTimestamp("missing"), "unknown frame -> null");
 
-        assertEquals(2, dao.findByHash("video1").orElseThrow().frameCount(),
-                "frame_count column must track linked frames");
+        assertEquals(2, dao.findFramesForVideo("video1").size(),
+                "the video's linked frames must be countable");
     }
 
     @Test

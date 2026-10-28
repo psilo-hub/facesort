@@ -1,6 +1,5 @@
 package free.svoss.facesort.db;
 
-import free.svoss.facesort.model.ImageRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,22 +40,11 @@ class ImageDaoTest {
     }
 
     @Test
-    void insert_exists_findByHash_roundTrip() throws Exception {
+    void insert_exists_roundTrip() throws Exception {
         insertImage("hash1", 2);
 
         assertTrue(dao.exists("hash1"), "inserted image must exist");
         assertFalse(dao.exists("missing"), "unknown hash must not exist");
-
-        ImageRecord record = dao.findByHash("hash1").orElseThrow();
-        assertEquals("hash1", record.hash());
-        assertEquals(123L, record.detectionTs());
-        assertEquals("{}", record.criteriaJson());
-        assertEquals(2, record.faceCount());
-    }
-
-    @Test
-    void findByHash_missing_returnsEmpty() throws Exception {
-        assertTrue(dao.findByHash("nope").isEmpty());
     }
 
     @Test
@@ -72,16 +60,6 @@ class ImageDaoTest {
         assertTrue(paths.contains("/photos/b.jpg"));
 
         assertTrue(dao.getPaths("missing").isEmpty());
-    }
-
-    @Test
-    void getAllHashes_returnsAllInserted() throws Exception {
-        insertImage("h1", 0);
-        insertImage("h2", 0);
-        List<String> hashes = dao.getAllHashes();
-        assertEquals(2, hashes.size());
-        assertTrue(hashes.contains("h1"));
-        assertTrue(hashes.contains("h2"));
     }
 
     @Test

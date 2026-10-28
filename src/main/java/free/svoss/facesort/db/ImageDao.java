@@ -1,14 +1,11 @@
 package free.svoss.facesort.db;
 
-import free.svoss.facesort.model.ImageRecord;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Data access object for the images and image_paths tables.
@@ -33,22 +30,7 @@ public class ImageDao {
     }
 
     /**
-     * Returns an ImageRecord by hash, or empty if not found.
-     */
-    public Optional<ImageRecord> findByHash(String hash) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT hash, detection_ts, criteria_json, face_count FROM images WHERE hash = ?")) {
-            ps.setString(1, hash);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
-            }
-            return Optional.empty();
-        }
-    }
-
-    /**
-     * Inserts a new image row. Returns the hash.
+     * Adds a path for an existing image hash.
      */
     public void insert(String hash, long detectionTs, String criteriaJson, int faceCount) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
@@ -87,20 +69,6 @@ public class ImageDao {
             }
         }
         return paths;
-    }
-
-    /**
-     * Returns all image hashes.
-     */
-    public List<String> getAllHashes() throws SQLException {
-        List<String> hashes = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT hash FROM images")) {
-            while (rs.next()) {
-                hashes.add(rs.getString("hash"));
-            }
-        }
-        return hashes;
     }
 
     // ---- Thumbnail operations ----
@@ -197,14 +165,5 @@ public class ImageDao {
             ps.setString(1, hash);
             return ps.executeQuery().next();
         }
-    }
-
-    private ImageRecord mapRow(ResultSet rs) throws SQLException {
-        return new ImageRecord(
-                rs.getString("hash"),
-                rs.getLong("detection_ts"),
-                rs.getString("criteria_json"),
-                rs.getInt("face_count")
-        );
     }
 }

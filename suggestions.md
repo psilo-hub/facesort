@@ -2,7 +2,7 @@
 
 ## Clean code
 
-- [ ] Remove the 8 test-only DAO methods: NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes (keep NotDupeDao.findAll - it is used by DeduplicationService)
+- [x] Remove the 8 test-only DAO methods: NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes are gone from src/main (NotDupeDao.findAll kept). Tests that needed the removed reads now use shared queries: DbTestQueries.allImageHashes for the image-hash list, countRows for face/not-dupe counting, notDupeDao.findAll for the stored-pair check; the 7 test methods that tested the deleted methods themselves were dropped (652 → 645 tests)
 - [ ] Extract the duplicated FaceUi.FaceActions.Source bridge, handleFailure and originalCheckFailed error lambda shared by all six views (NameFaceView.java:72/414, ViewView.java:87/460, DedupeView.java:77/360, RandomNameView.java:72/396, FaceNameView.java:89/721, MostSimilarView.java:72)
 - [x] Consolidate ViewService's duplicated path resolution and extract MediaFileResolver shared with StoredFaceImageSource.firstReadableFile - resolveOriginalFile/resolveFilterPath/openInDefaultViewer/openContainingFolder/resolveContainingFolder/firstExistingPath now live in MediaFileResolver; ViewService, DeduplicationService, FaceToNameService, NamingService and StoredFaceImageSource all delegate to it
 - [ ] Extract shared UI helpers: TagWithNameDialog.toImage duplicates FaceUi.toImage, SettingsView.tooltip duplicates FaceUi.wrappedTooltip including the magic 420, RandomNameView.java:114 still builds a bare Tooltip, and applyFilterPath is duplicated in FaceNameView.java:541 and RandomNameView.java:312

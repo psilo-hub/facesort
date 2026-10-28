@@ -245,7 +245,6 @@ class DataRemovalDaoTest {
 
         assertEquals(3, removed, "matching photo + orphan frame + plain frame all removed");
         assertFalse(imageDao.exists("gone"), "matching photo must be deleted");
-        assertFalse(imageDao.findByHash("gone").isPresent());
         assertFalse(imageDao.hasThumbnail("gone"), "thumbnail must cascade");
         assertTrue(faceDao.findByImageHash("gone").isEmpty(), "faces must cascade");
         assertFalse(imageDao.exists("orphan-frame"), "orphan frame must be deleted");

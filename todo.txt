@@ -1,7 +1,7 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-10-25. `mvn test` is green: 646 tests / 65 test classes,
+State as of 2026-10-28. `mvn test` is green: 645 tests / 67 test classes,
 0 failures, 0 skipped.
 
 All work is tracked in `suggestions.md` (28 items, with the rationale and the
@@ -9,6 +9,13 @@ file/line references; finished items have been removed). This file keeps no
 separate backlog: every item it used to carry is done, superseded, or already
 one of those items. Keep the two files in sync in the same commit (see
 `AGENTS.md`).
+
+Items from further_improvements.txt — all done:
+1. Name tagged in "Put a name to a face" / "Tag random face" is selected when
+   switching to "Add faces to a name" (TabState + FaceNameView.selectPendingTaggedName)
+2. Path filter is shared across tabs via TabState; restoring on tab switch
+3. Tab switching does not interrupt running tasks (ImportView task runs on its
+   own daemon thread; MainWindow only touches the newly selected tab)
 
 
 Open items
