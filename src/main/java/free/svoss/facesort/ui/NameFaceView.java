@@ -45,6 +45,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
     private static final int CANDIDATE_LIMIT = 24;
 
     private final NamingService namingService;
+    private final TabState tabState;
 
     private final Label statusLabel = new Label("");
     private final Label clusterLabel = new Label("");
@@ -65,9 +66,11 @@ public class NameFaceView extends BorderPane implements Refreshable {
      * Creates the naming tab.
      *
      * @param namingService the naming service; must not be null
+     * @param tabState      shared cross-tab state; must not be null
      */
-    public NameFaceView(NamingService namingService) {
+    public NameFaceView(NamingService namingService, TabState tabState) {
         this.namingService = namingService;
+        this.tabState = tabState;
         this.faceActions = new FaceUi.FaceActions(
                 new FaceUi.FaceActions.Source() {
                     @Override
@@ -303,6 +306,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
             setBusy(false, clusters.isEmpty());
             statusLabel.setText(I18n.format("ui.nameFace.taggedSuggest",
                     name, similar.size()));
+            tabState.setLastTaggedName(name);
             removeCluster(representative.id());
             candidateRepId = -1;
             showCandidates(similar);
@@ -366,6 +370,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
         task.setOnSucceeded(e -> {
             setBusy(false, clusters == null || clusters.isEmpty());
             statusLabel.setText(I18n.format("ui.nameFace.taggedFace", faceId, name));
+            tabState.setLastTaggedName(name);
             candidatesPane.getChildren().removeIf(node ->
                     node.getUserData() instanceof Long id && id == faceId);
         });

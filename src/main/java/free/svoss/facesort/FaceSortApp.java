@@ -35,6 +35,7 @@ import free.svoss.facesort.ui.MostSimilarView;
 import free.svoss.facesort.ui.NameFaceView;
 import free.svoss.facesort.ui.RandomNameView;
 import free.svoss.facesort.ui.SettingsView;
+import free.svoss.facesort.ui.TabState;
 import free.svoss.facesort.ui.ViewView;
 import free.svoss.facesort.update.UpdateChecker;
 import javafx.application.Application;
@@ -117,6 +118,8 @@ public class FaceSortApp extends Application {
     private FaceRotationMigration faceRotationMigration;
     /** The Import tab of the window on screen; a rebuild disposes it. */
     private ImportView importView;
+    /** Shared cross-tab state: last tagged name and last path filter. */
+    private final TabState tabState = new TabState();
     /** Guards the one-off pass: rebuilding the window after a language change must not start a second one. */
     private boolean faceRotationMigrationStarted;
 
@@ -325,9 +328,10 @@ public class FaceSortApp extends Application {
         // 6. Views.
         importView = new ImportView(importService, videoImportService,
                 dataRemovalService, configStore);
-        NameFaceView nameFaceView = new NameFaceView(namingService);
-        RandomNameView randomNameView = new RandomNameView(namingService);
-        FaceNameView faceNameView = new FaceNameView(faceToNameService, configStore);
+        NameFaceView nameFaceView = new NameFaceView(namingService, tabState);
+        RandomNameView randomNameView = new RandomNameView(namingService, tabState);
+        FaceNameView faceNameView = new FaceNameView(faceToNameService, configStore,
+                tabState);
         MostSimilarView mostSimilarView = new MostSimilarView(mostSimilarService, faceToNameService);
         DedupeView dedupeView = new DedupeView(dedupService);
         ViewView viewView = new ViewView(viewService);

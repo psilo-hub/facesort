@@ -48,7 +48,9 @@ localement sur votre ordinateur : **vos photos ne quittent jamais votre machine.
   un nom*, faites un clic droit sur un visage et choisissez **Coller le chemin
   dans le filtre de chemin** pour remplir le champ avec la source de ce visage :
   le dossier de l'image, ou le chemin complet (nom de fichier inclus) de la vidéo
-  d'où provient une image.
+  d'où provient une image. Le filtre de chemin est mémorisé d'un onglet à
+  l'autre : passer à un autre onglet ayant un filtre de chemin remplit son champ
+  avec la dernière valeur utilisée.
 - **Suppression par préfixe de chemin** — dans l'onglet *Importer*, supprimez
   toutes les images et vidéos importées dont le chemin stocké commence par un
   préfixe que vous saisissez. Une fenêtre affiche d'abord combien d'images, de
@@ -111,6 +113,8 @@ ordre :
    version antérieure sont remises d'aplomb une fois, automatiquement et en
    arrière-plan, au premier démarrage après cette mise à jour. Vous pouvez
    arrêter un import à tout moment ; les fichiers déjà importés sont conservés.
+   Un import continue de s'exécuter quand vous changez d'onglet et ne se termine
+   que lorsqu'il est terminé (ou quand vous cliquez sur Arrêter).
    Réimporter ensuite le même dossier n'enregistre que les nouveaux fichiers.
    Pour supprimer les entrées importées dont le chemin stocké commence par un
    préfixe donné (par exemple après avoir effacé les fichiers d'origine d'un
@@ -123,6 +127,9 @@ ordre :
    noms existants sont détectés pendant la saisie) et appuyez sur **Nommer** ; les
    visages similaires restants du cluster sont ensuite proposés pour que vous les
    nommiez dans la même session. Passez au cluster suivant avec *Cluster suivant*.
+   Le nom que vous venez d'assigner est sélectionné quand vous passez à
+   l'onglet *Ajouter des visages à un nom*, pour que vous puissiez continuer à
+   nommer la même personne.
 
 3. **Nommer un visage au hasard** — un échantillon aléatoire de visages non
    nommés. Cliquez sur des visages pour les sélectionner — ou maintenez **Maj**
@@ -136,7 +143,9 @@ ordre :
    une image de vidéo, le chemin complet de sa vidéo source. Faites un clic droit
    sur un visage et choisissez *Pas un visage* pour écarter une détection qui
    n'est pas vraiment un visage ; elle est ensuite retirée de toutes les listes de
-   visages non nommés, tandis que l'image stockée est conservée.
+   visages non nommés, tandis que l'image stockée est conservée. Le nom que vous
+   venez d'assigner est sélectionné quand vous passez à l'onglet *Ajouter des
+   visages à un nom*.
 
 4. **Ajouter des visages à un nom** — Sélectionnez une personne à gauche ;
    l'application classe chaque visage non nommé selon sa similitude avec
@@ -159,7 +168,9 @@ ordre :
    visage le plus représentatif et la similarité avec l'embedding moyen du nom.
    Un clic droit sur un visage candidat non nommé et *Pas un visage* permet
    d'écarter une détection qui n'est pas vraiment un visage, afin qu'elle ne soit
-   plus proposée à aucun nom.
+   plus proposée à aucun nom. Un nom que vous avez attribué dans *Associer un
+   visage à un nom* ou *Nommer un visage au hasard* est sélectionné quand vous
+   passez à cet onglet.
 
 5. **Le plus similaire** — l'application affiche le visage non nommé qui
    correspond le mieux à l'un de vos noms à côté d'un visage déjà nommé avec ce

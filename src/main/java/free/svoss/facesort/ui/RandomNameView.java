@@ -46,6 +46,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
     private static final int BATCH_SIZE = 25;
 
     private final NamingService namingService;
+    private final TabState tabState;
 
     private final Label statusLabel = new Label("");
     private final TextField nameField = new TextField();
@@ -65,9 +66,11 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
      * Creates the random-tagging tab.
      *
      * @param namingService the naming service; must not be null
+     * @param tabState      shared cross-tab state; must not be null
      */
-    public RandomNameView(NamingService namingService) {
+    public RandomNameView(NamingService namingService, TabState tabState) {
         this.namingService = namingService;
+        this.tabState = tabState;
         this.faceActions = new FaceUi.FaceActions(
                 new FaceUi.FaceActions.Source() {
                     @Override
@@ -112,7 +115,10 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
 
         pathFilterField.setPromptText(I18n.get("ui.randomName.pathFilterPrompt"));
         pathFilterField.setTooltip(new Tooltip(I18n.get("ui.randomName.pathFilterTooltip")));
-        pathFilterField.setOnAction(e -> loadSample());
+        pathFilterField.setOnAction(e -> {
+            tabState.setLastPathFilter(pathFilterField.getText());
+            loadSample();
+        });
         HBox.setHgrow(pathFilterField, Priority.ALWAYS);
         HBox.setHgrow(nameField, Priority.ALWAYS);
 
@@ -196,6 +202,10 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
      */
     @Override
     public void refresh() {
+        String stored = tabState.getLastPathFilter();
+        if (stored != null) {
+            pathFilterField.setText(stored);
+        }
         loadSample();
     }
 
@@ -312,6 +322,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
     private void applyFilterPath(Path path) {
         pathFilterField.setText(path.toString());
         pathFilterField.positionCaret(pathFilterField.getLength());
+        tabState.setLastPathFilter(path.toString());
         loadSample();
     }
 
@@ -365,6 +376,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
                     node.getUserData() instanceof Long id && faceIds.contains(id));
             setBusy(false);
             statusLabel.setText(I18n.format("ui.randomName.tagged", faceIds.size(), name));
+            tabState.setLastTaggedName(name);
         });
 
         task.setOnFailed(e -> {

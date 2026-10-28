@@ -45,7 +45,9 @@ fusionar y limpiar tu biblioteca. Todo se ejecuta localmente en tu ordenador:
   En *Etiquetar cara al azar* y *Añadir caras a un nombre*, haz clic derecho en
   una cara y elige **Pegar ruta en el filtro de ruta** para rellenar el campo con
   el origen de esa cara: la carpeta de la imagen o la ruta completa (incluido el
-  nombre de archivo) del vídeo del que proviene un fotograma.
+  nombre de archivo) del vídeo del que proviene un fotograma. El filtro de ruta
+  se recuerda entre pestañas: al cambiar a otra pestaña que tenga un filtro de
+  ruta, su campo se rellena con el último valor que usaste.
 - **Eliminar por prefijo de ruta**: en la pestaña *Importar*, elimina todos los
   fotos y vídeos importados cuya ruta almacenada comience por el prefijo que
   introduzcas. Un diálogo muestra primero cuántas imágenes, vídeos, miniaturas y
@@ -103,7 +105,9 @@ este orden:
    vuelta más cercano. Las bibliotecas importadas con una versión anterior se
    enderezan una vez de forma automática, en segundo plano, en el primer inicio
    tras esta actualización. Puedes detener una importación en cualquier
-   momento; los archivos ya importados se conservan. Reimportar la misma carpeta
+   momento; los archivos ya importados se conservan. Una importación sigue
+   ejecutándose cuando cambias a otra pestaña y solo termina cuando termina
+   (o cuando detienes la importación). Reimportar la misma carpeta
    más tarde solo registra los archivos nuevos.
    Para eliminar registros importados cuya ruta almacenada comienza por un
    prefijo determinado (por ejemplo, tras borrar los archivos originales de una
@@ -116,6 +120,8 @@ este orden:
    nombres existentes se detectan mientras escribes), pulsa **Etiquetar**; a
    continuación se ofrecen las caras similares restantes del cluster para que las
    etiquetes en la misma pasada. Pasa al siguiente cluster con *Siguiente cluster*.
+   El nombre que acabas de etiquetar se selecciona al cambiar a la pestaña
+   *Añadir caras a un nombre*, así puedes seguir etiquetando a la misma persona.
 
 3. **Etiquetar cara al azar**: una muestra aleatoria de caras sin nombre. Haz clic
    en las caras para seleccionarlas —o mantén pulsada la tecla **Mayús** y haz
@@ -128,7 +134,9 @@ este orden:
    fotograma de vídeo, con la ruta completa de su vídeo de origen. Haz clic
    derecho en una cara y elige *No es una cara* para descartar una detección que
    no es realmente una cara; a partir de entonces se excluye de todas las listas
-   de caras sin nombre, aunque la imagen almacenada se conserva.
+   de caras sin nombre, aunque la imagen almacenada se conserva. El nombre que
+   acabas de etiquetar se selecciona al cambiar a la pestaña *Añadir caras a un
+   nombre*.
 
 4. **Añadir caras a un nombre**: selecciona a una persona a la izquierda; la
    aplicación ordena cada cara sin nombre por su similitud con el embedding medio
@@ -150,7 +158,9 @@ este orden:
    representativa y la similitud con el embedding medio del nombre. Haz clic
    derecho en una cara candidata sin nombre y elige *No es una cara* para
    descartar una detección que no es realmente una cara, de modo que deje de
-   ofrecerse a cualquier nombre.
+   ofrecerse a cualquier nombre. Un nombre que etiquetaste en *Poner un nombre a
+   una cara* o *Etiquetar cara al azar* se selecciona aquí al cambiar a esta
+   pestaña.
 
 5. **Cara más similar**: la aplicación muestra la cara sin nombre que mejor
    coincide con uno de tus nombres junto a una cara ya etiquetada con ese

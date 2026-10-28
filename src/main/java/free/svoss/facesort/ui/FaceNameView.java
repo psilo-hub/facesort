@@ -59,6 +59,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
 
     private final FaceToNameService faceToNameService;
     private final ConfigStore configStore;
+    private final TabState tabState;
 
     private final Label statusLabel = new Label("");
     private final ListView<NameRecord> nameList = new ListView<>();
@@ -85,10 +86,13 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      *
      * @param faceToNameService the face-to-name service; must not be null
      * @param configStore       the application settings; must not be null
+     * @param tabState          shared cross-tab state; must not be null
      */
-    public FaceNameView(FaceToNameService faceToNameService, ConfigStore configStore) {
+    public FaceNameView(FaceToNameService faceToNameService, ConfigStore configStore,
+                        TabState tabState) {
         this.faceToNameService = faceToNameService;
         this.configStore = configStore;
+        this.tabState = tabState;
         this.faceActions = new FaceUi.FaceActions(
                 new FaceUi.FaceActions.Source() {
                     @Override
@@ -192,6 +196,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
         unnamedLabel.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.selectionHint")));
         pathFilterField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> {
+            tabState.setLastPathFilter(pathFilterField.getText());
             if (activeName != null) {
                 selectName(activeName);
             }
@@ -240,8 +245,12 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
         task.setOnSucceeded(e -> {
             List<NameRecord> names = task.getValue();
             applyNames(names);
-            if (refreshActiveName && activeName != null) {
-                selectName(activeName); // reload candidates for the still-active name
+            if (refreshActiveName) {
+                // A name tagged in another tab takes precedence over the
+                // still-active name: it is consumed exactly once.
+                if (!selectPendingTaggedName() && activeName != null) {
+                    selectName(activeName); // reload candidates for the still-active name
+                }
             }
         });
 
@@ -294,12 +303,42 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     }
 
     /**
+     * Selects the name most recently tagged in another tab, if it is present
+     * in the name list. Consumes the pending hint so it is applied at most
+     * once. The selection listener then reloads the candidates for the
+     * selected name.
+     *
+     * @return {@code true} when a pending name was found and selected
+     */
+    private boolean selectPendingTaggedName() {
+        String pending = tabState.takeLastTaggedName();
+        if (pending == null || pending.isBlank()) {
+            return false;
+        }
+        var items = nameList.getItems();
+        if (items == null) {
+            return false;
+        }
+        for (NameRecord record : items) {
+            if (pending.equals(record.name())) {
+                nameList.getSelectionModel().select(record);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Reloads the name list and, when a name is currently active, the
      * candidate faces for it. Called by the tab window when this tab is
      * selected.
      */
     @Override
     public void refresh() {
+        String stored = tabState.getLastPathFilter();
+        if (stored != null) {
+            pathFilterField.setText(stored);
+        }
         loadNames(true);
     }
 
@@ -587,6 +626,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     private void applyFilterPath(Path path) {
         pathFilterField.setText(path.toString());
         pathFilterField.positionCaret(pathFilterField.getLength());
+        tabState.setLastPathFilter(path.toString());
         if (activeName != null) {
             selectName(activeName);
         }

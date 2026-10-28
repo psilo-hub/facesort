@@ -47,7 +47,9 @@ Rechner: **deine Fotos verlassen niemals deinen Computer.**
   mit Rechtsklick auf ein Gesicht und wähle **Pfad in den Pfadfilter einfügen**,
   um das Feld mit der Quelle dieses Gesichts zu füllen: dem Ordner des Bildes
   bzw. dem vollständigen Pfad (einschließlich Dateiname) des Videos, aus dem ein
-  Frame stammt.
+  Frame stammt. Der Pfadfilter wird über Tabs hinweg gespeichert: der Wechsel
+  zu einem anderen Tab mit einem Pfadfilter füllt dessen Feld mit dem zuletzt
+  verwendeten Wert.
 - **Nach Pfad-Präfix entfernen** – lösche im Tab *Import* alle importierten Fotos
   und Videos, deren gespeicherter Pfad mit einem eingegebenen Präfix beginnt. Ein
   Dialog zeigt zuerst, wie viele Bilder, Videos, Vorschaubilder und
@@ -108,7 +110,9 @@ Reihenfolge ab:
    gedreht. Bibliotheken, die mit einer älteren Version importiert wurden,
    werden nach diesem Update beim ersten Start einmal automatisch im Hintergrund
    ausgerichtet. Du kannst einen Import jederzeit stoppen;
-   bereits importierte Dateien bleiben erhalten.
+   bereits importierte Dateien bleiben erhalten. Ein Import läuft weiter, wenn
+   du zu einem anderen Tab wechselst, und endet erst, wenn er fertig ist (oder
+   wenn du auf Stopp klickst).
    Ein späterer erneuter Import desselben Ordners protokolliert nur neue Dateien.
    Um importierte Einträge zu löschen, deren gespeicherter Pfad mit einem
    bestimmten Präfix beginnt (z. B. nachdem die Originaldateien eines Ordners
@@ -120,7 +124,9 @@ Reihenfolge ab:
    den Vertreter der größten Gruppe. Gib einen Namen ein (vorhandene Namen
    werden beim Tippen erkannt) und drücke auf **Benennen**; die übrigen ähnlichen
    Gesichter der Gruppe werden dann angeboten, sodass du sie im selben Durchgang
-   benennen kannst. Wechsle mit *Nächste Gruppe* zur nächsten Gruppe.
+   benennen kannst. Wechsle mit *Nächste Gruppe* zur nächsten Gruppe. Der gerade
+   vergebene Name wird im Tab *Gesichter einem Namen hinzufügen* ausgewählt, wenn
+   du dorthin wechselst.
 
 3. **Zufälliges Gesicht benennen** – eine zufällige Stichprobe unbenannter
    Gesichter. Klicke Gesichter an, um sie auszuwählen – oder halte die
@@ -134,7 +140,8 @@ Reihenfolge ab:
    seines Quellvideos zu füllen. Klicke mit Rechtsklick auf ein Gesicht und wähle
    *Kein Gesicht*, um eine Erkennung zu verwerfen, die kein Gesicht ist; sie wird
    dann aus allen Listen unbenannter Gesichter herausgehalten, das gespeicherte
-   Bild bleibt jedoch erhalten.
+   Bild bleibt jedoch erhalten. Der gerade vergebene Name wird im Tab *Gesichter
+   einem Namen hinzufügen* ausgewählt, wenn du dorthin wechselst.
 
 4. **Gesichter einem Namen hinzufügen** – Wähle links eine Person; die App reiht
    jedes unbenannte Gesicht nach Ähnlichkeit zum durchschnittlichen Embedding der
@@ -153,6 +160,8 @@ Reihenfolge ab:
    werden als Vorschaubilder exportiert). Klicke mit Rechtsklick auf ein
    unbenanntes Kandidatengesicht und wähle *Kein Gesicht*, um eine Erkennung zu
    verwerfen, die kein Gesicht ist; sie wird dann keinem Namen mehr angeboten.
+   Ein Name, den du in *Gesicht benennen* oder *Zufälliges Gesicht benennen*
+   vergeben hast, wird hier ausgewählt, wenn du zu diesem Tab wechselst.
 
 5. **Ähnlichste** – die App zeigt das unbenannte Gesicht, das einem deiner
    Namen am besten entspricht, neben einem Gesicht, das bereits mit diesem

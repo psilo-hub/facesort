@@ -4,6 +4,12 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Tagging a face with a name in "Put a name to a face" or "Tag random face" now
+  selects that name when you switch to the "Add faces to a name" tab, so you can
+  keep tagging the same person right away (2026-10-26)
+- The path filter you set in "Tag random face" or "Add faces to a name" is
+  remembered across tabs: switching to another tab with a path filter fills its
+  field with the last value you used (2026-10-26)
 - Windows icon files (`.ico`) can now be imported like any other image; their
   largest embedded size is used for face detection and thumbnails (2026-10-15)
 - New "Most similar" tab: it shows the unnamed face that best matches one of
@@ -323,6 +329,9 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Switching tabs no longer interrupts running background tasks: an import
+  started in the Import tab keeps running until it finishes, even if you switch
+  away (2026-10-26)
 - Changing the UI language no longer leaks an HTTP connection. Every language
   change rebuilds the tabs, and the Feedback tab used to build its own HTTP
   client each time; the old client could never be closed and kept its thread
