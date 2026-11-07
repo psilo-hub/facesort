@@ -130,6 +130,10 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- Similarity scores are now shown as percentages everywhere: the dedupe round
+  line and the tag-with-name preview use the same whole-percent format as the
+  candidate cards, instead of a raw fraction or a separately formatted number
+  (2026-11-07)
 - Shared UI helpers consolidated: face-crop decoding, wrapped tooltips and
   path-filter application now live in one place, so the tagging views, settings
   and the tag-with-name dialog behave consistently; long tooltips wrap at the

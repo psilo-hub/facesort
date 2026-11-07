@@ -213,7 +213,7 @@ public class DedupeView extends BorderPane {
         pairLabel.setText(I18n.format("ui.dedupe.comparing",
                 candidate.nameA(), candidate.nameB()));
         statusLabel.setText(I18n.format("ui.dedupe.round",
-                round, candidate.nameA(), candidate.nameB(), candidate.similarity()));
+                round, candidate.nameA(), candidate.nameB(), I18n.percent(candidate.similarity())));
         nameALabel.setText(candidate.nameA());
         nameBLabel.setText(candidate.nameB());
         FaceUi.setImage(faceAView, candidate.repFaceA());

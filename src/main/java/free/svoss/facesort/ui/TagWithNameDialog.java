@@ -173,7 +173,7 @@ public class TagWithNameDialog extends Dialog<String> {
                 FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_EXISTS);
                 previewThumb.setImage(FaceUi.toImage(p.representative()));
                 previewSimilarityLabel.setText(
-                        I18n.format("ui.faceName.differentName.similar", name, p.similarity() * 100));
+                        I18n.format("ui.faceName.differentName.similar", name, I18n.percent(p.similarity())));
                 previewBox.setVisible(true);
             }
         });

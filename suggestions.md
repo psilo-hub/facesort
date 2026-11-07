@@ -6,7 +6,7 @@
 - [ ] Extract the duplicated FaceUi.FaceActions.Source bridge, handleFailure and originalCheckFailed error lambda shared by all six views (NameFaceView.java:72/414, ViewView.java:87/460, DedupeView.java:77/360, RandomNameView.java:72/396, FaceNameView.java:89/721, MostSimilarView.java:72)
 - [x] Consolidate ViewService's duplicated path resolution and extract MediaFileResolver shared with StoredFaceImageSource.firstReadableFile - resolveOriginalFile/resolveFilterPath/openInDefaultViewer/openContainingFolder/resolveContainingFolder/firstExistingPath now live in MediaFileResolver; ViewService, DeduplicationService, FaceToNameService, NamingService and StoredFaceImageSource all delegate to it
 - [x] Extract shared UI helpers: FaceUi now owns toImage(FaceRecord), wrappedTooltip with a named TOOLTIP_MAX_WIDTH and applyFilterPath(TextField, TabState, Path); TagWithNameDialog, SettingsView, RandomNameView and FaceNameView delegate to them, so the duplicated decode, tooltip and path-filter code is gone (FaceUiTest covers the missing-crop guards)
-- [ ] Clean up small code smells - unused CSS selectors (.grid-of-faces, .candidate-check), modal-error Javadoc copied across six views, misleading getText() == null checks on never-null TextField.getText(), the magic constant 420 in FaceUi/SettingsView, inconsistent constructor null-check styles across services
+- [ ] Clean up small code smells - unused CSS selectors (.grid-of-faces, .candidate-check), modal-error Javadoc copied across six views, misleading getText() == null checks on never-null TextField.getText(), the magic 420 placeholder width in MostSimilarView, inconsistent constructor null-check styles across services
 - [x] Reduce ConfigModel's 21 with* copy-method fan-out with a toBuilder() while keeping the record immutable - adding one config field now touches the Builder once instead of every with* method
 - [ ] Refactor views to depend on narrow service interfaces instead of concrete fat services for testability (DedupeView uses DeduplicationService, NameFaceView/RandomNameView use NamingService, ViewView uses ViewService, FaceNameView uses FaceToNameService)
 
@@ -19,7 +19,7 @@
 
 - [ ] Extend headless test seams for SettingsView, DedupeView, NameFaceView and RandomNameView - none of the four has a test class and all build JavaFX controls inline
 - [ ] Add headless test seams for TagWithNameDialog, ImportView, MostSimilarView and MainWindow - none has a test class and all build JavaFX controls inline
-- [ ] Add i18n bundle-consistency tests - every key referenced in source must exist in the base bundle and all five translations must match its key set (I18n.text silently returns the raw key on a miss; the six bundles are at parity today with 297 keys each)
+- [ ] Add i18n bundle-consistency tests - every key referenced in source must exist in the base bundle and all five translations must match its key set (I18n.text silently returns the raw key on a miss; the six bundles are at parity today with 307 keys each)
 - [x] Add a headless TaskRunnerTest with a runLater/executor seam covering success, failure propagation and cancellation before/after start (TaskRunner has no direct test; bugs in this area were found twice already)
 
 ## Build / CI
@@ -33,7 +33,7 @@
 ## i18n
 
 - [ ] Wire up or remove the unused i18n key ui.faceName.pathFilterPrompt - defined in all six bundles but never referenced in code (FaceNameView uses a label and tooltip instead of prompt text)
-- [ ] Unify similarity score formatting on I18n.percent - three approaches coexist: I18n.percent (FaceNameView/NameFaceView/MostSimilarView), raw similarity*100 with %.0f%% in the bundle (TagWithNameDialog.java:174), and raw fraction with %.2f in ui.dedupe.round (DedupeView.java:216)
+- [x] Unify similarity score formatting on I18n.percent - TagWithNameDialog and DedupeView now pass I18n.percent(...) into their messages; ui.faceName.differentName.similar and ui.dedupe.round take a %s percentage in all six bundles instead of raw numbers
 - [ ] Refactor I18n to reduce global mutable state - static currentLocale/bundle fields and every lookup synchronized (I18n.java:28-94)
 
 ## UI / UX

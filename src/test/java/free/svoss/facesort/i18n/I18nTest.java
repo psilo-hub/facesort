@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for the process-global {@link I18n} helper.
@@ -34,5 +35,22 @@ class I18nTest {
     @Test
     void percentFollowsTheActiveLocale() {
         assertEquals("100%", I18n.percent(0.999));
+    }
+
+    @Test
+    void dedupeRoundShowsThePercentItIsGiven() {
+        String text = I18n.format("ui.dedupe.round", 2, "Alice", "Bob", I18n.percent(0.87));
+
+        assertTrue(text.contains("87%"),
+                "the dedupe round must use the shared percentage formatting, got: " + text);
+    }
+
+    @Test
+    void differentNameSimilarityShowsThePercentItIsGiven() {
+        String text = I18n.format("ui.faceName.differentName.similar",
+                "Alice", I18n.percent(0.87));
+
+        assertTrue(text.contains("87%"),
+                "the tag-with-name preview must use the shared percentage formatting, got: " + text);
     }
 }
