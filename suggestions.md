@@ -24,7 +24,7 @@
 
 ## Build / CI
 
-- [ ] Add a CI test job running mvn test on pull requests and make the release job depend on it (.github/workflows/build.yml currently builds with -DskipTests in every job)
+- [x] Add a CI test job running mvn test on pull requests and make the release job depend on it - build.yml has a test job that installs the FaceAI/ffmpeg4j dependencies, installs JavaFX system libraries and runs the full suite under Xvfb on every push and pull request; release now needs test as well as the two build jobs
 - [ ] Add static analysis and a JaCoCo coverage gate with maven-enforcer-plugin
 - [ ] Reduce pom.xml duplication - the 5 platform profiles each duplicate ~110 lines of shade-plugin configuration; parameterize the transformer and native-exclusion blocks
 - [ ] Pin the FaceAI dependency to a commit SHA in CI - ffmpeg4j is already pinned to a SHA, FaceAI is still cloned from the default branch (build.yml)

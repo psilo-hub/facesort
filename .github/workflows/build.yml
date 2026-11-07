@@ -7,6 +7,44 @@ on:
     branches: [ main, master ]
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Cache ~/.m2
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: m2-${{ runner.os }}-
+      - name: Install FaceAI dependency
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/psilo-hub/FaceAI.git faceai-deps
+          mvn -B install -DskipTests -f faceai-deps/pom.xml
+      - name: Install ffmpeg4j dependency
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/Manevolent/ffmpeg4j.git ffmpeg4j-deps
+          git -C ffmpeg4j-deps fetch --depth 1 origin 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
+          git -C ffmpeg4j-deps checkout 30d9a734a982b9b8a36e5cc800c4994d7e5c51ed
+          mvn -B install -DskipTests -f ffmpeg4j-deps/pom.xml
+      - name: Install JavaFX system libraries
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo apt-get install -y libgtk-3-0t64 || sudo apt-get install -y libgtk-3-0
+      # TaskRunnerTest starts the JavaFX toolkit, which needs a display.
+      - name: Run tests
+        shell: bash
+        run: xvfb-run -a mvn -B test
+
   build-fat:
     name: Build fat jar
     runs-on: ubuntu-latest
@@ -110,7 +148,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [ build-fat, build-platform ]
+    needs: [ test, build-fat, build-platform ]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
     runs-on: ubuntu-latest
     permissions:
