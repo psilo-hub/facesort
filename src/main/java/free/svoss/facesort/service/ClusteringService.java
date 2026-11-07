@@ -63,8 +63,9 @@ public class ClusteringService {
      *                      clustering run so one run uses one consistent config
      */
     public ClusteringService(FaceAiService faceAiService, FaceDao faceDao, ConfigStore configStore) {
+        Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
-        this.faceDao = faceDao;
+        this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.configStore = Objects.requireNonNull(configStore, "configStore");
     }
 

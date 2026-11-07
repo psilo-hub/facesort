@@ -45,6 +45,7 @@ public class ViewService {
      */
     public ViewService(FaceAiService faceAiService, FaceDao faceDao,
                        NameDao nameDao, ImageDao imageDao, VideoDao videoDao) {
+        Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");

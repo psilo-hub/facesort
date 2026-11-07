@@ -475,12 +475,6 @@ public class ViewView extends BorderPane implements Refreshable {
         scrollPane.setDisable(busy);
     }
 
-    /**
-     * Raises a modal error dialog and resets the status bar.
-     *
-     * @param message the header text
-     * @param error   the underlying exception
-     */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;

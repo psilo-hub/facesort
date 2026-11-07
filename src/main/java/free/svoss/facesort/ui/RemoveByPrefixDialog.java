@@ -106,7 +106,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
     private void onPrefixChanged() {
         resultLabel.setText("");
         removeButton.setDisable(true);
-        scanButton.setDisable(prefixField.getText() == null || prefixField.getText().isBlank());
+        scanButton.setDisable(prefixField.getText().isBlank());
     }
 
     /**
@@ -114,7 +114,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
      * changing anything.
      */
     private void onScan() {
-        String prefix = prefixField.getText() == null ? "" : prefixField.getText().trim();
+        String prefix = prefixField.getText().trim();
         if (prefix.isEmpty()) {
             return; // the button is disabled for an empty prefix
         }
@@ -142,7 +142,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
      * label and the user can cancel the removal while it runs.
      */
     private void onRemove() {
-        String prefix = prefixField.getText() == null ? "" : prefixField.getText().trim();
+        String prefix = prefixField.getText().trim();
         if (prefix.isEmpty()) {
             return;
         }
@@ -203,7 +203,7 @@ public class RemoveByPrefixDialog extends Dialog<DataRemovalService.Removal> imp
      * @param busy {@code true} while a background operation runs
      */
     private void setBusy(boolean busy) {
-        boolean hasPrefix = prefixField.getText() != null && !prefixField.getText().isBlank();
+        boolean hasPrefix = !prefixField.getText().isBlank();
         prefixField.setDisable(busy);
         scanButton.setDisable(busy || !hasPrefix);
         removeButton.setDisable(true); // invalidate the preview while busy

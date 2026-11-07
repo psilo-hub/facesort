@@ -279,7 +279,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
      * similar remaining faces from the same cluster.
      */
     private void onTagRepresentative() {
-        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        String name = nameField.getText().trim();
         if (name.isEmpty()) {
             statusLabel.setText(I18n.get("ui.nameFace.typeNameFirst"));
             return;
@@ -350,7 +350,7 @@ public class NameFaceView extends BorderPane implements Refreshable {
      * @param faceId id of the candidate face
      */
     private void onTagCandidate(long faceId) {
-        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        String name = nameField.getText().trim();
         if (name.isEmpty()) {
             statusLabel.setText(I18n.get("ui.nameFace.typeSuggestName"));
             return;
@@ -410,12 +410,6 @@ public class NameFaceView extends BorderPane implements Refreshable {
         nameField.setDisable(busy);
     }
 
-    /**
-     * Raises a modal error dialog and resets the status bar.
-     *
-     * @param message the header text
-     * @param error   the underlying exception
-     */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;

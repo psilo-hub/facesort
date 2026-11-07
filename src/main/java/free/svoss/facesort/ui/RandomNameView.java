@@ -152,7 +152,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
      */
     private void loadSample() {
         setBusy(true);
-        String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
+        String pathPrefix = pathFilterField.getText().trim();
         statusLabel.setText(I18n.get("ui.randomName.loading"));
         facesPane.getChildren().clear();
         rangeAnchor = null;
@@ -343,7 +343,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
      * current sample.
      */
     private void onTagSelected() {
-        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        String name = nameField.getText().trim();
         if (name.isEmpty()) {
             statusLabel.setText(I18n.get("ui.randomName.typeNameFirst"));
             return;
@@ -396,12 +396,6 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
         tagSelectedButton.setDisable(busy || selectedFaceIds().isEmpty());
     }
 
-    /**
-     * Raises a modal error dialog and resets the status bar.
-     *
-     * @param message the header text
-     * @param error   the underlying exception
-     */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;

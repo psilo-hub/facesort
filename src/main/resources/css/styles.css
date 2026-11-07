@@ -137,14 +137,6 @@
     -fx-background-color: #3269a8;
 }
 
-/* ---- Face grids ---- */
-
-.grid-of-faces {
-    -fx-hgap: 10px;
-    -fx-vgap: 10px;
-    -fx-padding: 8px;
-}
-
 /* ---- Representative face frame (Put a name to a face) ---- */
 
 .representative-frame {
@@ -184,12 +176,6 @@
     -fx-background-color: #e8f0fb;
     -fx-border-color: #4a90d9;
     -fx-border-width: 2px;
-}
-
-.candidate-card .candidate-check {
-    -fx-text-fill: #4a90d9;
-    -fx-font-weight: bold;
-    -fx-font-size: 14px;
 }
 
 /* ---- Model download frame (first start) ---- */

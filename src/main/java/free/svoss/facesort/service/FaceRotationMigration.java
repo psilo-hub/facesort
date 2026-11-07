@@ -83,10 +83,10 @@ public final class FaceRotationMigration implements AutoCloseable {
      */
     FaceRotationMigration(FaceDao faceDao, MetaDao metaDao, FaceImageSource imageSource,
                           ConfigStore configStore) {
-        this.faceDao = Objects.requireNonNull(faceDao, "faceDao must not be null");
-        this.metaDao = Objects.requireNonNull(metaDao, "metaDao must not be null");
-        this.imageSource = Objects.requireNonNull(imageSource, "imageSource must not be null");
-        this.configStore = Objects.requireNonNull(configStore, "configStore must not be null");
+        this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
+        this.metaDao = Objects.requireNonNull(metaDao, "metaDao");
+        this.imageSource = Objects.requireNonNull(imageSource, "imageSource");
+        this.configStore = Objects.requireNonNull(configStore, "configStore");
     }
 
     /**

@@ -49,9 +49,9 @@ final class StoredFaceImageSource implements FaceImageSource {
      * @param opener   opens a frame source for a video file; must not be null
      */
     StoredFaceImageSource(ImageDao imageDao, VideoDao videoDao, VideoFrameSourceOpener opener) {
-        this.imageDao = Objects.requireNonNull(imageDao, "imageDao must not be null");
-        this.videoDao = Objects.requireNonNull(videoDao, "videoDao must not be null");
-        this.opener = Objects.requireNonNull(opener, "opener must not be null");
+        this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
+        this.videoDao = Objects.requireNonNull(videoDao, "videoDao");
+        this.opener = Objects.requireNonNull(opener, "opener");
         this.resolver = new MediaFileResolver(imageDao, videoDao);
     }
 

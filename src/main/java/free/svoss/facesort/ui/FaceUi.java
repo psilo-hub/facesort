@@ -387,7 +387,7 @@ final class FaceUi {
         if (field.isDisabled()) {
             return;
         }
-        String name = field.getText() == null ? "" : field.getText().trim();
+        String name = field.getText().trim();
         if (name.isEmpty()) {
             label.setText("");
             setStatusClass(label, null);
@@ -402,7 +402,7 @@ final class FaceUi {
         };
 
         task.setOnSucceeded(e -> {
-            String current = field.getText() == null ? "" : field.getText().trim();
+            String current = field.getText().trim();
             if (!name.equals(current)) {
                 return; // user kept typing; ignore the stale result
             }

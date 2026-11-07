@@ -350,7 +350,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      */
     private void selectName(NameRecord name) {
         activeName = name;
-        String pathPrefix = pathFilterField.getText() == null ? "" : pathFilterField.getText().trim();
+        String pathPrefix = pathFilterField.getText().trim();
         statusLabel.setText(I18n.format("ui.faceName.loadingSimilar", name.name()));
         namedFacesLabel.setText("");
         namedFacesPane.getChildren().clear();
@@ -796,12 +796,6 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
         taskRunner.start(task, "facename-exporter");
     }
 
-    /**
-     * Raises a modal error dialog and resets the status bar.
-     *
-     * @param message the header text
-     * @param error   the underlying exception
-     */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;

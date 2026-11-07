@@ -37,6 +37,7 @@ import java.util.Optional;
 public class MostSimilarView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 170.0;
+    private static final double PLACEHOLDER_MAX_WIDTH = 420.0;
 
     private final MostSimilarService mostSimilarService;
     private final FaceToNameService faceToNameService;
@@ -228,7 +229,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         Label placeholder = new Label(message);
         placeholder.getStyleClass().add("secondary-text");
         placeholder.setWrapText(true);
-        placeholder.setMaxWidth(420);
+        placeholder.setMaxWidth(PLACEHOLDER_MAX_WIDTH);
         pairBox.getChildren().add(placeholder);
     }
 
@@ -338,12 +339,6 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         skipButton.setDisable(disabled);
     }
 
-    /**
-     * Raises a modal error dialog and resets the status bar.
-     *
-     * @param message the header text
-     * @param error   the underlying exception
-     */
     private void handleFailure(String message, Throwable error) {
         statusLabel.setText(message + ".");
         Window window = getScene() != null ? getScene().getWindow() : null;

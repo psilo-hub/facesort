@@ -128,7 +128,7 @@ public class TagWithNameDialog extends Dialog<String> {
 
         setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
-                String typed = nameField.getText() == null ? "" : nameField.getText().trim();
+                String typed = nameField.getText().trim();
                 return typed.isEmpty() ? null : typed;
             }
             return null;
@@ -145,7 +145,7 @@ public class TagWithNameDialog extends Dialog<String> {
      * @param lookup the name lookup to call
      */
     private void onNameChanged(NameLookup lookup) {
-        String name = nameField.getText() == null ? "" : nameField.getText().trim();
+        String name = nameField.getText().trim();
         if (name.isEmpty()) {
             hintLabel.setText("");
             previewBox.setVisible(false);

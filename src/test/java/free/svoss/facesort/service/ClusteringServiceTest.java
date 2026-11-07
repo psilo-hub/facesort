@@ -19,6 +19,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -50,6 +51,13 @@ class ClusteringServiceTest {
     @AfterEach
     void tearDown() throws SQLException {
         db.close();
+    }
+
+    @Test
+    void constructorRejectsNullFaceDao() {
+        assertThrows(NullPointerException.class,
+                () -> new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), null,
+                        new ConfigStore(ConfigModel.defaults())));
     }
 
     /** Inserts an image row (FK) plus an unnamed face with the given embedding. */
