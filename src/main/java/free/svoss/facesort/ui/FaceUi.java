@@ -23,6 +23,7 @@ import javafx.stage.Window;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,6 +55,9 @@ final class FaceUi {
 
     /** Upper bound of the shared decoded-face-thumbnail cache. */
     private static final int FACE_THUMBNAIL_CACHE_CAPACITY = 256;
+
+    /** Maximum width of a wrapped tooltip, in pixels. */
+    private static final double TOOLTIP_MAX_WIDTH = 420;
 
     /**
      * Upper bound of the shared stored-path cache: enough image hashes that the
@@ -168,6 +172,21 @@ final class FaceUi {
     }
 
     /**
+     * Decodes a face's stored crop on the calling thread, or returns
+     * {@code null} when the face is absent or has no stored crop.
+     *
+     * @param face the face whose crop should be decoded, may be {@code null}
+     * @return the decoded image, or {@code null}
+     */
+    static Image toImage(FaceRecord face) {
+        byte[] jpg = face != null ? face.subImageJpg() : null;
+        if (jpg == null || jpg.length == 0) {
+            return null;
+        }
+        return new Image(new ByteArrayInputStream(jpg));
+    }
+
+    /**
      * Clears a face thumbnail view and stops any decode still on its way to it.
      *
      * @param view the image view to clear
@@ -259,8 +278,22 @@ final class FaceUi {
     static Tooltip wrappedTooltip(String text) {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
-        tooltip.setMaxWidth(420);
+        tooltip.setMaxWidth(TOOLTIP_MAX_WIDTH);
         return tooltip;
+    }
+
+    /**
+     * Drops a path into a path-filter field, moves the caret behind it and
+     * remembers it for the other tabs. Callers reload their own view afterwards.
+     *
+     * @param field    the path filter field to fill
+     * @param tabState the shared cross-tab state to update
+     * @param path     the path to filter by
+     */
+    static void applyFilterPath(TextField field, TabState tabState, Path path) {
+        field.setText(path.toString());
+        field.positionCaret(field.getLength());
+        tabState.setLastPathFilter(path.toString());
     }
 
     /**

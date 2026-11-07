@@ -12,14 +12,12 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Window;
 
-import java.io.ByteArrayInputStream;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.Optional;
@@ -92,7 +90,7 @@ public class TagWithNameDialog extends Dialog<String> {
         header.getStyleClass().add("dialog-header");
 
         ImageView selectedView = new ImageView();
-        selectedView.setImage(toImage(selectedFace));
+        selectedView.setImage(FaceUi.toImage(selectedFace));
         selectedView.setFitWidth(FACE_SIZE);
         selectedView.setFitHeight(FACE_SIZE);
         selectedView.setPreserveRatio(true);
@@ -173,7 +171,7 @@ public class TagWithNameDialog extends Dialog<String> {
                 FaceToNameService.NamePreview p = preview.get();
                 hintLabel.setText(I18n.get("ui.faceName.differentName.exists"));
                 FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_EXISTS);
-                previewThumb.setImage(toImage(p.representative()));
+                previewThumb.setImage(FaceUi.toImage(p.representative()));
                 previewSimilarityLabel.setText(
                         I18n.format("ui.faceName.differentName.similar", name, p.similarity() * 100));
                 previewBox.setVisible(true);
@@ -188,18 +186,4 @@ public class TagWithNameDialog extends Dialog<String> {
         thread.start();
     }
 
-    /**
-     * Decodes a face's JPEG sub-image, or returns {@code null} when none is
-     * available.
-     *
-     * @param face the face whose thumbnail to decode
-     * @return the decoded image, or {@code null}
-     */
-    private static Image toImage(FaceRecord face) {
-        byte[] jpg = face != null ? face.subImageJpg() : null;
-        if (jpg == null || jpg.length == 0) {
-            return null;
-        }
-        return new Image(new ByteArrayInputStream(jpg));
-    }
 }

@@ -1,5 +1,6 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.model.FaceRecord;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -133,6 +135,21 @@ class FaceUiTest {
 
         assertEquals(List.of(2), selected(reloaded),
                 "a range cannot be built from a card that is no longer shown");
+    }
+
+    @Test
+    void toImageWithoutAFaceOrWithoutBytesIsNull() {
+        assertNull(FaceUi.toImage(null),
+                "no face must decode to no image");
+        assertNull(FaceUi.toImage(face(null)),
+                "a face without a stored crop must decode to no image");
+        assertNull(FaceUi.toImage(face(new byte[0])),
+                "an empty crop must decode to no image");
+    }
+
+    /** A face record carrying only the given crop bytes. */
+    private static FaceRecord face(byte[] crop) {
+        return new FaceRecord(1L, "hash", 0, 0, 1, 1, 0.9, new float[]{0f}, crop, null);
     }
 
     /** Cards only need to carry the {@code selected} style class. */

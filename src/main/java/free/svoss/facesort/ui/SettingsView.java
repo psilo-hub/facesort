@@ -13,7 +13,6 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -206,23 +205,10 @@ public class SettingsView extends BorderPane {
                                String tooltipText) {
         Label labelNode = new Label(label);
         if (tooltipText != null && !tooltipText.isBlank()) {
-            labelNode.setTooltip(tooltip(tooltipText));
+            labelNode.setTooltip(FaceUi.wrappedTooltip(tooltipText));
         }
         grid.add(labelNode, 0, row);
         grid.add(field, 1, row);
-    }
-
-    /**
-     * Builds a wrapped tooltip for a settings explanation.
-     *
-     * @param text the tooltip text
-     * @return a tooltip that wraps its text within a maximum width
-     */
-    private static Tooltip tooltip(String text) {
-        Tooltip tooltip = new Tooltip(text);
-        tooltip.setWrapText(true);
-        tooltip.setMaxWidth(420);
-        return tooltip;
     }
 
     /**

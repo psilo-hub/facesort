@@ -130,6 +130,10 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- Shared UI helpers consolidated: face-crop decoding, wrapped tooltips and
+  path-filter application now live in one place, so the tagging views, settings
+  and the tag-with-name dialog behave consistently; long tooltips wrap at the
+  same width everywhere (2026-11-07)
 - Tabs renamed (2026-09-19)
 - Changelog shortened (2026-09-19)
 - The UI refreshes immediately when the language is switched (2026-09-19)

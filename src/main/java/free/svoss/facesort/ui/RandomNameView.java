@@ -13,7 +13,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -114,7 +113,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
         nextButton.setOnAction(e -> loadSample());
 
         pathFilterField.setPromptText(I18n.get("ui.randomName.pathFilterPrompt"));
-        pathFilterField.setTooltip(new Tooltip(I18n.get("ui.randomName.pathFilterTooltip")));
+        pathFilterField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.randomName.pathFilterTooltip")));
         pathFilterField.setOnAction(e -> {
             tabState.setLastPathFilter(pathFilterField.getText());
             loadSample();
@@ -320,9 +319,7 @@ public class RandomNameView extends BorderPane implements Refreshable, NotAFaceP
      * @param path the path to filter by
      */
     private void applyFilterPath(Path path) {
-        pathFilterField.setText(path.toString());
-        pathFilterField.positionCaret(pathFilterField.getLength());
-        tabState.setLastPathFilter(path.toString());
+        FaceUi.applyFilterPath(pathFilterField, tabState, path);
         loadSample();
     }
 

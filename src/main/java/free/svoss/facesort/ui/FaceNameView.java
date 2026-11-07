@@ -624,9 +624,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      * @param path the path to filter by
      */
     private void applyFilterPath(Path path) {
-        pathFilterField.setText(path.toString());
-        pathFilterField.positionCaret(pathFilterField.getLength());
-        tabState.setLastPathFilter(path.toString());
+        FaceUi.applyFilterPath(pathFilterField, tabState, path);
         if (activeName != null) {
             selectName(activeName);
         }
