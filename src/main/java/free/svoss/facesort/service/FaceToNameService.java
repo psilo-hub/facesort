@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -161,6 +162,27 @@ public class FaceToNameService implements MediaFileActions {
     public List<SimilarityResult> findUnnamedForName(long nameId, int limit,
                                                      boolean excludeCloserToOtherNames,
                                                      String pathPrefix) throws SQLException {
+        List<SimilarityResult> ranked = rankUnnamedForName(
+                nameId, limit, excludeCloserToOtherNames, pathPrefix);
+        return hydrateUnnamed(ranked);
+    }
+
+    /**
+     * Scores unnamed faces against a name's average without hydrating their
+     * crops, for callers that only need the ids and embeddings.
+     *
+     * @param nameId id of the reference name
+     * @param limit  maximum number of results; values &le; 0 yield an empty list
+     * @return the slim candidates, descending by similarity
+     * @throws SQLException on database error
+     */
+    List<SimilarityResult> findUnnamedForNameSlim(long nameId, int limit) throws SQLException {
+        return rankUnnamedForName(nameId, limit, false, null);
+    }
+
+    private List<SimilarityResult> rankUnnamedForName(long nameId, int limit,
+                                                      boolean excludeCloserToOtherNames,
+                                                      String pathPrefix) throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
@@ -176,7 +198,7 @@ public class FaceToNameService implements MediaFileActions {
         Set<Long> rejected = notMatchDao.findFaceIdsByNameId(nameId);
 
         List<SimilarityResult> results = new ArrayList<>();
-        for (FaceRecord candidate : faceDao.findUnnamed(pathPrefix)) {
+        for (FaceRecord candidate : faceDao.findUnnamedSlim(pathPrefix)) {
             if (rejected.contains(candidate.id())) {
                 continue;
             }
@@ -195,6 +217,40 @@ public class FaceToNameService implements MediaFileActions {
         Collections.sort(results);
 
         return results.size() <= limit ? results : new ArrayList<>(results.subList(0, limit));
+    }
+
+    /** Loads the full rows of the unnamed faces that will be shown. */
+    private List<SimilarityResult> hydrateUnnamed(List<SimilarityResult> ranked) throws SQLException {
+        Map<Long, FaceRecord> full = new HashMap<>();
+        for (FaceRecord face : faceDao.findUnnamedByIds(idsOf(ranked))) {
+            full.put(face.id(), face);
+        }
+        return rehydrate(ranked, full);
+    }
+
+    /** Loads the full rows of the tagged faces that will be shown. */
+    private List<SimilarityResult> hydrateNamed(List<SimilarityResult> ranked) throws SQLException {
+        Map<Long, FaceRecord> full = new HashMap<>();
+        for (FaceRecord face : faceDao.findNamedByIds(idsOf(ranked))) {
+            full.put(face.id(), face);
+        }
+        return rehydrate(ranked, full);
+    }
+
+    private static List<Long> idsOf(List<SimilarityResult> results) {
+        return results.stream().map(result -> result.faceRecord().id()).toList();
+    }
+
+    private static List<SimilarityResult> rehydrate(List<SimilarityResult> ranked,
+                                                    Map<Long, FaceRecord> full) {
+        List<SimilarityResult> hydrated = new ArrayList<>(ranked.size());
+        for (SimilarityResult result : ranked) {
+            FaceRecord face = full.get(result.faceRecord().id());
+            if (face != null) {
+                hydrated.add(new SimilarityResult(face, result.similarity()));
+            }
+        }
+        return hydrated;
     }
 
     /**
@@ -251,6 +307,19 @@ public class FaceToNameService implements MediaFileActions {
      * @throws SQLException on database error
      */
     public List<SimilarityResult> findMostSimilarNamed(long nameId, int limit) throws SQLException {
+        return hydrateNamed(findMostSimilarNamedSlim(nameId, limit));
+    }
+
+    /**
+     * Scores a name's tagged faces against its average without hydrating their
+     * crops, for callers that only need the best ids and embeddings.
+     *
+     * @param nameId id of the name whose tagged faces should be ranked
+     * @param limit  maximum number of results; values &le; 0 yield an empty list
+     * @return the slim tagged faces, descending by similarity
+     * @throws SQLException on database error
+     */
+    List<SimilarityResult> findMostSimilarNamedSlim(long nameId, int limit) throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
@@ -259,7 +328,7 @@ public class FaceToNameService implements MediaFileActions {
         if (average.isEmpty()) {
             return List.of();
         }
-        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
+        List<FaceRecord> namedFaces = faceDao.findByNameIdSlim(nameId);
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord face : namedFaces) {
@@ -271,6 +340,17 @@ public class FaceToNameService implements MediaFileActions {
         Collections.sort(results);
 
         return results.size() <= limit ? results : new ArrayList<>(results.subList(0, limit));
+    }
+
+    /**
+     * Loads a face's full row, including its thumbnail crop.
+     *
+     * @param faceId id of the face
+     * @return the full face record, or empty when it no longer exists
+     * @throws SQLException on database error
+     */
+    Optional<FaceRecord> findFaceById(long faceId) throws SQLException {
+        return faceDao.findById(faceId);
     }
 
     /**

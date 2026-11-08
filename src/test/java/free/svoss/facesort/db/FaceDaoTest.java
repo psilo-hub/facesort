@@ -706,6 +706,87 @@ class FaceDaoTest {
     }
 
     @Test
+    void findUnnamedSlim_returnsUnnamedFacesWithoutTheCrop() throws Exception {
+        insertImage("imgU");
+        insertImage("imgN");
+        long alice = nameDao.insert("Alice");
+        long unnamed = insertFace("imgU", 10, 20, new float[]{1.0f, 2.0f}, null);
+        insertFace("imgN", 0, 0, new float[]{3.0f}, alice);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        List<FaceRecord> slim = countingDao.findUnnamedSlim(null);
+
+        assertEquals(List.of(unnamed), slim.stream().map(FaceRecord::id).toList(),
+                "only unnamed faces are candidates");
+        FaceRecord face = slim.get(0);
+        assertArrayEquals(new float[]{1.0f, 2.0f}, face.embedding(),
+                "the embedding must stay hydrated for scoring");
+        assertTrue(face.subImageJpg() == null,
+                "the slim projection must not hydrate the per-face crop");
+        String sql = String.join("; ", counting.statements());
+        assertFalse(sql.contains("sub_image_jpg"),
+                "scoring unnamed faces must not read the per-face JPEG: " + sql);
+    }
+
+    @Test
+    void findUnnamedSlim_excludesDismissedFacesAndHonoursThePathPrefix() throws Exception {
+        insertImage("keep");
+        insertImage("dismissed");
+        insertImage("other");
+        imageDao.addPath("keep", "/photos/family/keep.jpg");
+        imageDao.addPath("dismissed", "/photos/family/dismissed.jpg");
+        imageDao.addPath("other", "/photos/elsewhere/other.jpg");
+        insertFace("keep", 0, 0, new float[]{1.0f}, null);
+        long dismissed = insertFace("dismissed", 0, 0, new float[]{2.0f}, null);
+        insertFace("other", 0, 0, new float[]{3.0f}, null);
+        faceDao.markNotAFace(dismissed);
+
+        List<String> matching = imageHashesOf(faceDao.findUnnamedSlim("/photos/family"));
+
+        assertEquals(List.of("keep"), matching,
+                "a dismissed face and a face outside the prefix must not be candidates");
+    }
+
+    @Test
+    void findByNameIdSlim_returnsTheNamesFacesWithoutTheCrop() throws Exception {
+        insertImage("img1");
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long aliceFace = insertFace("img1", 10, 10, new float[]{1.0f}, alice);
+        insertFace("img1", 20, 20, new float[]{2.0f}, bob);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+
+        List<FaceRecord> slim = countingDao.findByNameIdSlim(alice);
+
+        assertEquals(List.of(aliceFace), slim.stream().map(FaceRecord::id).toList());
+        FaceRecord face = slim.get(0);
+        assertArrayEquals(new float[]{1.0f}, face.embedding(),
+                "the embedding must stay hydrated for scoring");
+        assertEquals(alice, face.nameId());
+        assertTrue(face.subImageJpg() == null,
+                "the slim projection must not hydrate the per-face crop");
+        String sql = String.join("; ", counting.statements());
+        assertFalse(sql.contains("sub_image_jpg"),
+                "ranking a name's tagged faces must not read their JPEGs: " + sql);
+    }
+
+    @Test
+    void findUnnamedByIds_hydratesTheCropAndKeepsTheRequestedOrder() throws Exception {
+        insertImage("img1");
+        long first = insertFace("img1", 0, 0, new float[]{1.0f}, null);
+        long second = insertFace("img1", 20, 0, new float[]{2.0f}, null);
+
+        List<FaceRecord> loaded = faceDao.findUnnamedByIds(List.of(second, 999L, first));
+
+        assertEquals(List.of(second, first), loaded.stream().map(FaceRecord::id).toList(),
+                "the requested id order is kept and unknown ids are skipped");
+        assertArrayEquals(JPEG, loaded.get(0).subImageJpg(),
+                "hydrating the shown candidate must include its crop");
+    }
+
+    @Test
     void findNamedByIds_preservesIdOrderAndSkipsMissingIds() throws Exception {
         insertImage("img1");
         long alice = nameDao.insert("Alice");

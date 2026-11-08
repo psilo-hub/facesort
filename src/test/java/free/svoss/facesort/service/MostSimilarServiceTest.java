@@ -7,6 +7,7 @@ import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.ImageDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotMatchDao;
+import free.svoss.facesort.db.QueryCountingConnection;
 import free.svoss.facesort.db.VideoDao;
 import free.svoss.facesort.model.FaceRecord;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,8 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -103,6 +106,39 @@ class MostSimilarServiceTest {
         assertEquals(closest, best.get().tagged().id(),
                 "the tagged face shown must be the one most similar to the name's average");
         assertEquals(candidate, best.get().candidate().id());
+    }
+
+    @Test
+    void findBestSuggestion_scoresSlimRowsAndHydratesOnlyTheShownPair() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgU1", xLike(), null);
+        addImageAndFace("imgU2", yLike(), null);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+        ConfigStore configStore = new ConfigStore(ConfigModel.defaults());
+        configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0));
+        FaceAiService ai = new FaceAiService(new FakeFaceAiEngine());
+        MostSimilarService countingService = new MostSimilarService(
+                new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
+                        new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
+                ai, nameDao, notMatchDao);
+
+        MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
+
+        assertNotNull(best.tagged().subImageJpg(),
+                "the tagged card still needs its crop");
+        assertNotNull(best.candidate().subImageJpg(),
+                "the candidate card still needs its crop");
+        assertFalse(loadsEveryChosenRowWithItsCrop(counting.statements()),
+                "the scan must score slim rows and hydrate only the shown pair: "
+                        + counting.statements());
+    }
+
+    private static boolean loadsEveryChosenRowWithItsCrop(java.util.List<String> statements) {
+        return statements.stream().anyMatch(sql -> sql.contains("sub_image_jpg")
+                && (sql.contains("FROM faces WHERE name_id IS NULL")
+                        || sql.contains("FROM faces WHERE name_id = ?")));
     }
 
     @Test

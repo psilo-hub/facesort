@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -337,6 +338,57 @@ class FaceToNameServiceTest {
 
         assertTrue(service.findMostSimilarNamed(alice, 0).isEmpty());
         assertTrue(service.findMostSimilarNamed(alice, -1).isEmpty());
+    }
+
+    @Test
+    void findUnnamedForName_scoresSlimRowsButReturnsHydratedCrops() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+        addImageAndFace("imgU2", yLike(), null);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceToNameService countingService = new FaceToNameService(
+                new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
+                nameDao, new NotMatchDao(db.getConnection()), imageDao,
+                new VideoDao(db.getConnection()), configStore);
+
+        List<SimilarityResult> results = countingService.findUnnamedForName(alice, 10);
+
+        assertEquals(candidate, results.get(0).faceRecord().id());
+        assertTrue(results.get(0).faceRecord().subImageJpg() != null,
+                "the ranked cards still need the chosen faces' crops");
+        assertFalse(scoredEveryUnnamedFaceWithItsCrop(counting.statements()),
+                "scoring must use the slim projection and hydrate only the returned faces: "
+                        + counting.statements());
+    }
+
+    private static boolean scoredEveryUnnamedFaceWithItsCrop(List<String> statements) {
+        return statements.stream().anyMatch(sql ->
+                sql.contains("sub_image_jpg") && sql.contains("FROM faces WHERE name_id IS NULL"));
+    }
+
+    @Test
+    void findMostSimilarNamed_scoresSlimRowsButReturnsHydratedCrops() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", yLike(), alice);
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceToNameService countingService = new FaceToNameService(
+                new FaceAiService(new FakeFaceAiEngine()), new FaceDao(counting.connection()),
+                nameDao, new NotMatchDao(db.getConnection()), imageDao,
+                new VideoDao(db.getConnection()), configStore);
+
+        List<SimilarityResult> results = countingService.findMostSimilarNamed(alice, 10);
+
+        assertTrue(results.get(0).faceRecord().subImageJpg() != null,
+                "the tagged representative still needs its crop");
+        assertFalse(statementsLoadEveryTaggedFaceWithItsCrop(counting.statements()),
+                "ranking tagged faces must use the slim projection: " + counting.statements());
+    }
+
+    private static boolean statementsLoadEveryTaggedFaceWithItsCrop(List<String> statements) {
+        return statements.stream().anyMatch(sql ->
+                sql.contains("sub_image_jpg") && sql.contains("FROM faces WHERE name_id = ?"));
     }
 
     @Test

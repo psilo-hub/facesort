@@ -34,7 +34,7 @@ and the UI appears frozen between decisions.
 | #  | Item                                              | Depends on | Status |
 |----|---------------------------------------------------|------------|--------|
 | 1  | Benchmark test for `findBestSuggestion()`         | —          | [ ]    |
-| 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [ ]    |
+| 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [x]    |
 | 3  | Cache name average embeddings                     | 1          | [x]    |
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [ ]    |
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [ ]    |
@@ -80,7 +80,7 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
 
 ## Algorithmic / service optimizations
 
-### 2. [ ] Slim projection: stop loading thumbnail blobs while scoring
+### 2. [x] ~~Slim projection: stop loading thumbnail blobs while scoring~~
 
 **Depends on:** 1 (to measure the gain). Independent of the others otherwise.
 
@@ -104,6 +104,12 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
   cards.
 - Test: slim query returns the same ids/embeddings as the full query; the
   `Suggestion` returned by the service still has non-null crops.
+
+**Done (2026-11-08):** `FaceDao.findUnnamedSlim`, `findByNameIdSlim` and
+`findUnnamedByIds` split scoring from hydration. `FaceToNameService` ranks on
+slim rows and hydrates only the returned faces, and `MostSimilarService` uses
+the non-hydrating `findUnnamedForNameSlim` / `findMostSimilarNamedSlim` during
+the scan, then loads just the two shown faces for the `Suggestion`.
 
 ### 3. [x] ~~Cache name average embeddings~~
 

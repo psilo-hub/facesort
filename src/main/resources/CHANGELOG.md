@@ -130,6 +130,10 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- The "Most similar" and "Add faces to a name" tabs now rank candidates from
+  their embeddings alone and load the thumbnails only for the faces they show,
+  instead of reading every candidate's JPEG on every scan, so large libraries
+  stay responsive between decisions (2026-11-08)
 - The "Most similar" and "Add faces to a name" tabs reuse each person's average
   face embedding instead of recomputing it for every suggestion and every
   decision, so working through the unnamed faces stays responsive on large

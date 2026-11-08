@@ -234,6 +234,37 @@ public class FaceDao {
     }
 
     /**
+     * Returns the candidates for tagging without their per-face thumbnail
+     * crops, optionally restricted by path prefix exactly like
+     * {@link #findUnnamed(String)}.
+     *
+     * <p>Ranking only needs the face id, its image hash, its embedding and its
+     * name id. A library can hold thousands of unnamed faces, so hydrating the
+     * {@code sub_image_jpg} blob for every one of them while scoring is pure
+     * waste. The returned records are a projection: {@code subImageJpg} is
+     * {@code null} and the bounding box and confidence are zero. Load the
+     * chosen faces through {@link #findUnnamedByIds(List)} before showing them.</p>
+     *
+     * @param pathPrefix path prefix the stored photo/video path must start with,
+     *                   or {@code null}/{@code ""} to return all unnamed faces
+     * @return the matching unnamed slim faces, excluding those dismissed as
+     *         "not a face"
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findUnnamedSlim(String pathPrefix) throws SQLException {
+        PathPrefix filter = PathPrefix.of(pathPrefix);
+        List<FaceRecord> faces = new ArrayList<>();
+        try (PreparedStatement ps = prepareWithPathFilter(
+                "SELECT " + SELECT_SLIM_COLUMNS + " FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE, filter)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                faces.add(mapSlimRow(rs));
+            }
+        }
+        return faces;
+    }
+
+    /**
      * Returns up to {@code limit} unnamed faces chosen at random.
      *
      * <p>Sampling happens in two steps to avoid SQLite sorting the whole
@@ -287,7 +318,7 @@ public class FaceDao {
             }
         }
         List<Long> sampled = sampleRandom(ids, limit, new Random());
-        return findByIds(sampled);
+        return findUnnamedByIds(sampled);
     }
 
     public List<free.svoss.facesort.model.FaceThumb> findRandomUnnamedThumbs(int limit, String pathPrefix)
@@ -364,7 +395,7 @@ public class FaceDao {
      * predicate and the mapper. Keys are de-duplicated, so a repeated key is
      * queried once; the returned map holds every requested key, in
      * first-appearance order, mapping to an empty list when nothing matches.
-     * Callers that must keep repeated keys (the id-ordered {@link #findByIds}
+     * Callers that must keep repeated keys (the id-ordered {@link #findUnnamedByIds}
      * and {@link #findThumbsByIds}) re-expand the map over their id list.</p>
      *
      * @param columns        the projection
@@ -403,15 +434,19 @@ public class FaceDao {
     }
 
     /**
-     * Loads the faces with the given ids by primary key, keeping the requested
-     * id order and repeating an id that was requested twice.
+     * Loads the unnamed faces with the given ids by primary key, keeping the
+     * requested id order and repeating an id that was requested twice.
+     *
+     * <p>This hydrates the full row, including the {@code sub_image_jpg} crop,
+     * so a caller that scored slim rows can load only the faces it is about to
+     * show.</p>
      *
      * @param ids the ids to load; must not be {@code null}
      * @return the matching faces, in the given id order; ids that no longer
-     *         exist (deleted between the id pick and this fetch) are skipped
+     *         exist, are tagged, or were dismissed are skipped
      * @throws SQLException on database error
      */
-    private List<FaceRecord> findByIds(List<Long> ids) throws SQLException {
+    public List<FaceRecord> findUnnamedByIds(List<Long> ids) throws SQLException {
         Map<Long, List<FaceRecord>> byId = queryGroupedByKey(
                 SELECT_COLUMNS, "id", " AND name_id IS NULL" + NOT_A_FACE_CLAUSE,
                 ids, FaceRecord::id, this::mapRow);
@@ -422,7 +457,7 @@ public class FaceDao {
      * Loads the named faces with the given ids by primary key, with the full
      * row including the {@code sub_image_jpg} crop.
      *
-     * <p>This is the named-only sibling of the private {@link #findByIds} and of
+     * <p>This is the named-only sibling of the {@link #findUnnamedByIds} and of
      * {@link #findById(long)}, which return named <em>and</em> unnamed faces:
      * the representatives picked from {@link #findSlimByNameIds} are always
      * tagged, so hydrating them needs a batch that keeps only named rows.</p>
@@ -468,6 +503,32 @@ public class FaceDao {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 faces.add(mapRow(rs));
+            }
+        }
+        return faces;
+    }
+
+    /**
+     * Returns the faces tagged with a name without their per-face thumbnail
+     * crops, for ranking them against the name's average embedding.
+     *
+     * <p>The returned records are a projection: {@code subImageJpg} is
+     * {@code null} and the bounding box and confidence are zero. Load the
+     * chosen representatives through {@link #findNamedByIds(List)} before
+     * showing them.</p>
+     *
+     * @param nameId id of the name
+     * @return the name's slim faces, in stored order
+     * @throws SQLException on database error
+     */
+    public List<FaceRecord> findByNameIdSlim(long nameId) throws SQLException {
+        List<FaceRecord> faces = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT " + SELECT_SLIM_COLUMNS + " FROM faces WHERE name_id = ?")) {
+            ps.setLong(1, nameId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                faces.add(mapSlimRow(rs));
             }
         }
         return faces;

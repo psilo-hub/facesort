@@ -78,7 +78,7 @@ public class MostSimilarService {
             if (candidate == null) {
                 continue;
             }
-            List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamed(name.id(), 1);
+            List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamedSlim(name.id(), 1);
             if (tagged.isEmpty()) {
                 continue;
             }
@@ -89,11 +89,33 @@ public class MostSimilarService {
                 best = new Suggestion(name, taggedFace, candidate.faceRecord(),
                         candidate.similarity(), faceSim);
                 if (best.nameSimilarity() >= 0.99) {
-                    return Optional.of(best);
+                    break;
                 }
             }
         }
-        return Optional.ofNullable(best);
+        return hydrate(best);
+    }
+
+    /**
+     * Loads the full rows of the two faces that will be shown, so the cards
+     * still receive their thumbnail crops after a slim scan.
+     *
+     * @param suggestion the pair picked from slim rows, or {@code null}
+     * @return the pair with hydrated faces, or empty when a face disappeared
+     *         while the scan was running
+     * @throws SQLException on database error
+     */
+    private Optional<Suggestion> hydrate(Suggestion suggestion) throws SQLException {
+        if (suggestion == null) {
+            return Optional.empty();
+        }
+        Optional<FaceRecord> tagged = faceToNameService.findFaceById(suggestion.tagged().id());
+        Optional<FaceRecord> candidate = faceToNameService.findFaceById(suggestion.candidate().id());
+        if (tagged.isEmpty() || candidate.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new Suggestion(suggestion.name(), tagged.get(), candidate.get(),
+                suggestion.nameSimilarity(), suggestion.faceSimilarity()));
     }
 
     /**
@@ -143,7 +165,7 @@ public class MostSimilarService {
      */
     private SimilarityResult firstNotSkipped(long nameId) throws SQLException {
         for (SimilarityResult candidate
-                : faceToNameService.findUnnamedForName(nameId, CANDIDATE_BATCH)) {
+                : faceToNameService.findUnnamedForNameSlim(nameId, CANDIDATE_BATCH)) {
             if (!skipped.contains(new MatchKey(candidate.faceRecord().id(), nameId))) {
                 return candidate;
             }
