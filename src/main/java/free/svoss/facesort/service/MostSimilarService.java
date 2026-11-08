@@ -76,7 +76,8 @@ public class MostSimilarService {
         List<FaceRecord> unnamed = faceToNameService.findUnnamedCandidates();
         double cutoff = faceToNameService.minNameSimilarity();
 
-        Suggestion best = null;
+        NameRecord bestName = null;
+        SimilarityResult bestCandidate = null;
         for (NameRecord name : names) {
             float[] average = averages.get(name.id());
             if (average == null) {
@@ -87,22 +88,27 @@ public class MostSimilarService {
             if (candidate == null) {
                 continue;
             }
-            List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamedSlim(name.id(), 1);
-            if (tagged.isEmpty()) {
-                continue;
-            }
-            if (best == null || candidate.similarity() > best.nameSimilarity()) {
-                FaceRecord taggedFace = tagged.get(0).faceRecord();
-                double faceSim = faceAiService.calcSimilarity(taggedFace.embedding(),
-                        candidate.faceRecord().embedding());
-                best = new Suggestion(name, taggedFace, candidate.faceRecord(),
-                        candidate.similarity(), faceSim);
-                if (best.nameSimilarity() >= 0.99) {
+            if (bestCandidate == null || candidate.similarity() > bestCandidate.similarity()) {
+                bestName = name;
+                bestCandidate = candidate;
+                if (bestCandidate.similarity() >= 0.99) {
                     break;
                 }
             }
         }
-        return hydrate(best);
+        if (bestCandidate == null) {
+            return Optional.empty();
+        }
+
+        List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamedSlim(bestName.id(), 1);
+        if (tagged.isEmpty()) {
+            return Optional.empty();
+        }
+        FaceRecord taggedFace = tagged.get(0).faceRecord();
+        double faceSim = faceAiService.calcSimilarity(taggedFace.embedding(),
+                bestCandidate.faceRecord().embedding());
+        return hydrate(new Suggestion(bestName, taggedFace, bestCandidate.faceRecord(),
+                bestCandidate.similarity(), faceSim));
     }
 
     /**

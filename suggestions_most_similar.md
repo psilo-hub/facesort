@@ -37,7 +37,7 @@ and the UI appears frozen between decisions.
 | 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [x]    |
 | 3  | Cache name average embeddings                     | 1          | [x]    |
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [x]    |
-| 5  | Prune names and skip the redundant second query   | 3, 4       | [ ]    |
+| 5  | Prune names and skip the redundant second query   | 3, 4       | [x]    |
 | 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
 | 7  | Partial index for unnamed faces                   | 1          | [ ]    |
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [ ]    |
@@ -172,7 +172,7 @@ against the shared rows and keeps only each name's best non-skipped candidate.
 The scan no longer has a per-name top-25 list, so skipping still works after
 more than 25 candidates were skipped.
 
-### 5. [ ] Prune names and skip the redundant second query
+### 5. [x] ~~Prune names and skip the redundant second query~~
 
 **Depends on:** 3, 4.
 
@@ -189,6 +189,11 @@ more than 25 candidates were skipped.
 - Test: the pair and both similarity values are unchanged; add a test with a
   counting `FaceAiService` wrapper to assert the number of `calcSimilarity`
   calls dropped.
+
+**Done (2026-11-08):** `findBestSuggestion` keeps only the best
+(name, candidate) pair while scanning, then loads the winner's tagged
+representative and computes `faceSimilarity` once at the end. The representative
+scoring therefore no longer runs for every name that has a candidate.
 
 ### 6. [ ] Configurable / adaptive early-exit threshold
 

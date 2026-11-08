@@ -33,6 +33,7 @@ class MostSimilarServiceTest {
     private FaceDao faceDao;
     private NameDao nameDao;
     private NotMatchDao notMatchDao;
+    private FakeFaceAiEngine engine;
     private MostSimilarService service;
 
     @BeforeEach
@@ -43,7 +44,8 @@ class MostSimilarServiceTest {
         notMatchDao = new NotMatchDao(db.getConnection());
         ConfigStore configStore = new ConfigStore(ConfigModel.defaults());
         configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0)); // no cutoff in these tests
-        FaceAiService faceAiService = new FaceAiService(new FakeFaceAiEngine());
+        engine = new FakeFaceAiEngine();
+        FaceAiService faceAiService = new FaceAiService(engine);
         FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao,
                 nameDao, notMatchDao, new ImageDao(db.getConnection()),
                 new VideoDao(db.getConnection()), configStore);
@@ -166,6 +168,32 @@ class MostSimilarServiceTest {
         return statements.stream().anyMatch(sql -> sql.contains("sub_image_jpg")
                 && (sql.contains("FROM faces WHERE name_id IS NULL")
                         || sql.contains("FROM faces WHERE name_id = ?")));
+    }
+
+    @Test
+    void findBestSuggestion_scoresOnlyTheWinnersRepresentative() throws SQLException {
+        float near = 0.9f;
+        float side = (float) Math.sqrt(1.0 - near * near);
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long carol = nameDao.insert("Carol");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgB", yLike(), bob);
+        addImageAndFace("imgC", new float[]{0, 0, 1, 0, 0, 0, 0, 0}, carol);
+        addImageAndFace("imgU1", new float[]{near, side, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", new float[]{side, near, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU3", new float[]{0, 0, near, side, 0, 0, 0, 0}, null);
+
+        MostSimilarService.Suggestion best = service.findBestSuggestion().orElseThrow();
+
+        assertEquals("Alice", best.name().name());
+        assertEquals(near, best.nameSimilarity(), 1e-6,
+                "the candidate's similarity to the winner's average must be unchanged");
+        assertEquals(near, best.faceSimilarity(), 1e-6,
+                "the similarity between the two shown faces must be unchanged");
+        assertEquals(11, engine.similarityCalls(),
+                "three candidates against three names, plus one representative and one shown pair: "
+                        + "only the winning name may have its tagged faces scored");
     }
 
     @Test

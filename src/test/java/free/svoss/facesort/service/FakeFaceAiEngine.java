@@ -22,6 +22,7 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
     private Runnable detectionHook;
     private final AtomicInteger detectCalls = new AtomicInteger();
     private final AtomicInteger averageCalls = new AtomicInteger();
+    private final AtomicInteger similarityCalls = new AtomicInteger();
 
     /** Sets the faces reported for every detected image. */
     FakeFaceAiEngine withFaces(DetectedFace... faces) {
@@ -37,6 +38,11 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
     /** Returns how many embedding averages were computed. */
     int averageCalls() {
         return averageCalls.get();
+    }
+
+    /** Returns how many similarity comparisons were computed. */
+    int similarityCalls() {
+        return similarityCalls.get();
     }
 
     /** Sets the embedding returned for every face crop. */
@@ -83,6 +89,7 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
 
     @Override
     public double calcSimilarity(float[] a, float[] b) {
+        similarityCalls.incrementAndGet();
         return cosineSimilarity(a, b);
     }
 

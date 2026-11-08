@@ -130,6 +130,9 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- The "Most similar" tab now computes the tagged-face representative and the
+  face-to-face similarity only for the pair it is about to show, instead of for
+  every name that has a candidate (2026-11-08)
 - The "Most similar" tab now loads the unnamed faces, name averages and
   rejections once per scan and scores every name against that shared snapshot,
   instead of rescanning the whole unnamed set once per name (2026-11-08)
