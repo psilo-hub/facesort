@@ -21,6 +21,7 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
     private boolean failEmbedding = false;
     private Runnable detectionHook;
     private final AtomicInteger detectCalls = new AtomicInteger();
+    private final AtomicInteger averageCalls = new AtomicInteger();
 
     /** Sets the faces reported for every detected image. */
     FakeFaceAiEngine withFaces(DetectedFace... faces) {
@@ -31,6 +32,11 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
     /** Returns how many images were offered to face detection. */
     int detectCalls() {
         return detectCalls.get();
+    }
+
+    /** Returns how many embedding averages were computed. */
+    int averageCalls() {
+        return averageCalls.get();
     }
 
     /** Sets the embedding returned for every face crop. */
@@ -102,6 +108,7 @@ class FakeFaceAiEngine implements FaceAiService.Engine {
 
     @Override
     public float[] calcAverage(List<float[]> embeddings) {
+        averageCalls.incrementAndGet();
         if (embeddings.isEmpty()) {
             return new float[0];
         }

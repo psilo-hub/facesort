@@ -130,6 +130,11 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- The "Most similar" and "Add faces to a name" tabs reuse each person's average
+  face embedding instead of recomputing it for every suggestion and every
+  decision, so working through the unnamed faces stays responsive on large
+  libraries. Tagging, untagging, merging or re-cropping a face refreshes it
+  immediately (2026-11-08)
 - Similarity scores are now shown as percentages everywhere: the dedupe round
   line and the tag-with-name preview use the same whole-percent format as the
   candidate cards, instead of a raw fraction or a separately formatted number

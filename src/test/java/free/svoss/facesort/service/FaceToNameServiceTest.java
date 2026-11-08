@@ -35,6 +35,7 @@ class FaceToNameServiceTest {
     private ImageDao imageDao;
     private FaceToNameService service;
     private ConfigStore configStore;
+    private FakeFaceAiEngine engine;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -44,7 +45,8 @@ class FaceToNameServiceTest {
         imageDao = new ImageDao(db.getConnection());
         configStore = new ConfigStore(ConfigModel.defaults());
         configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0)); // no cutoff by default in these tests
-        service = new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()),
+        engine = new FakeFaceAiEngine();
+        service = new FaceToNameService(new FaceAiService(engine),
                 faceDao, nameDao, new NotMatchDao(db.getConnection()), imageDao,
                 new VideoDao(db.getConnection()), configStore);
     }
@@ -335,6 +337,37 @@ class FaceToNameServiceTest {
 
         assertTrue(service.findMostSimilarNamed(alice, 0).isEmpty());
         assertTrue(service.findMostSimilarNamed(alice, -1).isEmpty());
+    }
+
+    @Test
+    void findUnnamedForName_andFindMostSimilarNamed_shareTheCachedAverage() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgU1", xLike(), null);
+
+        service.findUnnamedForName(alice, 10);
+        service.findMostSimilarNamed(alice, 10);
+        service.findUnnamedForName(alice, 10);
+
+        assertEquals(1, engine.averageCalls(),
+                "both ranking methods must reuse the same cached name average");
+    }
+
+    @Test
+    void tagFace_invalidatesTheCachedAverage() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long extra = addImageAndFace("imgU1", yLike(), null);
+        addImageAndFace("imgU2", xLike(), null);
+
+        service.findUnnamedForName(alice, 10);
+        service.tagFace(extra, alice);
+        List<SimilarityResult> results = service.findUnnamedForName(alice, 10);
+
+        assertEquals(1, results.size());
+        assertEquals(1.0 / Math.sqrt(2.0), results.get(0).similarity(), 1e-9,
+                "a face tagged through the service must change the next ranking's average");
+        assertEquals(2, engine.averageCalls());
     }
 
     @Test

@@ -178,6 +178,23 @@ class MostSimilarServiceTest {
     }
 
     @Test
+    void findBestSuggestion_reflectsAFaceTaggedAfterTheFirstScan() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgU1", xLike(), null);
+
+        assertEquals(1.0, service.findBestSuggestion().orElseThrow().nameSimilarity(), 1e-9);
+
+        // Another tab tags a face with Alice after the first scan.
+        long extra = addImageAndFace("imgU2", yLike(), null);
+        faceDao.assignName(extra, alice);
+
+        assertEquals(1.0 / Math.sqrt(2.0),
+                service.findBestSuggestion().orElseThrow().nameSimilarity(), 1e-9,
+                "the next suggestion must use Alice's updated average embedding");
+    }
+
+    @Test
     void markDifferentPerson_persistsTheRejectionAcrossInstances() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA1", xLike(), alice);

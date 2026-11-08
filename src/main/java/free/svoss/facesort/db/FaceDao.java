@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /**
@@ -47,8 +48,33 @@ public class FaceDao {
 
     private final Connection conn;
 
+    /**
+     * Monotonically increasing counter bumped after every face write. Caches
+     * derived from face data (for example a name's average embedding) compare
+     * the value they last saw against {@link #writeVersion()} and drop their
+     * entries when a write happened, without every service having to publish
+     * invalidation events.
+     */
+    private final AtomicLong writeVersion = new AtomicLong();
+
     public FaceDao(Connection conn) {
         this.conn = conn;
+    }
+
+    /**
+     * Returns the number of face writes this DAO has performed. The value only
+     * changes when a face row can have changed, so a derived cache can use it
+     * as a cheap staleness check.
+     *
+     * @return the current write version
+     */
+    public long writeVersion() {
+        return writeVersion.get();
+    }
+
+    /** Marks every cached view of the faces table as stale. */
+    private void recordWrite() {
+        writeVersion.incrementAndGet();
     }
 
     /**
@@ -82,6 +108,7 @@ public class FaceDao {
                 ps.setNull(9, Types.INTEGER);
             }
             ps.executeUpdate();
+            recordWrite();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
                     return keys.getLong(1);
@@ -167,6 +194,7 @@ public class FaceDao {
             ps.setBytes(2, subImageJpg);
             ps.setLong(3, faceId);
             ps.executeUpdate();
+            recordWrite();
         }
     }
 
@@ -563,6 +591,7 @@ public class FaceDao {
             ps.setLong(1, nameId);
             ps.setLong(2, faceId);
             ps.executeUpdate();
+            recordWrite();
         }
     }
 
@@ -580,7 +609,11 @@ public class FaceDao {
                 "UPDATE faces SET name_id = NULL WHERE image_hash = ? AND name_id = ?")) {
             ps.setString(1, imageHash);
             ps.setLong(2, nameId);
-            return ps.executeUpdate();
+            int updated = ps.executeUpdate();
+            if (updated > 0) {
+                recordWrite();
+            }
+            return updated;
         }
     }
 
@@ -605,6 +638,7 @@ public class FaceDao {
             ps.setLong(1, toNameId);
             ps.setLong(2, fromNameId);
             ps.executeUpdate();
+            recordWrite();
         }
     }
 

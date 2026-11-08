@@ -35,7 +35,7 @@ and the UI appears frozen between decisions.
 |----|---------------------------------------------------|------------|--------|
 | 1  | Benchmark test for `findBestSuggestion()`         | —          | [ ]    |
 | 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [ ]    |
-| 3  | Cache name average embeddings                     | 1          | [ ]    |
+| 3  | Cache name average embeddings                     | 1          | [x]    |
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [ ]    |
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [ ]    |
 | 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
@@ -105,7 +105,7 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
 - Test: slim query returns the same ids/embeddings as the full query; the
   `Suggestion` returned by the service still has non-null crops.
 
-### 3. [ ] Cache name average embeddings
+### 3. [x] ~~Cache name average embeddings~~
 
 **Depends on:** 1 (to measure).
 
@@ -128,6 +128,12 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
   `(nameId, tagged face count, max tagged face id)` as a cheap staleness check.
 - Test: cached and uncached averages are identical; tagging a face through any
   path changes the next suggestion's similarity accordingly.
+
+**Done (2026-11-08):** `NameAverageCache` caches each name's average in
+`FaceToNameService`. `FaceDao.writeVersion()` is bumped by every face write, and
+the cache drops its entries when it sees a newer version, so tagging in any
+tab, untagging, a merge and the rotation migration all invalidate it without
+each service knowing about the cache.
 
 ### 4. [ ] Single-pass scoring over one unnamed-face load
 

@@ -18,7 +18,6 @@ import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +36,7 @@ public class FaceToNameService implements MediaFileActions {
 
     private final FaceAiService faceAiService;
     private final FaceSelector faceSelector;
+    private final NameAverageCache nameAverages;
     private final FaceDao faceDao;
     private final NameDao nameDao;
     private final NotMatchDao notMatchDao;
@@ -63,6 +63,7 @@ public class FaceToNameService implements MediaFileActions {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
+        this.nameAverages = new NameAverageCache(faceDao, faceSelector);
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");
@@ -164,12 +165,10 @@ public class FaceToNameService implements MediaFileActions {
             return List.of();
         }
 
-        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
-        if (namedFaces.isEmpty()) {
+        Optional<float[]> average = nameAverages.averageFor(nameId);
+        if (average.isEmpty()) {
             return List.of();
         }
-
-        float[] average = faceSelector.averageOf(namedFaces);
         double cutoff = configStore.get().minNameSimilarity();
 
         Map<Long, float[]> otherAverages = excludeCloserToOtherNames
@@ -181,7 +180,7 @@ public class FaceToNameService implements MediaFileActions {
             if (rejected.contains(candidate.id())) {
                 continue;
             }
-            double similarity = faceAiService.calcSimilarity(average, candidate.embedding());
+            double similarity = faceAiService.calcSimilarity(average.get(), candidate.embedding());
             if (similarity < cutoff) {
                 continue;
             }
@@ -214,13 +213,7 @@ public class FaceToNameService implements MediaFileActions {
             }
         }
 
-        Map<Long, float[]> averages = new HashMap<>();
-        for (Map.Entry<Long, List<FaceRecord>> entry : faceDao.findByNameIds(otherIds).entrySet()) {
-            if (!entry.getValue().isEmpty()) {
-                averages.put(entry.getKey(), faceSelector.averageOf(entry.getValue()));
-            }
-        }
-        return averages;
+        return nameAverages.averagesFor(otherIds);
     }
 
     /**
@@ -262,17 +255,16 @@ public class FaceToNameService implements MediaFileActions {
             return List.of();
         }
 
-        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
-        if (namedFaces.isEmpty()) {
+        Optional<float[]> average = nameAverages.averageFor(nameId);
+        if (average.isEmpty()) {
             return List.of();
         }
-
-        float[] average = faceSelector.averageOf(namedFaces);
+        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
 
         List<SimilarityResult> results = new ArrayList<>();
         for (FaceRecord face : namedFaces) {
             results.add(new SimilarityResult(face,
-                    faceAiService.calcSimilarity(average, face.embedding())));
+                    faceAiService.calcSimilarity(average.get(), face.embedding())));
         }
 
         // SimilarityResult orders descending by similarity.
@@ -404,16 +396,16 @@ public class FaceToNameService implements MediaFileActions {
         if (existing.isEmpty()) {
             return Optional.empty();
         }
-        List<FaceRecord> namedFaces = faceDao.findByNameId(existing.get().id());
-        if (namedFaces.isEmpty()) {
+        Optional<float[]> average = nameAverages.averageFor(existing.get().id());
+        if (average.isEmpty()) {
             return Optional.empty();
         }
-        float[] average = faceSelector.averageOf(namedFaces);
-        FaceRecord representative = faceSelector.mostSimilarTo(average, namedFaces);
+        List<FaceRecord> namedFaces = faceDao.findByNameId(existing.get().id());
+        FaceRecord representative = faceSelector.mostSimilarTo(average.get(), namedFaces);
         FaceRecord candidate = faceDao.findById(candidateFaceId)
                 .orElseThrow(() -> new IllegalArgumentException("Face not found: " + candidateFaceId));
         return Optional.of(new NamePreview(representative,
-                faceAiService.calcSimilarity(average, candidate.embedding())));
+                faceAiService.calcSimilarity(average.get(), candidate.embedding())));
     }
 
     /**
