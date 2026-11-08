@@ -91,6 +91,30 @@ class NotMatchDaoTest {
     }
 
     @Test
+    void findFaceIdsByNameIds_groupsRejectionsByEveryRequestedName() throws Exception {
+        long alice = insertName("Alice");
+        long bob = insertName("Bob");
+        long carol = insertName("Carol");
+        long rejectedForAlice = insertUnnamedFace("img1");
+        long alsoRejectedForAlice = insertUnnamedFace("img2");
+        long rejectedForBob = insertUnnamedFace("img3");
+        dao.insert(rejectedForAlice, alice);
+        dao.insert(alsoRejectedForAlice, alice);
+        dao.insert(rejectedForBob, bob);
+
+        java.util.Map<Long, Set<Long>> grouped =
+                dao.findFaceIdsByNameIds(java.util.List.of(alice, bob, carol));
+
+        assertEquals(Set.of(rejectedForAlice, alsoRejectedForAlice), grouped.get(alice));
+        assertEquals(Set.of(rejectedForBob), grouped.get(bob));
+        assertTrue(grouped.get(carol).isEmpty(),
+                "a name without rejections must still be a key with an empty set");
+        assertEquals(java.util.List.of(alice, bob, carol),
+                new java.util.ArrayList<>(grouped.keySet()),
+                "every requested name is keyed in request order");
+    }
+
+    @Test
     void deletingTheFace_removesTheRejection() throws Exception {
         long alice = insertName("Alice");
         long face = insertUnnamedFace("img1");

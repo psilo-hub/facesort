@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -26,13 +27,6 @@ import java.util.Set;
  * current session, so the user is never forced to decide a pair right now.</p>
  */
 public class MostSimilarService {
-
-    /**
-     * Candidates fetched per name while looking for the first pair that was
-     * not skipped this session. Large enough to step over the pairs a user
-     * skips in a row, small enough to stay one query per name.
-     */
-    private static final int CANDIDATE_BATCH = 25;
 
     private final FaceToNameService faceToNameService;
     private final FaceAiService faceAiService;
@@ -72,9 +66,24 @@ public class MostSimilarService {
      * @throws SQLException on database error
      */
     public Optional<Suggestion> findBestSuggestion() throws SQLException {
+        List<NameRecord> names = nameDao.findAll();
+        if (names.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Long> nameIds = names.stream().map(NameRecord::id).toList();
+        Map<Long, float[]> averages = faceToNameService.averageEmbeddingsFor(nameIds);
+        Map<Long, Set<Long>> rejected = notMatchDao.findFaceIdsByNameIds(nameIds);
+        List<FaceRecord> unnamed = faceToNameService.findUnnamedCandidates();
+        double cutoff = faceToNameService.minNameSimilarity();
+
         Suggestion best = null;
-        for (NameRecord name : nameDao.findAll()) {
-            SimilarityResult candidate = firstNotSkipped(name.id());
+        for (NameRecord name : names) {
+            float[] average = averages.get(name.id());
+            if (average == null) {
+                continue;
+            }
+            SimilarityResult candidate = bestNotSkipped(name.id(), average, unnamed,
+                    rejected.getOrDefault(name.id(), Set.of()), cutoff);
             if (candidate == null) {
                 continue;
             }
@@ -156,21 +165,37 @@ public class MostSimilarService {
     }
 
     /**
-     * Returns the name's best candidate that was not skipped this session.
+     * Returns the name's best candidate that is not rejected and not skipped
+     * this session, scoring the shared unnamed pool instead of reloading it.
      *
-     * @param nameId id of the name whose candidates should be ranked
-     * @return the first candidate not skipped, or {@code null} when the name
-     *         has none left to offer
-     * @throws SQLException on database error
+     * @param nameId   id of the name whose candidates should be ranked
+     * @param average  the name's average embedding
+     * @param unnamed  the shared unnamed candidate pool
+     * @param rejected face ids the user rejected for this name
+     * @param cutoff   minimum similarity a candidate needs to qualify
+     * @return the best qualifying candidate, or {@code null} when the name has
+     *         none left to offer
      */
-    private SimilarityResult firstNotSkipped(long nameId) throws SQLException {
-        for (SimilarityResult candidate
-                : faceToNameService.findUnnamedForNameSlim(nameId, CANDIDATE_BATCH)) {
-            if (!skipped.contains(new MatchKey(candidate.faceRecord().id(), nameId))) {
-                return candidate;
+    private SimilarityResult bestNotSkipped(long nameId, float[] average,
+                                            List<FaceRecord> unnamed, Set<Long> rejected,
+                                            double cutoff) {
+        SimilarityResult best = null;
+        for (FaceRecord face : unnamed) {
+            if (rejected.contains(face.id())) {
+                continue;
+            }
+            double similarity = faceAiService.calcSimilarity(average, face.embedding());
+            if (similarity < cutoff) {
+                continue;
+            }
+            if (skipped.contains(new MatchKey(face.id(), nameId))) {
+                continue;
+            }
+            if (best == null || similarity > best.similarity()) {
+                best = new SimilarityResult(face, similarity);
             }
         }
-        return null;
+        return best;
     }
 
     /**

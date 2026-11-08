@@ -167,19 +167,6 @@ public class FaceToNameService implements MediaFileActions {
         return hydrateUnnamed(ranked);
     }
 
-    /**
-     * Scores unnamed faces against a name's average without hydrating their
-     * crops, for callers that only need the ids and embeddings.
-     *
-     * @param nameId id of the reference name
-     * @param limit  maximum number of results; values &le; 0 yield an empty list
-     * @return the slim candidates, descending by similarity
-     * @throws SQLException on database error
-     */
-    List<SimilarityResult> findUnnamedForNameSlim(long nameId, int limit) throws SQLException {
-        return rankUnnamedForName(nameId, limit, false, null);
-    }
-
     private List<SimilarityResult> rankUnnamedForName(long nameId, int limit,
                                                       boolean excludeCloserToOtherNames,
                                                       String pathPrefix) throws SQLException {
@@ -251,6 +238,38 @@ public class FaceToNameService implements MediaFileActions {
             }
         }
         return hydrated;
+    }
+
+    /**
+     * Loads the average embedding of every given name, so a whole-library scan
+     * scores against cached averages instead of asking per name.
+     *
+     * @param nameIds the names to look up; must not be null
+     * @return the average embedding of every requested name that has faces
+     * @throws SQLException on database error
+     */
+    Map<Long, float[]> averageEmbeddingsFor(List<Long> nameIds) throws SQLException {
+        return nameAverages.averagesFor(nameIds);
+    }
+
+    /**
+     * Returns the current minimum similarity a candidate needs to qualify.
+     *
+     * @return the configured {@code minNameSimilarity}
+     */
+    double minNameSimilarity() {
+        return configStore.get().minNameSimilarity();
+    }
+
+    /**
+     * Loads the unnamed candidate pool once, without thumbnail crops, so a
+     * scan can score every name against the same in-memory rows.
+     *
+     * @return the unnamed slim faces, excluding those dismissed as "not a face"
+     * @throws SQLException on database error
+     */
+    List<FaceRecord> findUnnamedCandidates() throws SQLException {
+        return faceDao.findUnnamedSlim(null);
     }
 
     /**

@@ -109,6 +109,33 @@ class MostSimilarServiceTest {
     }
 
     @Test
+    void findBestSuggestion_readsTheUnnamedPoolOnceForAllNames() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA", xLike(), alice);
+        long candidate = addImageAndFace("imgU", xLike(), null);
+        for (int i = 0; i < 5; i++) {
+            long other = nameDao.insert("Other " + i);
+            addImageAndFace("imgO" + i, xLike(), other);
+        }
+        QueryCountingConnection counting = QueryCountingConnection.around(db.getConnection());
+        FaceDao countingDao = new FaceDao(counting.connection());
+        ConfigStore configStore = new ConfigStore(ConfigModel.defaults());
+        configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0));
+        FaceAiService ai = new FaceAiService(new FakeFaceAiEngine());
+        MostSimilarService countingService = new MostSimilarService(
+                new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
+                        new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
+                ai, nameDao, notMatchDao);
+
+        MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
+
+        assertEquals(candidate, best.candidate().id());
+        assertEquals(1, counting.queriesMatching("FROM faces WHERE name_id IS NULL"),
+                "the unnamed pool must be loaded once per scan, not once per name: "
+                        + counting.statements());
+    }
+
+    @Test
     void findBestSuggestion_scoresSlimRowsAndHydratesOnlyTheShownPair() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA1", xLike(), alice);

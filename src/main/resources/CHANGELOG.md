@@ -130,6 +130,9 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- The "Most similar" tab now loads the unnamed faces, name averages and
+  rejections once per scan and scores every name against that shared snapshot,
+  instead of rescanning the whole unnamed set once per name (2026-11-08)
 - The "Most similar" and "Add faces to a name" tabs now rank candidates from
   their embeddings alone and load the thumbnails only for the faces they show,
   instead of reading every candidate's JPEG on every scan, so large libraries

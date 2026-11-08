@@ -36,7 +36,7 @@ and the UI appears frozen between decisions.
 | 1  | Benchmark test for `findBestSuggestion()`         | —          | [ ]    |
 | 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [x]    |
 | 3  | Cache name average embeddings                     | 1          | [x]    |
-| 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [ ]    |
+| 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [x]    |
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [ ]    |
 | 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
 | 7  | Partial index for unnamed faces                   | 1          | [ ]    |
@@ -141,7 +141,7 @@ the cache drops its entries when it sees a newer version, so tagging in any
 tab, untagging, a merge and the rotation migration all invalidate it without
 each service knowing about the cache.
 
-### 4. [ ] Single-pass scoring over one unnamed-face load
+### 4. [x] ~~Single-pass scoring over one unnamed-face load~~
 
 **Depends on:** 2 (slim rows), 3 (cached averages).
 
@@ -164,6 +164,13 @@ each service knowing about the cache.
 - Test: result equals the old implementation on the correctness fixture from
   item 1 and on randomised libraries (compare old vs new in a test while the
   old code still exists).
+
+**Done (2026-11-08):** `MostSimilarService.findBestSuggestion` loads the slim
+unnamed pool, all name averages and all rejections once, then scores every name
+against the shared rows and keeps only each name's best non-skipped candidate.
+`NotMatchDao.findFaceIdsByNameIds` provides the single chunked rejection lookup.
+The scan no longer has a per-name top-25 list, so skipping still works after
+more than 25 candidates were skipped.
 
 ### 5. [ ] Prune names and skip the redundant second query
 
