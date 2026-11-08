@@ -7,7 +7,10 @@ import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +30,8 @@ import java.util.Set;
  * current session, so the user is never forced to decide a pair right now.</p>
  */
 public class MostSimilarService {
+
+    private static final double EARLY_EXIT_SIMILARITY = 0.99;
 
     private final FaceToNameService faceToNameService;
     private final FaceAiService faceAiService;
@@ -66,32 +71,27 @@ public class MostSimilarService {
      * @throws SQLException on database error
      */
     public Optional<Suggestion> findBestSuggestion() throws SQLException {
-        List<NameRecord> names = nameDao.findAll();
-        if (names.isEmpty()) {
+        Scan scan = loadScan();
+        if (scan.names().isEmpty()) {
             return Optional.empty();
         }
-        List<Long> nameIds = names.stream().map(NameRecord::id).toList();
-        Map<Long, float[]> averages = faceToNameService.averageEmbeddingsFor(nameIds);
-        Map<Long, Set<Long>> rejected = notMatchDao.findFaceIdsByNameIds(nameIds);
-        List<FaceRecord> unnamed = faceToNameService.findUnnamedCandidates();
-        double cutoff = faceToNameService.minNameSimilarity();
 
         NameRecord bestName = null;
         SimilarityResult bestCandidate = null;
-        for (NameRecord name : names) {
-            float[] average = averages.get(name.id());
+        for (NameRecord name : scan.names()) {
+            float[] average = scan.averages().get(name.id());
             if (average == null) {
                 continue;
             }
-            SimilarityResult candidate = bestNotSkipped(name.id(), average, unnamed,
-                    rejected.getOrDefault(name.id(), Set.of()), cutoff);
+            SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
+                    scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
             if (candidate == null) {
                 continue;
             }
             if (bestCandidate == null || candidate.similarity() > bestCandidate.similarity()) {
                 bestName = name;
                 bestCandidate = candidate;
-                if (bestCandidate.similarity() >= 0.99) {
+                if (bestCandidate.similarity() >= EARLY_EXIT_SIMILARITY) {
                     break;
                 }
             }
@@ -99,16 +99,142 @@ public class MostSimilarService {
         if (bestCandidate == null) {
             return Optional.empty();
         }
+        return Optional.ofNullable(suggestionFor(bestName, bestCandidate, new HashMap<>()));
+    }
 
-        List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamedSlim(bestName.id(), 1);
-        if (tagged.isEmpty()) {
-            return Optional.empty();
+    /**
+     * Returns up to {@code limit} (name, unnamed face) pairs with the highest
+     * similarity, ordered by descending similarity. A face appears at most once,
+     * paired with the name that scores it highest, so the list can be shown or
+     * prefetched without offering the same unnamed face twice.
+     *
+     * <p>The scan stops at the first name whose best candidate reaches the
+     * early-exit threshold, exactly like {@link #findBestSuggestion()}, so a
+     * non-positive limit and the presence of a near-perfect match keep the
+     * previous behaviour.</p>
+     *
+     * @param limit maximum number of pairs; values &le; 0 yield an empty list
+     * @return the best pairs in descending similarity order
+     * @throws SQLException on database error
+     */
+    public List<Suggestion> findBestSuggestions(int limit) throws SQLException {
+        if (limit <= 0) {
+            return List.of();
         }
-        FaceRecord taggedFace = tagged.get(0).faceRecord();
+        Scan scan = loadScan();
+        if (scan.names().isEmpty()) {
+            return List.of();
+        }
+
+        List<RankedName> ranked = new ArrayList<>();
+        for (int order = 0; order < scan.names().size(); order++) {
+            NameRecord name = scan.names().get(order);
+            float[] average = scan.averages().get(name.id());
+            if (average == null) {
+                continue;
+            }
+            SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
+                    scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
+            if (candidate == null) {
+                continue;
+            }
+            ranked.add(new RankedName(order, name, candidate));
+            if (candidate.similarity() >= EARLY_EXIT_SIMILARITY) {
+                break;
+            }
+        }
+        if (ranked.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, RankedName> bestByCandidate = new HashMap<>();
+        for (RankedName entry : ranked) {
+            long faceId = entry.candidate().faceRecord().id();
+            RankedName existing = bestByCandidate.get(faceId);
+            if (existing == null
+                    || entry.candidate().similarity() > existing.candidate().similarity()) {
+                bestByCandidate.put(faceId, entry);
+            }
+        }
+        List<RankedName> sorted = new ArrayList<>(bestByCandidate.values());
+        sorted.sort(Comparator
+                .comparingDouble((RankedName entry) -> entry.candidate().similarity())
+                .reversed()
+                .thenComparingInt(RankedName::order));
+
+        List<Suggestion> suggestions = new ArrayList<>();
+        Map<Long, FaceRecord> representatives = new HashMap<>();
+        for (RankedName entry : sorted) {
+            Suggestion suggestion = suggestionFor(entry.name(), entry.candidate(), representatives);
+            if (suggestion != null) {
+                suggestions.add(suggestion);
+            }
+            if (suggestions.size() == limit) {
+                break;
+            }
+        }
+        return suggestions;
+    }
+
+    /**
+     * Tells whether a pair is still offerable: its name still exists, its face
+     * is still unnamed and not dismissed, and the user has neither rejected nor
+     * skipped exactly that combination. Used to drop prefetched pairs that a
+     * decision or another tab invalidated while they waited in the queue.
+     *
+     * @param suggestion the pair to check; must not be null
+     * @return {@code true} when the pair may still be shown
+     * @throws SQLException on database error
+     */
+    public boolean isSuggestionAvailable(Suggestion suggestion) throws SQLException {
+        Objects.requireNonNull(suggestion, "suggestion");
+        long faceId = suggestion.candidate().id();
+        long nameId = suggestion.name().id();
+        if (skipped.contains(new MatchKey(faceId, nameId))) {
+            return false;
+        }
+        if (notMatchDao.isNotMatch(faceId, nameId)) {
+            return false;
+        }
+        if (nameDao.findById(nameId).isEmpty()) {
+            return false;
+        }
+        return faceToNameService.isUnnamedCandidate(faceId);
+    }
+
+    private Scan loadScan() throws SQLException {
+        List<NameRecord> names = nameDao.findAll();
+        if (names.isEmpty()) {
+            return new Scan(names, Map.of(), Map.of(), List.of(), 0.0);
+        }
+        List<Long> nameIds = names.stream().map(NameRecord::id).toList();
+        Map<Long, float[]> averages = faceToNameService.averageEmbeddingsFor(nameIds);
+        Map<Long, Set<Long>> rejected = notMatchDao.findFaceIdsByNameIds(nameIds);
+        List<FaceRecord> unnamed = faceToNameService.findUnnamedCandidates();
+        double cutoff = faceToNameService.minNameSimilarity();
+        return new Scan(names, averages, rejected, unnamed, cutoff);
+    }
+
+    /**
+     * Builds the suggestion for one name/candidate pair, loading the name's
+     * representative tagged face at most once across the batch and hydrating
+     * only the faces a returned suggestion needs.
+     */
+    private Suggestion suggestionFor(NameRecord name, SimilarityResult candidate,
+                                     Map<Long, FaceRecord> representatives) throws SQLException {
+        FaceRecord taggedFace = representatives.get(name.id());
+        if (taggedFace == null) {
+            List<SimilarityResult> tagged = faceToNameService.findMostSimilarNamedSlim(name.id(), 1);
+            if (tagged.isEmpty()) {
+                return null;
+            }
+            taggedFace = tagged.get(0).faceRecord();
+            representatives.put(name.id(), taggedFace);
+        }
         double faceSim = faceAiService.calcSimilarity(taggedFace.embedding(),
-                bestCandidate.faceRecord().embedding());
-        return hydrate(new Suggestion(bestName, taggedFace, bestCandidate.faceRecord(),
-                bestCandidate.similarity(), faceSim));
+                candidate.faceRecord().embedding());
+        return hydrate(new Suggestion(name, taggedFace, candidate.faceRecord(),
+                candidate.similarity(), faceSim)).orElse(null);
     }
 
     /**
@@ -217,6 +343,16 @@ public class MostSimilarService {
      */
     public record Suggestion(NameRecord name, FaceRecord tagged, FaceRecord candidate,
                              double nameSimilarity, double faceSimilarity) {
+    }
+
+    /** The shared data one scan scores every name against. */
+    private record Scan(List<NameRecord> names, Map<Long, float[]> averages,
+                        Map<Long, Set<Long>> rejected, List<FaceRecord> unnamed,
+                        double cutoff) {
+    }
+
+    /** A name's best candidate, with the name's order in the scan for stable ties. */
+    private record RankedName(int order, NameRecord name, SimilarityResult candidate) {
     }
 
     /** An unnamed face paired with a name, as identified for session skips. */

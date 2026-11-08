@@ -373,6 +373,18 @@ public class FaceToNameService implements MediaFileActions {
     }
 
     /**
+     * Tells whether a face is still an offerable unnamed candidate: it exists,
+     * has no name, and was not dismissed as "not a face".
+     *
+     * @param faceId id of the face
+     * @return {@code true} when the face may still be suggested
+     * @throws SQLException on database error
+     */
+    boolean isUnnamedCandidate(long faceId) throws SQLException {
+        return faceDao.isUnnamedCandidate(faceId);
+    }
+
+    /**
      * Tags multiple faces with the given name.
      *
      * @param faceIds ids of the faces to tag; must not be null

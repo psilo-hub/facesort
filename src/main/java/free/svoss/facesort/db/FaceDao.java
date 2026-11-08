@@ -629,6 +629,25 @@ public class FaceDao {
     }
 
     /**
+     * Tells whether a face is still an offerable unnamed candidate: it exists,
+     * has no name, and was not dismissed as "not a face". Used to validate
+     * prefetched suggestions without reloading their rows.
+     *
+     * @param id id of the face
+     * @return {@code true} when the face may still be suggested
+     * @throws SQLException on database error
+     */
+    public boolean isUnnamedCandidate(long id) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM faces WHERE id = ? AND name_id IS NULL" + NOT_A_FACE_CLAUSE)) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    /**
      * Returns a face by its id.
      */
     public Optional<FaceRecord> findById(long id) throws SQLException {

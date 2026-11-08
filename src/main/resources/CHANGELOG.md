@@ -130,6 +130,9 @@ All notable changes to Face Sort will be documented in this file.
   the matching count when a filter is active (2026-09-24)
 
 ### Changed
+- The "Most similar" tab now prepares the next few pairs while you review the
+  current one, so "Same person", "Not the same person" and "Skip" show the next
+  pair without scanning the whole library again (2026-11-08)
 - The "Most similar" tab now computes the tagged-face representative and the
   face-to-face similarity only for the pair it is about to show, instead of for
   every name that has a candidate (2026-11-08)

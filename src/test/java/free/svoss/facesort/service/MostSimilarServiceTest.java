@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -194,6 +195,59 @@ class MostSimilarServiceTest {
         assertEquals(11, engine.similarityCalls(),
                 "three candidates against three names, plus one representative and one shown pair: "
                         + "only the winning name may have its tagged faces scored");
+    }
+
+    @Test
+    void findBestSuggestions_returnsDistinctCandidatesInDescendingOrder() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long carol = nameDao.insert("Carol");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgB", yLike(), bob);
+        addImageAndFace("imgC", new float[]{0, 0, 1, 0, 0, 0, 0, 0}, carol);
+        long forAlice = addImageAndFace("imgU1", new float[]{0.8f, 0.6f, 0, 0, 0, 0, 0, 0}, null);
+        long forBob = addImageAndFace("imgU2", new float[]{0, 0.9f, 0.43589f, 0, 0, 0, 0, 0}, null);
+        long forCarol = addImageAndFace("imgU3", new float[]{0.3f, 0, 0.95394f, 0, 0, 0, 0, 0}, null);
+
+        List<MostSimilarService.Suggestion> suggestions = service.findBestSuggestions(3);
+
+        assertEquals(3, suggestions.size(), "the limit must yield the three best pairs");
+        assertEquals(List.of(forCarol, forBob, forAlice),
+                suggestions.stream().map(s -> s.candidate().id()).toList(),
+                "pairs must be ordered by descending name similarity");
+        assertTrue(suggestions.get(0).nameSimilarity() > suggestions.get(1).nameSimilarity());
+        assertTrue(suggestions.get(1).nameSimilarity() > suggestions.get(2).nameSimilarity());
+        suggestions.forEach(s -> {
+            assertNotNull(s.tagged().subImageJpg(), "every returned pair must carry its tagged crop");
+            assertNotNull(s.candidate().subImageJpg(), "every returned pair must carry its candidate crop");
+        });
+    }
+
+    @Test
+    void findBestSuggestions_keepsOnePairPerUnnamedFace() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgB", xLike(), bob);
+        long shared = addImageAndFace("imgU", new float[]{0.8f, 0.6f, 0, 0, 0, 0, 0, 0}, null);
+
+        List<MostSimilarService.Suggestion> suggestions = service.findBestSuggestions(3);
+
+        assertEquals(1, suggestions.size(),
+                "a face must appear only once, paired with the name that scores it highest");
+        assertEquals(shared, suggestions.get(0).candidate().id());
+        assertEquals("Alice", suggestions.get(0).name().name(),
+                "an equal score must keep the earlier name");
+    }
+
+    @Test
+    void findBestSuggestions_returnsNothingForANonPositiveLimit() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgU", xLike(), null);
+
+        assertTrue(service.findBestSuggestions(0).isEmpty());
+        assertTrue(service.findBestSuggestions(-1).isEmpty());
     }
 
     @Test

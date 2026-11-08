@@ -114,6 +114,48 @@ class TaskRunnerTest {
     }
 
     @Test
+    void cancel_cancelsOnlyTheNamedTask() throws Exception {
+        CountDownLatch loaderStarted = new CountDownLatch(1);
+        CountDownLatch exporterStarted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        final boolean[] loaderWasCancelled = new boolean[1];
+        final boolean[] exporterWasCancelled = new boolean[1];
+        Task<Void> loader = blockingTask(loaderStarted, release, loaderWasCancelled);
+        Task<Void> exporter = blockingTask(exporterStarted, release, exporterWasCancelled);
+        runner.start(loader, "loader-cancel");
+        runner.start(exporter, "exporter-cancel");
+        assertTrue(loaderStarted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertTrue(exporterStarted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        runner.cancel("loader-cancel");
+        release.countDown();
+        loader.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        exporter.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertTrue(loaderWasCancelled[0] || loader.isCancelled(),
+                "the named task must be cancelled");
+        assertFalse(exporterWasCancelled[0] || exporter.isCancelled(),
+                "unrelated work must keep running");
+    }
+
+    private static Task<Void> blockingTask(CountDownLatch started, CountDownLatch release,
+                                           boolean[] wasCancelled) {
+        return new Task<>() {
+            @Override
+            protected Void call() {
+                started.countDown();
+                try {
+                    release.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                wasCancelled[0] = isCancelled();
+                return null;
+            }
+        };
+    }
+
+    @Test
     void cancelAll_cancelsRunningTasks() throws Exception {
         CountDownLatch running = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

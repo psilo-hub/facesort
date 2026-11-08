@@ -43,7 +43,7 @@ and the UI appears frozen between decisions.
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [ ]    |
 | 9  | Keep the unnamed pool in memory between decisions | 2, 4       | [ ]    |
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
-| 11 | Prefetch the next suggestion                      | 3, 4       | [ ]    |
+| 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
 | 12 | Scan progress indicator and cancel                | 4          | [ ]    |
 | 13 | Backlog counter                                   | 4 (or 7)   | [ ]    |
 | 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [ ]    |
@@ -296,7 +296,7 @@ scoring therefore no longer runs for every name that has a candidate.
 
 ## UX improvements
 
-### 11. [ ] Prefetch the next suggestion
+### 11. [x] ~~Prefetch the next suggestion~~
 
 **Depends on:** 3, 4 (so the background computation is cheap).
 
@@ -314,6 +314,15 @@ scoring therefore no longer runs for every name that has a candidate.
   empty. Keep all queries on background `Task`s via `TaskRunner`.
 - Test: service-level test for the queue (validation after tag/reject/skip) and
   a UI-free test that the next suggestion is available without a new scan.
+
+**Done (2026-11-08):** `MostSimilarService.findBestSuggestions(limit)` returns
+the best pairs with distinct unnamed faces in descending order.
+`MostSimilarQueue` keeps three pairs ready, validates each before showing it,
+and lets the view drop exactly the entries a decision invalidated. The view
+shows a queued pair without a scan, refills the queue on a background `Task`,
+and cancels the prefetch when a decision starts. `TaskRunner.cancel(name)` was
+added for that. Queue tests cover tag/reject/skip invalidation and assert that
+serving a queued pair issues no new unnamed-pool query.
 
 ### 12. [ ] Scan progress indicator and cancel
 

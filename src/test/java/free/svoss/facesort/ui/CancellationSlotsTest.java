@@ -35,6 +35,28 @@ class CancellationSlotsTest {
     }
 
     @Test
+    void cancel_cancelsOnlyTheMatchingActionAndForgetsIt() {
+        slots.replace("loader", () -> cancelled.add("loader"));
+        slots.replace("exporter", () -> cancelled.add("exporter"));
+
+        slots.cancel("loader");
+
+        assertEquals(List.of("loader"), cancelled, "only the requested kind of work may be cancelled");
+        cancelled.clear();
+        slots.cancelAll();
+        assertEquals(List.of("exporter"), cancelled, "an already cancelled action must be forgotten");
+    }
+
+    @Test
+    void cancel_unknownKey_doesNothing() {
+        slots.replace("loader", () -> cancelled.add("loader"));
+
+        slots.cancel("exporter");
+
+        assertTrue(cancelled.isEmpty(), "an unknown key must not cancel unrelated work");
+    }
+
+    @Test
     void cancelAll_cancelsEveryAction() {
         slots.replace("loader", () -> cancelled.add("loader"));
         slots.replace("exporter", () -> cancelled.add("exporter"));

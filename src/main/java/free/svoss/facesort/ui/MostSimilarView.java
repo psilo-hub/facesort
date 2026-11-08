@@ -3,6 +3,7 @@ package free.svoss.facesort.ui;
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.service.FaceToNameService;
+import free.svoss.facesort.service.MostSimilarQueue;
 import free.svoss.facesort.service.MostSimilarService;
 
 import javafx.concurrent.Task;
@@ -26,20 +27,25 @@ import java.util.Optional;
  * person. "Same person" tags the unnamed face with the name, "Not the same
  * person" records the rejection so neither naming tab offers that combination
  * again, and "Skip" hides the pair for the current session only. After every
- * decision the next best pair is loaded.</p>
+ * decision the next best pair is loaded, usually straight from the look-ahead
+ * queue that was filled while the user was reviewing the previous pair.</p>
  *
  * <p>The view owns no business logic; selecting the pair and applying the
- * decisions are delegated to {@link MostSimilarService}, and the face context
- * menu to {@link FaceToNameService}. Queries run on background {@link Task}s so
- * the UI stays responsive.</p>
+ * decisions are delegated to {@link MostSimilarService}, the look-ahead queue
+ * lives in {@link MostSimilarQueue}, and the face context menu is backed by
+ * {@link FaceToNameService}. Queries run on background {@link Task}s so the UI
+ * stays responsive.</p>
  */
 public class MostSimilarView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 170.0;
     private static final double PLACEHOLDER_MAX_WIDTH = 420.0;
+    private static final String LOADER_THREAD = "most-similar-loader";
+    private static final String PREFETCH_THREAD = "most-similar-prefetcher";
 
     private final MostSimilarService mostSimilarService;
     private final FaceToNameService faceToNameService;
+    private final MostSimilarQueue queue;
 
     private final Label titleLabel = new Label();
     private final Label similarityLabel = new Label();
@@ -68,6 +74,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     public MostSimilarView(MostSimilarService mostSimilarService, FaceToNameService faceToNameService) {
         this.mostSimilarService = mostSimilarService;
         this.faceToNameService = faceToNameService;
+        this.queue = new MostSimilarQueue(mostSimilarService);
         this.faceActions = FaceUi.faceActions(faceToNameService, statusLabel::setText,
                 this::handleFailure);
         buildUi();
@@ -115,32 +122,60 @@ public class MostSimilarView extends BorderPane implements Refreshable {
      */
     @Override
     public void refresh() {
+        queue.clear();
         loadNextSuggestion();
     }
 
     /**
-     * Loads the pair with the highest similarity that is still undecided and
-     * renders it, or shows the empty state when nothing is left.
+     * Shows the next prefetched pair, or loads one when the queue is empty, and
+     * refills the queue in the background. The loading placeholder appears only
+     * when no pair is ready.
      */
     private void loadNextSuggestion() {
+        taskRunner.cancel(PREFETCH_THREAD);
+        boolean queued = queue.hasQueued();
         setBusy(true);
-        pairBox.getChildren().clear();
-        showPlaceholder(I18n.get("ui.mostSimilar.loading"));
+        if (!queued) {
+            pairBox.getChildren().clear();
+            showPlaceholder(I18n.get("ui.mostSimilar.loading"));
+        }
 
         Task<Optional<MostSimilarService.Suggestion>> task = new Task<>() {
             @Override
             protected Optional<MostSimilarService.Suggestion> call() throws SQLException {
-                return mostSimilarService.findBestSuggestion();
+                return queue.next();
             }
         };
 
-        task.setOnSucceeded(e -> showSuggestion(task.getValue()));
+        task.setOnSucceeded(e -> {
+            showSuggestion(task.getValue());
+            prefetchNext();
+        });
         task.setOnFailed(e -> {
             setBusy(false);
             handleFailure(I18n.get("ui.mostSimilar.loadFailed"), task.getException());
         });
 
-        taskRunner.start(task, "most-similar-loader");
+        taskRunner.start(task, LOADER_THREAD);
+    }
+
+    /**
+     * Refills the look-ahead queue while the user looks at the current pair.
+     * A failure only updates the status bar; it must not interrupt the review.
+     */
+    private void prefetchNext() {
+        if (current == null) {
+            return;
+        }
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                queue.prefetch();
+                return null;
+            }
+        };
+        task.setOnFailed(e -> statusLabel.setText(I18n.get("ui.mostSimilar.loadFailed")));
+        taskRunner.start(task, PREFETCH_THREAD);
     }
 
     /**
@@ -219,6 +254,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
                 I18n.format("ui.mostSimilar.tagged", suggestion.name().name()),
                 () -> mostSimilarService.markSamePerson(
                         suggestion.candidate().id(), suggestion.name().id()),
+                queue::clear,
                 "most-similar-tagger");
     }
 
@@ -235,6 +271,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
                 I18n.format("ui.mostSimilar.rejected", suggestion.name().name()),
                 () -> mostSimilarService.markDifferentPerson(
                         suggestion.candidate().id(), suggestion.name().id()),
+                () -> queue.forgetPair(suggestion.candidate().id(), suggestion.name().id()),
                 "most-similar-rejecter");
     }
 
@@ -247,7 +284,9 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         if (suggestion == null) {
             return;
         }
+        taskRunner.cancel(PREFETCH_THREAD);
         mostSimilarService.skip(suggestion.candidate().id(), suggestion.name().id());
+        queue.forgetPair(suggestion.candidate().id(), suggestion.name().id());
         statusLabel.setText(I18n.get("ui.mostSimilar.skipped"));
         loadNextSuggestion();
     }
@@ -262,6 +301,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         runDecision("common.notAFaceFailed",
                 I18n.get("common.notAFaceMarked"),
                 () -> faceToNameService.markNotAFace(faceId),
+                () -> queue.forgetCandidate(faceId),
                 "most-similar-not-a-face");
     }
 
@@ -273,10 +313,12 @@ public class MostSimilarView extends BorderPane implements Refreshable {
      * @param failureKey     message key used as the dialog header when the action fails
      * @param successMessage status text shown while the next pair loads
      * @param action         the database action to run
+     * @param invalidate     removes queued pairs the decision made stale
      * @param threadName     name of the daemon thread running the action
      */
     private void runDecision(String failureKey, String successMessage,
-                             SqlAction action, String threadName) {
+                             SqlAction action, Runnable invalidate, String threadName) {
+        taskRunner.cancel(PREFETCH_THREAD);
         setBusy(true);
         Task<Void> task = new Task<>() {
             @Override
@@ -287,6 +329,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         };
 
         task.setOnSucceeded(e -> {
+            invalidate.run();
             statusLabel.setText(successMessage);
             loadNextSuggestion();
         });

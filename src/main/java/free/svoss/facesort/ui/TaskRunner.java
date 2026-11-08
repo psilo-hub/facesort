@@ -48,6 +48,16 @@ public final class TaskRunner {
     }
 
     /**
+     * Cancels the task currently running under the given name, if any, and
+     * forgets it. Unrelated tasks keep running.
+     *
+     * @param threadName the name the task was started with
+     */
+    public void cancel(String threadName) {
+        slots.cancel(Objects.requireNonNull(threadName, "threadName"));
+    }
+
+    /**
      * Cancels every task this runner started, if any. Used when a view stops the
      * work behind its current state, e.g. when a session ends.
      */

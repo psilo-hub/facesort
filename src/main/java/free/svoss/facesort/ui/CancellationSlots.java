@@ -48,6 +48,17 @@ final class CancellationSlots {
     }
 
     /**
+     * Cancels the action registered under the given key, if any, and forgets
+     * it so a later {@link #cancelAll()} does not run it again.
+     *
+     * @param key identifies the kind of work
+     */
+    void cancel(String key) {
+        Objects.requireNonNull(key, "key");
+        cancelKey(key);
+    }
+
+    /**
      * Cancels every registered action and forgets them.
      */
     void cancelAll() {

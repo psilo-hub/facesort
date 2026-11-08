@@ -749,6 +749,21 @@ class FaceDaoTest {
     }
 
     @Test
+    void isUnnamedCandidate_checksTheSameConditionsAsTheUnnamedPool() throws Exception {
+        insertImage("img");
+        long alice = nameDao.insert("Alice");
+        long unnamed = insertFace("img", 0, 0, new float[]{1.0f}, null);
+        long named = insertFace("img", 10, 0, new float[]{2.0f}, alice);
+        long dismissed = insertFace("img", 20, 0, new float[]{3.0f}, null);
+        faceDao.markNotAFace(dismissed);
+
+        assertTrue(faceDao.isUnnamedCandidate(unnamed), "an unnamed, undismissed face is a candidate");
+        assertFalse(faceDao.isUnnamedCandidate(named), "a tagged face is not an unnamed candidate");
+        assertFalse(faceDao.isUnnamedCandidate(dismissed), "a dismissed face is not a candidate");
+        assertFalse(faceDao.isUnnamedCandidate(-1), "a missing face is not a candidate");
+    }
+
+    @Test
     void findByNameIdSlim_returnsTheNamesFacesWithoutTheCrop() throws Exception {
         insertImage("img1");
         long alice = nameDao.insert("Alice");
