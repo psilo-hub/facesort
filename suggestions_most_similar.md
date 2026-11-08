@@ -39,7 +39,7 @@ and the UI appears frozen between decisions.
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [x]    |
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [x]    |
 | 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
-| 7  | Partial index for unnamed faces                   | 1          | [ ]    |
+| 7  | Partial index for unnamed faces                   | 1          | [x]    |
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [ ]    |
 | 9  | Keep the unnamed pool in memory between decisions | 2, 4       | [ ]    |
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
@@ -221,7 +221,7 @@ scoring therefore no longer runs for every name that has a candidate.
   trade-off in the Javadoc.
 - Test: threshold behaviour at, just below and just above the value.
 
-### 7. [ ] Partial index for unnamed faces
+### 7. [x] ~~Partial index for unnamed faces~~
 
 **Depends on:** 1 (to measure whether it matters once items 2–4 are in).
 
@@ -237,6 +237,18 @@ scoring therefore no longer runs for every name that has a candidate.
   `IF NOT EXISTS`; note it in `CHANGELOG.md` only if the speedup is visible.
 - Test: `DatabaseTest` asserts the index exists; optionally assert the query
   plan mentions it.
+
+**Done (2026-11-08):** Checked with `EXPLAIN QUERY PLAN` on a synthetic
+100 000-face library (90 000 named, 10 000 unnamed, 1 000 dismissals):
+`idx_faces_name_id` already serves `name_id IS NULL` with
+`SEARCH faces USING INDEX idx_faces_name_id (name_id=?)`, and the dismissal
+check is an integer-primary-key search on `not_faces`. The proposed
+`idx_faces_unnamed ON faces(id) WHERE name_id IS NULL` was not chosen by the
+planner, and forcing it gave no measurable gain (the id-only projection took
+~5 ms with the name index and ~3 ms with the partial index, inside noise),
+because `id` is the rowid and the partial index only duplicates the unnamed
+rowid subset. No index was added. `FaceDaoTest` now pins the unnamed-pool plan
+so an accidental full scan fails the suite.
 
 ### 8. [ ] Parallel scoring across names
 

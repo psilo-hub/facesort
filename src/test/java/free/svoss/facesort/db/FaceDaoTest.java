@@ -411,6 +411,15 @@ class FaceDaoTest {
     }
 
     @Test
+    void unnamedPoolQuery_isServedByTheNameIndexAndTheNotFacesPrimaryKey() throws Exception {
+        insertFolderFamilyFaces();
+        String sql = "SELECT " + FaceDao.SELECT_SLIM_COLUMNS
+                + " FROM faces WHERE name_id IS NULL" + FaceDao.NOT_A_FACE_CLAUSE;
+
+        QueryPlans.assertSearchedByIndex(QueryPlans.of(db.getConnection(), sql), sql, "faces", "nf");
+    }
+
+    @Test
     void findRandomUnnamed_respectsLimit() throws Exception {
         insertImage("img1");
         for (int i = 0; i < 5; i++) {
