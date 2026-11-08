@@ -20,7 +20,6 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -71,34 +70,8 @@ public class NameFaceView extends BorderPane implements Refreshable {
     public NameFaceView(NamingService namingService, TabState tabState) {
         this.namingService = namingService;
         this.tabState = tabState;
-        this.faceActions = new FaceUi.FaceActions(
-                new FaceUi.FaceActions.Source() {
-                    @Override
-                    public boolean isOriginalAvailable(String hash) throws SQLException {
-                        return namingService.isOriginalAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
-                        return namingService.isContainingFolderAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean openOriginal(String hash) throws java.io.IOException, SQLException {
-                        return namingService.openOriginal(hash);
-                    }
-
-                    @Override
-                    public boolean openContainingFolder(String hash) throws java.io.IOException, SQLException {
-                        return namingService.openContainingFolder(hash);
-                    }
-                },
-                statusLabel::setText,
-                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
-                (message, ex) -> {
-                    statusLabel.setText(message);
-                    handleFailure(message, ex);
-                });
+        this.faceActions = FaceUi.faceActions(namingService, statusLabel::setText,
+                this::handleFailure);
         buildUi();
         loadClusters();
     }
@@ -411,8 +384,6 @@ public class NameFaceView extends BorderPane implements Refreshable {
     }
 
     private void handleFailure(String message, Throwable error) {
-        statusLabel.setText(message + ".");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        FaceUi.showError(window, "ui.nameFace.alertTitle", message, error);
+        FaceUi.handleFailure(statusLabel, this, "ui.nameFace.alertTitle", message, error);
     }
 }

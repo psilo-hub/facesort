@@ -33,7 +33,7 @@ import java.util.Set;
  * similarity to the average embedding of the faces already tagged with that
  * name, so the user can batch-tag the most similar ones without searching.</p>
  */
-public class FaceToNameService {
+public class FaceToNameService implements MediaFileActions {
 
     private final FaceAiService faceAiService;
     private final FaceSelector faceSelector;

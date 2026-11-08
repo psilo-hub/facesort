@@ -22,11 +22,9 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.sql.SQLException;
 import java.text.Collator;
 import java.util.ArrayList;
@@ -87,34 +85,8 @@ public class ViewView extends BorderPane implements Refreshable {
      */
     public ViewView(ViewService viewService) {
         this.viewService = viewService;
-        this.faceActions = new FaceUi.FaceActions(
-                new FaceUi.FaceActions.Source() {
-                    @Override
-                    public boolean isOriginalAvailable(String hash) throws SQLException {
-                        return viewService.isOriginalAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
-                        return viewService.isContainingFolderAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean openOriginal(String hash) throws IOException, SQLException {
-                        return viewService.openOriginal(hash);
-                    }
-
-                    @Override
-                    public boolean openContainingFolder(String hash) throws IOException, SQLException {
-                        return viewService.openContainingFolder(hash);
-                    }
-                },
-                statusLabel::setText,
-                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
-                (message, ex) -> {
-                    statusLabel.setText(message);
-                    handleFailure(message, ex);
-                });
+        this.faceActions = FaceUi.faceActions(viewService, statusLabel::setText,
+                this::handleFailure);
         buildUi();
         loadNames();
     }
@@ -476,9 +448,7 @@ public class ViewView extends BorderPane implements Refreshable {
     }
 
     private void handleFailure(String message, Throwable error) {
-        statusLabel.setText(message + ".");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        FaceUi.showError(window, "ui.view.alertTitle", message, error);
+        FaceUi.handleFailure(statusLabel, this, "ui.view.alertTitle", message, error);
     }
 
     /**

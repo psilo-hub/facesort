@@ -31,7 +31,7 @@ import java.util.Set;
  * There is no similarity cutoff; the session continues until the user stops
  * or no pairs are left.</p>
  */
-public class DeduplicationService {
+public class DeduplicationService implements MediaFileActions {
 
     private final FaceAiService faceAiService;
     private final FaceSelector faceSelector;

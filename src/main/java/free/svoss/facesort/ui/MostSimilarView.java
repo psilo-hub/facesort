@@ -14,7 +14,6 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
 
 import java.sql.SQLException;
 import java.util.Optional;
@@ -69,34 +68,8 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     public MostSimilarView(MostSimilarService mostSimilarService, FaceToNameService faceToNameService) {
         this.mostSimilarService = mostSimilarService;
         this.faceToNameService = faceToNameService;
-        this.faceActions = new FaceUi.FaceActions(
-                new FaceUi.FaceActions.Source() {
-                    @Override
-                    public boolean isOriginalAvailable(String hash) throws SQLException {
-                        return faceToNameService.isOriginalAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
-                        return faceToNameService.isContainingFolderAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean openOriginal(String hash) throws java.io.IOException, SQLException {
-                        return faceToNameService.openOriginal(hash);
-                    }
-
-                    @Override
-                    public boolean openContainingFolder(String hash) throws java.io.IOException, SQLException {
-                        return faceToNameService.openContainingFolder(hash);
-                    }
-                },
-                statusLabel::setText,
-                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
-                (message, ex) -> {
-                    statusLabel.setText(message);
-                    handleFailure(message, ex);
-                });
+        this.faceActions = FaceUi.faceActions(faceToNameService, statusLabel::setText,
+                this::handleFailure);
         buildUi();
         loadNextSuggestion();
     }
@@ -340,9 +313,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     }
 
     private void handleFailure(String message, Throwable error) {
-        statusLabel.setText(message + ".");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        FaceUi.showError(window, "ui.mostSimilar.alertTitle", message, error);
+        FaceUi.handleFailure(statusLabel, this, "ui.mostSimilar.alertTitle", message, error);
     }
 
     /** A database action that may fail with an {@link SQLException}. */

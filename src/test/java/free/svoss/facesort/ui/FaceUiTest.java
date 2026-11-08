@@ -1,10 +1,13 @@
 package free.svoss.facesort.ui;
 
+import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
+import free.svoss.facesort.service.MediaFileActions;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for the toolkit-free logic of {@link FaceUi}.
@@ -138,6 +142,54 @@ class FaceUiTest {
     }
 
     @Test
+    void faceActionsDelegatesAvailabilityChecksToTheSource() {
+        RecordingMediaFileActions source = new RecordingMediaFileActions();
+        List<String> statuses = new ArrayList<>();
+
+        FaceUi.FaceActions actions = FaceUi.faceActions(source, statuses::add,
+                (message, error) -> fail("an availability check must not open a dialog"));
+
+        assertTrue(actions.isOriginalAvailable("hash"));
+        assertTrue(actions.isContainingFolderAvailable("hash"));
+        assertEquals(List.of("original:hash", "folder:hash"), source.calls);
+        assertTrue(statuses.isEmpty());
+    }
+
+    @Test
+    void faceActionsReportsAvailabilityFailureInTheStatusBar() {
+        MediaFileActions source = new MediaFileActions() {
+            @Override
+            public boolean isOriginalAvailable(String imageHash) throws SQLException {
+                throw new SQLException("boom");
+            }
+
+            @Override
+            public boolean isContainingFolderAvailable(String imageHash) throws SQLException {
+                throw new SQLException("boom");
+            }
+
+            @Override
+            public boolean openOriginal(String imageHash) {
+                return false;
+            }
+
+            @Override
+            public boolean openContainingFolder(String imageHash) {
+                return false;
+            }
+        };
+        List<String> statuses = new ArrayList<>();
+
+        FaceUi.FaceActions actions = FaceUi.faceActions(source, statuses::add,
+                (message, error) -> fail("an availability check must not open a dialog"));
+
+        assertFalse(actions.isOriginalAvailable("hash"));
+        assertFalse(actions.isContainingFolderAvailable("hash"));
+        assertEquals(List.of(I18n.get("common.originalCheckFailed"),
+                I18n.get("common.originalCheckFailed")), statuses);
+    }
+
+    @Test
     void toImageWithoutAFaceOrWithoutBytesIsNull() {
         assertNull(FaceUi.toImage(null),
                 "no face must decode to no image");
@@ -170,6 +222,34 @@ class FaceUiTest {
             }
         }
         return indices;
+    }
+
+    /** A source that records the availability checks it receives. */
+    private static final class RecordingMediaFileActions implements MediaFileActions {
+
+        private final List<String> calls = new ArrayList<>();
+
+        @Override
+        public boolean isOriginalAvailable(String imageHash) {
+            calls.add("original:" + imageHash);
+            return true;
+        }
+
+        @Override
+        public boolean isContainingFolderAvailable(String imageHash) {
+            calls.add("folder:" + imageHash);
+            return true;
+        }
+
+        @Override
+        public boolean openOriginal(String imageHash) {
+            return false;
+        }
+
+        @Override
+        public boolean openContainingFolder(String imageHash) {
+            return false;
+        }
     }
 
     /** Records what the view was told, in order. */

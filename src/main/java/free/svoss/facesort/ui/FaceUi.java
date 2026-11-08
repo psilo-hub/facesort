@@ -4,6 +4,7 @@ import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.FaceThumb;
 import free.svoss.facesort.model.NameRecord;
+import free.svoss.facesort.service.MediaFileActions;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -544,27 +545,49 @@ final class FaceUi {
     }
 
     /**
+     * Creates the standard face actions for a view: the service-backed file
+     * operations plus the shared status and failure handling.
+     *
+     * @param source  the service-backed file operations
+     * @param status  sets the view's status bar text
+     * @param failure receives (message, exception) when an action fails
+     * @return the wired face actions
+     */
+    static FaceActions faceActions(MediaFileActions source, Consumer<String> status,
+                                   BiFail<Throwable> failure) {
+        return new FaceActions(
+                source,
+                status,
+                (hash, ex) -> status.accept(I18n.get("common.originalCheckFailed")),
+                failure::fail);
+    }
+
+    /**
+     * Shows a failure in a view's status bar and in a modal error dialog owned
+     * by the view's window.
+     *
+     * @param statusLabel   the view's status bar
+     * @param owner         the view that owns the dialog
+     * @param alertTitleKey i18n key for the dialog title
+     * @param message       the header text
+     * @param error         the underlying exception
+     */
+    static void handleFailure(Label statusLabel, Node owner, String alertTitleKey,
+                              String message, Throwable error) {
+        statusLabel.setText(message + ".");
+        Window window = owner.getScene() != null ? owner.getScene().getWindow() : null;
+        showError(window, alertTitleKey, message, error);
+    }
+
+    /**
      * The "Open Original" / "Open containing folder" operations every face view
      * offers, plus the context menu that presents them. Each view supplies the
-     * service-backed {@link Source}, a status-bar setter and its own failure
-     * handling.
+     * service-backed {@link MediaFileActions}, a status-bar setter and its own
+     * failure handling.
      */
     static final class FaceActions {
 
-        /**
-         * The four file operations a service exposes for an image hash.
-         */
-        interface Source {
-            boolean isOriginalAvailable(String hash) throws SQLException;
-
-            boolean isContainingFolderAvailable(String hash) throws SQLException;
-
-            boolean openOriginal(String hash) throws IOException, SQLException;
-
-            boolean openContainingFolder(String hash) throws IOException, SQLException;
-        }
-
-        private final Source source;
+        private final MediaFileActions source;
         private final Consumer<String> status;
         private final BiFail<SQLException> availabilityFailure;
         private final BiFail<Throwable> openFailure;
@@ -577,7 +600,7 @@ final class FaceUi {
          * @param openFailure         receives (message, exception) when opening
          *                            a file or folder fails
          */
-        FaceActions(Source source, Consumer<String> status,
+        FaceActions(MediaFileActions source, Consumer<String> status,
                     BiFail<SQLException> availabilityFailure, BiFail<Throwable> openFailure) {
             this.source = source;
             this.status = status;

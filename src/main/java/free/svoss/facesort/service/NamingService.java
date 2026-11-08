@@ -42,7 +42,7 @@ import java.util.Optional;
  * ({@code FaceRecord}), plus a {@code clusterUnnamed()} method returning
  * {@code List<Cluster>}.</p>
  */
-public final class NamingService {
+public final class NamingService implements MediaFileActions {
 
     private final ClusteringService clusteringService;
     private final FaceAiService faceAiService;

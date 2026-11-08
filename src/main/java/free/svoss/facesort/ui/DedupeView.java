@@ -12,9 +12,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -73,34 +71,8 @@ public class DedupeView extends BorderPane {
      */
     public DedupeView(DeduplicationService dedupService) {
         this.dedupService = dedupService;
-        this.faceActions = new FaceUi.FaceActions(
-                new FaceUi.FaceActions.Source() {
-                    @Override
-                    public boolean isOriginalAvailable(String hash) throws SQLException {
-                        return dedupService.isOriginalAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
-                        return dedupService.isContainingFolderAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean openOriginal(String hash) throws IOException, SQLException {
-                        return dedupService.openOriginal(hash);
-                    }
-
-                    @Override
-                    public boolean openContainingFolder(String hash) throws IOException, SQLException {
-                        return dedupService.openContainingFolder(hash);
-                    }
-                },
-                statusLabel::setText,
-                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
-                (message, ex) -> {
-                    statusLabel.setText(message);
-                    handleFailure(message, ex);
-                });
+        this.faceActions = FaceUi.faceActions(dedupService, statusLabel::setText,
+                this::handleFailure);
         buildUi();
     }
 
@@ -352,9 +324,7 @@ public class DedupeView extends BorderPane {
     }
 
     private void handleFailure(String message, Throwable error) {
-        statusLabel.setText(message + ".");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        FaceUi.showError(window, "ui.dedupe.alertTitle", message, error);
+        FaceUi.handleFailure(statusLabel, this, "ui.dedupe.alertTitle", message, error);
     }
 
     /**

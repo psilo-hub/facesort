@@ -25,7 +25,7 @@ import java.util.Optional;
  * name so the UI can present them as thumbnails. Opening an original image in
  * the operating system default viewer is also delegated here.</p>
  */
-public class ViewService {
+public class ViewService implements MediaFileActions {
 
     private final FaceSelector faceSelector;
     private final FaceDao faceDao;

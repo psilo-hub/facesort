@@ -93,34 +93,8 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
         this.faceToNameService = faceToNameService;
         this.configStore = configStore;
         this.tabState = tabState;
-        this.faceActions = new FaceUi.FaceActions(
-                new FaceUi.FaceActions.Source() {
-                    @Override
-                    public boolean isOriginalAvailable(String hash) throws SQLException {
-                        return faceToNameService.isOriginalAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean isContainingFolderAvailable(String hash) throws SQLException {
-                        return faceToNameService.isContainingFolderAvailable(hash);
-                    }
-
-                    @Override
-                    public boolean openOriginal(String hash) throws java.io.IOException, SQLException {
-                        return faceToNameService.openOriginal(hash);
-                    }
-
-                    @Override
-                    public boolean openContainingFolder(String hash) throws java.io.IOException, SQLException {
-                        return faceToNameService.openContainingFolder(hash);
-                    }
-                },
-                statusLabel::setText,
-                (hash, ex) -> statusLabel.setText(I18n.get("common.originalCheckFailed")),
-                (message, ex) -> {
-                    statusLabel.setText(message);
-                    handleFailure(message, ex);
-                });
+        this.faceActions = FaceUi.faceActions(faceToNameService, statusLabel::setText,
+                this::handleFailure);
         buildUi();
         loadNames(false);
     }
@@ -797,9 +771,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     }
 
     private void handleFailure(String message, Throwable error) {
-        statusLabel.setText(message + ".");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        FaceUi.showError(window, "ui.faceName.alertTitle", message, error);
+        FaceUi.handleFailure(statusLabel, this, "ui.faceName.alertTitle", message, error);
     }
 
     /** Result bundle for a selected name: its best tagged faces and the
