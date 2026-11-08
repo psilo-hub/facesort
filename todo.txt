@@ -1,9 +1,9 @@
 FaceSort — project todo
 ========================
 
-State as of 2026-11-08. `mvn test` is green: 685 tests / 69 test classes,
+State as of 2026-11-08. `mvn test` is green: 687 tests / 70 test classes,
 0 failures, 0 skipped (TaskRunnerTest's 5 tests need a JavaFX display; the
-other 680 tests pass headless in this environment). GitHub Actions runs the
+other 682 tests pass headless in this environment). GitHub Actions runs the
 full suite under Xvfb on every push and pull request, and releases depend on
 that job.
 

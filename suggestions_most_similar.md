@@ -33,7 +33,7 @@ and the UI appears frozen between decisions.
 
 | #  | Item                                              | Depends on | Status |
 |----|---------------------------------------------------|------------|--------|
-| 1  | Benchmark test for `findBestSuggestion()`         | —          | [ ]    |
+| 1  | Benchmark test for `findBestSuggestion()`         | —          | [x]    |
 | 2  | Slim projection: stop loading thumbnail blobs     | 1 (measure)| [x]    |
 | 3  | Cache name average embeddings                     | 1          | [x]    |
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [x]    |
@@ -56,7 +56,7 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
 
 ## Measurement
 
-### 1. [ ] Benchmark test for `findBestSuggestion()`
+### 1. [x] ~~Benchmark test for `findBestSuggestion()`~~
 
 **Depends on:** nothing. Do this first so every later item can be validated.
 
@@ -75,6 +75,14 @@ Items 2 and 5 are the cheapest and most likely to give the largest speedup.
   hand-built library. Every optimisation below must keep this test green.
 - Keep the benchmark out of the normal fast test run if it is slow (e.g. a
   JUnit tag), but make sure it can be run with `mvn test`.
+
+**Done (2026-11-08):** `MostSimilarServiceBenchmarkTest` seeds 100 names with
+four tagged faces each and 1000 unnamed 512-dimensional faces in an in-memory
+database, prints the measured time and checks a 30-second budget. It also pins
+a small hand-built best pair. The whole test takes well under a second headless,
+so it runs in the normal `mvn test` suite. Baseline after items 2–5 and 11:
+cold scan ≈ 135 ms; five decisions ≈ 332 ms (≈ 66 ms per decision); total
+≈ 467 ms. Benchmark runs will print the current figures for later comparisons.
 
 ---
 
