@@ -353,4 +353,59 @@ class MostSimilarServiceTest {
         assertTrue(notMatchDao.isNotMatch(candidate, alice),
                 "'not the same person' must be stored in the database");
     }
+
+    @Test
+    void findBestSuggestion_isDeterministicAcrossRepeatedRuns() throws SQLException {
+        // Many names, several unnamed faces, some exact ties: parallel scoring
+        // must converge to the same globally best pair every time.
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        long carol = nameDao.insert("Carol");
+        addImageAndFace("imgA", xLike(), alice);
+        addImageAndFace("imgB", yLike(), bob);
+        addImageAndFace("imgC", yLike(), carol);
+        // Alice's unnamed candidates are only ~0.6 similar to her average,
+        // so she cannot win; Bob and Carol both score 1.0 against imgU1.
+        long sharedBest = addImageAndFace("imgU1", yLike(), null);
+        addImageAndFace("imgU2", new float[]{0, 0.6f, 0.8f, 0, 0, 0, 0, 0}, null);
+
+        MostSimilarService.Suggestion first = null;
+        for (int i = 0; i < 20; i++) {
+            MostSimilarService.Suggestion next = service.findBestSuggestion().orElseThrow();
+            if (first == null) {
+                first = next;
+            } else {
+                assertEquals(first.name().name(), next.name().name(),
+                        "parallel scoring must be deterministic: same name every run");
+                assertEquals(first.candidate().id(), next.candidate().id(),
+                        "parallel scoring must be deterministic: same face every run");
+                assertEquals(first.nameSimilarity(), next.nameSimilarity(), 1e-12,
+                        "parallel scoring must be deterministic: same similarity every run");
+            }
+        }
+        assertEquals("Bob", first.name().name(),
+                "Bob and Carol tie at 1.0; the lower name id wins");
+        assertEquals(sharedBest, first.candidate().id());
+        assertEquals(1.0, first.nameSimilarity(), 1e-9);
+    }
+
+    @Test
+    void findBestSuggestion_lowerNameIdWinsOnExactTie() throws SQLException {
+        // Alice and Bob have identical averages; the same unnamed face is
+        // equally similar to both. The lower name id must win.
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgA2", xLike(), alice);
+        addImageAndFace("imgB1", xLike(), bob);
+        addImageAndFace("imgB2", xLike(), bob);
+        long shared = addImageAndFace("imgU1", xLike(), null);
+
+        MostSimilarService.Suggestion best = service.findBestSuggestion().orElseThrow();
+
+        assertEquals("Alice", best.name().name(),
+                "exact tie on similarity must keep the lower name id");
+        assertEquals(shared, best.candidate().id());
+        assertEquals(1.0, best.nameSimilarity(), 1e-9);
+    }
 }

@@ -40,7 +40,7 @@ and the UI appears frozen between decisions.
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [x]    |
 | 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
 | 7  | Partial index for unnamed faces                   | 1          | [x]    |
-| 8  | Parallel scoring across names                     | 3, 4, 5    | [ ]    |
+| 8  | Parallel scoring across names                     | 3, 4, 5    | [x] ~~Parallel scoring across names~~ |
 | 9  | Keep the unnamed pool in memory between decisions | 2, 4       | [ ]    |
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
@@ -250,7 +250,7 @@ because `id` is the rowid and the partial index only duplicates the unnamed
 rowid subset. No index was added. `FaceDaoTest` now pins the unnamed-pool plan
 so an accidental full scan fails the suite.
 
-### 8. [ ] Parallel scoring across names
+### 8. [x] ~~Parallel scoring across names~~
 
 **Depends on:** 3, 4, 5.
 
@@ -268,6 +268,14 @@ so an accidental full scan fails the suite.
   switch the hot loop to a plain dot-product over normalised vectors.
 - Test: parallel and sequential versions give identical results across many
   random libraries; benchmark from item 1 shows the gain.
+
+**Done (2026-11-08):** `findBestSuggestion()` and `findBestSuggestions(limit)`
+now score every name against the shared unnamed pool in parallel via
+`Stream.parallel()`, then reduce to the best pair. All DB reads happen in
+`loadScan()` before the parallel section, so no JDBC state is touched from
+multiple threads. Ties resolve deterministically: the lower name id wins, and
+`RankedName.order` preserves scan order for stable tie-breaking in the batch
+path. Determinism tests (20 repeated runs plus an exact-tie test) pass.
 
 ### 9. [ ] Keep the unnamed pool in memory between decisions
 

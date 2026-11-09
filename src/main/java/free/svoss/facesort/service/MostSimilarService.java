@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /**
  * Backs the "Most similar" tab: offers the single (name, unnamed face) pair
@@ -30,8 +31,6 @@ import java.util.Set;
  * current session, so the user is never forced to decide a pair right now.</p>
  */
 public class MostSimilarService {
-
-    private static final double EARLY_EXIT_SIMILARITY = 0.99;
 
     private final FaceToNameService faceToNameService;
     private final FaceAiService faceAiService;
@@ -76,30 +75,64 @@ public class MostSimilarService {
             return Optional.empty();
         }
 
-        NameRecord bestName = null;
-        SimilarityResult bestCandidate = null;
-        for (NameRecord name : scan.names()) {
-            float[] average = scan.averages().get(name.id());
-            if (average == null) {
-                continue;
-            }
-            SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
-                    scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
-            if (candidate == null) {
-                continue;
-            }
-            if (bestCandidate == null || candidate.similarity() > bestCandidate.similarity()) {
-                bestName = name;
-                bestCandidate = candidate;
-                if (bestCandidate.similarity() >= EARLY_EXIT_SIMILARITY) {
-                    break;
-                }
-            }
-        }
-        if (bestCandidate == null) {
+        // Score every name against the shared unnamed pool in parallel, then
+        // reduce to the single best pair. All database reads happened in
+        // loadScan(), so the parallel section touches no JDBC state. Ties
+        // resolve deterministically: the lower name id wins.
+        Optional<BestPair> best = scan.names().stream().parallel()
+                .map(name -> bestPairFor(scan, name))
+                .filter(Objects::nonNull)
+                .max(bySimilarityThenLowerNameId());
+
+        if (best.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(suggestionFor(bestName, bestCandidate, new HashMap<>()));
+        BestPair pair = best.get();
+        return Optional.ofNullable(suggestionFor(pair.name(), pair.candidate(), new HashMap<>()));
+    }
+
+    /**
+     * Scores one name against the shared unnamed pool and returns its best
+     * qualifying candidate, or null when the name has none left to offer.
+     */
+    private BestPair bestPairFor(Scan scan, NameRecord name) {
+        float[] average = scan.averages().get(name.id());
+        if (average == null) {
+            return null;
+        }
+        SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
+                scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
+        return candidate == null ? null : new BestPair(name, candidate);
+    }
+
+    /**
+     * Orders scored pairs by descending similarity; exact ties keep the lower
+     * name id so results are reproducible across parallel runs.
+     */
+    private static Comparator<BestPair> bySimilarityThenLowerNameId() {
+        return Comparator
+                .comparingDouble((BestPair p) -> p.candidate().similarity())
+                .thenComparingLong(p -> -p.name().id());
+    }
+
+    /** One name's best candidate, for reduction to the global best pair. */
+    private record BestPair(NameRecord name, SimilarityResult candidate) {
+    }
+
+    /**
+     * Scores the name at the given position against the shared unnamed pool,
+     * returning its best candidate tagged with the name's scan order for
+     * stable tie-breaking.
+     */
+    private RankedName rankName(Scan scan, int order) {
+        NameRecord name = scan.names().get(order);
+        float[] average = scan.averages().get(name.id());
+        if (average == null) {
+            return null;
+        }
+        SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
+                scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
+        return candidate == null ? null : new RankedName(order, name, candidate);
     }
 
     /**
@@ -108,10 +141,9 @@ public class MostSimilarService {
      * paired with the name that scores it highest, so the list can be shown or
      * prefetched without offering the same unnamed face twice.
      *
-     * <p>The scan stops at the first name whose best candidate reaches the
-     * early-exit threshold, exactly like {@link #findBestSuggestion()}, so a
-     * non-positive limit and the presence of a near-perfect match keep the
-     * previous behaviour.</p>
+     * <p>All names are scored in parallel against the shared unnamed pool, so
+     * the result is the same as a sequential scan: exact ties keep the name
+     * that appeared first in the scan order.</p>
      *
      * @param limit maximum number of pairs; values &le; 0 yield an empty list
      * @return the best pairs in descending similarity order
@@ -126,23 +158,13 @@ public class MostSimilarService {
             return List.of();
         }
 
-        List<RankedName> ranked = new ArrayList<>();
-        for (int order = 0; order < scan.names().size(); order++) {
-            NameRecord name = scan.names().get(order);
-            float[] average = scan.averages().get(name.id());
-            if (average == null) {
-                continue;
-            }
-            SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
-                    scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
-            if (candidate == null) {
-                continue;
-            }
-            ranked.add(new RankedName(order, name, candidate));
-            if (candidate.similarity() >= EARLY_EXIT_SIMILARITY) {
-                break;
-            }
-        }
+        // Score every name against the shared unnamed pool in parallel. The
+        // order field preserves the original sequence for stable tie-breaking
+        // after the parallel reduction.
+        List<RankedName> ranked = IntStream.range(0, scan.names().size()).parallel()
+                .mapToObj(order -> rankName(scan, order))
+                .filter(Objects::nonNull)
+                .toList();
         if (ranked.isEmpty()) {
             return List.of();
         }
@@ -152,7 +174,9 @@ public class MostSimilarService {
             long faceId = entry.candidate().faceRecord().id();
             RankedName existing = bestByCandidate.get(faceId);
             if (existing == null
-                    || entry.candidate().similarity() > existing.candidate().similarity()) {
+                    || entry.candidate().similarity() > existing.candidate().similarity()
+                    || (entry.candidate().similarity() == existing.candidate().similarity()
+                            && entry.order() < existing.order())) {
                 bestByCandidate.put(faceId, entry);
             }
         }
