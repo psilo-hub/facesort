@@ -38,7 +38,7 @@ and the UI appears frozen between decisions.
 | 3  | Cache name average embeddings                     | 1          | [x]    |
 | 4  | Single-pass scoring over one unnamed-face load    | 2, 3       | [x]    |
 | 5  | Prune names and skip the redundant second query   | 3, 4       | [x]    |
-| 6  | Configurable / adaptive early-exit threshold      | 5          | [ ]    |
+| 6  | [x] ~~Configurable / adaptive early-exit threshold~~      | 5          | [x] ~~Configurable / adaptive early-exit threshold~~ |
 | 7  | Partial index for unnamed faces                   | 1          | [x]    |
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [x] ~~Parallel scoring across names~~ |
 | 9  | Keep the unnamed pool in memory between decisions | 2, 4       | [ ]    |
@@ -203,7 +203,7 @@ more than 25 candidates were skipped.
 representative and computes `faceSimilarity` once at the end. The representative
 scoring therefore no longer runs for every name that has a candidate.
 
-### 6. [ ] Configurable / adaptive early-exit threshold
+### 6. [x] ~~Configurable / adaptive early-exit threshold~~
 
 **Depends on:** 5 (the scan loop in its final shape).
 
@@ -220,6 +220,16 @@ scoring therefore no longer runs for every name that has a candidate.
   than "global best" when a later name would score even higher; document this
   trade-off in the Javadoc.
 - Test: threshold behaviour at, just below and just above the value.
+
+**Done (2026-11-09):** Added `minEarlyExitSimilarity` to `ConfigModel` (default
+1.0, meaning no early exit by default — fully backward compatible) and exposed
+it in the Settings tab with a tooltip in all six language bundles.
+`MostSimilarService.findBestSuggestion()` now scores names in parallel against
+an `AtomicReference<BestPair>` shared best; as soon as any name's best
+candidate exceeds the threshold, remaining names are skipped. The trade-off
+("first pair above threshold" vs. strict global best) is documented in the
+Javadoc. Tests cover early exit at 0.99 (scan stops after the qualifying
+name) and threshold 1.0 (full scan returns the global best).
 
 ### 7. [x] ~~Partial index for unnamed faces~~
 

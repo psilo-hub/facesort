@@ -61,6 +61,7 @@ public class SettingsView extends BorderPane {
     private final Spinner<Integer> faceCropSize = intSpinner(96, 512, 16);
     private final Spinner<Integer> maxImportThreads = intSpinner(1, ConfigModel.MAX_IMPORT_THREADS, 1);
     private final TextField minNameSimilarity = new TextField();
+    private final TextField minEarlyExitSimilarity = new TextField();
     private final TextField faceNameMaxImages = new TextField();
     private final CheckBox updateCheckEnabled = new CheckBox();
 
@@ -167,6 +168,10 @@ public class SettingsView extends BorderPane {
                 I18n.format("settings.tooltip.minNameSimilarity",
                         format(defaults.minNameSimilarity())));
 
+        addRow(grid, row++, I18n.get("settings.minEarlyExitSimilarity"), minEarlyExitSimilarity,
+                I18n.format("settings.tooltip.minEarlyExitSimilarity",
+                        format(defaults.minEarlyExitSimilarity())));
+
         addRow(grid, row++, I18n.get("settings.faceNameMaxImages"), faceNameMaxImages,
                 I18n.format("settings.tooltip.faceNameMaxImages",
                         defaults.faceNameMaxImages()));
@@ -251,6 +256,7 @@ public class SettingsView extends BorderPane {
         faceCropSize.getValueFactory().setValue(config.faceCropSize());
         maxImportThreads.getValueFactory().setValue(config.maxImportThreads());
         minNameSimilarity.setText(String.valueOf(config.minNameSimilarity()));
+        minEarlyExitSimilarity.setText(String.valueOf(config.minEarlyExitSimilarity()));
         faceNameMaxImages.setText(String.valueOf(config.faceNameMaxImages()));
         updateCheckEnabled.setSelected(config.updateCheckEnabled());
     }
@@ -309,6 +315,11 @@ public class SettingsView extends BorderPane {
             statusLabel.setText(I18n.get("settings.error.minSimilarity"));
             return;
         }
+        Double minEarlyExit = parseUnitSimilarity(minEarlyExitSimilarity.getText());
+        if (minEarlyExit == null) {
+            statusLabel.setText(I18n.get("settings.error.minSimilarity"));
+            return;
+        }
         Integer maxImages = parsePositiveInteger(faceNameMaxImages.getText());
         if (maxImages == null) {
             statusLabel.setText(I18n.get("settings.error.maxImages"));
@@ -333,6 +344,7 @@ public class SettingsView extends BorderPane {
                 .withFaceCropSize(faceCropSize.getValue())
                 .withMaxImportThreads(maxImportThreads.getValue())
                 .withMinNameSimilarity(minSimilarity)
+                .withMinEarlyExitSimilarity(minEarlyExit)
                 .withFaceNameMaxImages(maxImages)
                 .withUpdateCheckEnabled(updateCheckEnabled.isSelected());
         configStore.set(updated);

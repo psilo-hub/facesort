@@ -38,7 +38,8 @@ public record ConfigModel(
         double minNameSimilarity,
         int faceNameMaxImages,
         boolean updateCheckEnabled,
-        String language
+        String language,
+        double minEarlyExitSimilarity
 ) {
 
     public static final int DEFAULT_THUMBNAIL_SIZE = 256;
@@ -55,6 +56,8 @@ public record ConfigModel(
     public static final String DEFAULT_DB_NAME = "facesort.db";
     /** Minimum similarity for adding a face to an existing name. */
     public static final double DEFAULT_MIN_NAME_SIMILARITY = 0.75;
+    /** Minimum similarity at which the "Most similar" scan stops early. */
+    public static final double DEFAULT_MIN_EARLY_EXIT_SIMILARITY = 1.0;
     /** Maximum unnamed faces shown as candidates in the "Add faces to a name" tab. */
     public static final int DEFAULT_FACE_NAME_MAX_IMAGES = 30;
     /** Whether the automatic update check runs on application startup. */
@@ -148,6 +151,7 @@ public record ConfigModel(
                 .withThumbnailSize(clamp(thumbnailSize, MIN_THUMBNAIL_SIZE, Integer.MAX_VALUE))
                 .withMaxImportThreads(clamp(maxImportThreads, 1, MAX_IMPORT_THREADS))
                 .withMinNameSimilarity(clamp(minNameSimilarity, 0.0, 1.0))
+                .withMinEarlyExitSimilarity(clamp(minEarlyExitSimilarity, 0.0, 1.0))
                 .withFaceNameMaxImages(clamp(faceNameMaxImages, MIN_FACE_NAME_MAX_IMAGES, Integer.MAX_VALUE))
                 .build();
     }
@@ -197,6 +201,7 @@ public record ConfigModel(
         private int maxImportThreads = DEFAULT_MAX_IMPORT_THREADS;
         private String dbName = DEFAULT_DB_NAME;
         private double minNameSimilarity = DEFAULT_MIN_NAME_SIMILARITY;
+        private double minEarlyExitSimilarity = DEFAULT_MIN_EARLY_EXIT_SIMILARITY;
         private int faceNameMaxImages = DEFAULT_FACE_NAME_MAX_IMAGES;
         private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK_ENABLED;
         private String language = DEFAULT_LANGUAGE;
@@ -223,6 +228,7 @@ public record ConfigModel(
             this.maxImportThreads = source.maxImportThreads;
             this.dbName = source.dbName;
             this.minNameSimilarity = source.minNameSimilarity;
+            this.minEarlyExitSimilarity = source.minEarlyExitSimilarity;
             this.faceNameMaxImages = source.faceNameMaxImages;
             this.updateCheckEnabled = source.updateCheckEnabled;
             this.language = source.language;
@@ -318,6 +324,11 @@ public record ConfigModel(
             return this;
         }
 
+        public Builder withMinEarlyExitSimilarity(double minEarlyExitSimilarity) {
+            this.minEarlyExitSimilarity = minEarlyExitSimilarity;
+            return this;
+        }
+
         public Builder withFaceNameMaxImages(int faceNameMaxImages) {
             this.faceNameMaxImages = faceNameMaxImages;
             return this;
@@ -355,7 +366,9 @@ public record ConfigModel(
                     minNameSimilarity,
                     faceNameMaxImages,
                     updateCheckEnabled,
-                    language);
+                    language,
+                    minEarlyExitSimilarity
+            );
         }
     }
 
@@ -429,6 +442,10 @@ public record ConfigModel(
 
     public ConfigModel withMinNameSimilarity(double minNameSimilarity) {
         return toBuilder().withMinNameSimilarity(minNameSimilarity).build();
+    }
+
+    public ConfigModel withMinEarlyExitSimilarity(double minEarlyExitSimilarity) {
+        return toBuilder().withMinEarlyExitSimilarity(minEarlyExitSimilarity).build();
     }
 
     public ConfigModel withFaceNameMaxImages(int faceNameMaxImages) {

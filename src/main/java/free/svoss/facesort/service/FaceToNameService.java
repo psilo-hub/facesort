@@ -262,6 +262,16 @@ public class FaceToNameService implements MediaFileActions {
     }
 
     /**
+     * Returns the similarity threshold at which the "Most similar" scan may
+     * stop early.
+     *
+     * @return the configured {@code minEarlyExitSimilarity}
+     */
+    double minEarlyExitSimilarity() {
+        return configStore.get().minEarlyExitSimilarity();
+    }
+
+    /**
      * Loads the unnamed candidate pool once, without thumbnail crops, so a
      * scan can score every name against the same in-memory rows.
      *

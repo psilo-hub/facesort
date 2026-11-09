@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 /**
@@ -72,6 +73,13 @@ public class MostSimilarService {
      * {@code minNameSimilarity} and candidates the user rejected for that name
      * never qualify, and pairs skipped this session are stepped over.</p>
      *
+     * <p>Names are scored in parallel against the shared unnamed pool. As soon
+     * as any name's best candidate reaches the configured early-exit
+     * threshold ({@link FaceToNameService#minEarlyExitSimilarity()}), the
+     * scan stops: the result is then "first pair at or above the threshold"
+     * rather than the strict global best, because a later name might score
+     * even higher. Ties resolve deterministically: the lower name id wins.</p>
+     *
      * @return the best pair still on offer, or empty when there is none
      * @throws SQLException on database error
      */
@@ -81,20 +89,55 @@ public class MostSimilarService {
             return Optional.empty();
         }
 
-        // Score every name against the shared unnamed pool in parallel, then
-        // reduce to the single best pair. All database reads happened in
-        // loadScan(), so the parallel section touches no JDBC state. Ties
-        // resolve deterministically: the lower name id wins.
-        Optional<BestPair> best = scan.names().stream().parallel()
-                .map(name -> bestPairFor(scan, name))
-                .filter(Objects::nonNull)
-                .max(bySimilarityThenLowerNameId());
+        double earlyExitThreshold = faceToNameService.minEarlyExitSimilarity();
 
-        if (best.isEmpty()) {
+        // Score every name against the shared unnamed pool in parallel. Each
+        // thread skips its name when a pair above the early-exit threshold
+        // has already been found. The shared reference holds the best pair
+        // seen so far; ties keep the lower name id. All database reads
+        // happened in loadScan(), so the parallel section touches no JDBC
+        // state.
+        AtomicReference<BestPair> best = new AtomicReference<>(null);
+        scan.names().stream().parallel().forEach(name -> {
+            BestPair current = best.get();
+            if (current != null
+                    && current.candidate().similarity() > earlyExitThreshold) {
+                return;
+            }
+            BestPair pair = bestPairFor(scan, name);
+            if (pair == null) {
+                return;
+            }
+            best.updateAndGet(existing -> better(existing, pair));
+        });
+
+        BestPair result = best.get();
+        if (result == null) {
             return Optional.empty();
         }
-        BestPair pair = best.get();
-        return Optional.ofNullable(suggestionFor(pair.name(), pair.candidate(), new HashMap<>()));
+        return Optional.ofNullable(
+                suggestionFor(result.name(), result.candidate(), new HashMap<>()));
+    }
+
+    /**
+     * Returns the better of two pairs: higher similarity wins; exact ties keep
+     * the lower name id for deterministic results.
+     */
+    private static BestPair better(BestPair a, BestPair b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        if (b.candidate().similarity() > a.candidate().similarity()) {
+            return b;
+        }
+        if (b.candidate().similarity() == a.candidate().similarity()
+                && b.name().id() < a.name().id()) {
+            return b;
+        }
+        return a;
     }
 
     /**
@@ -109,16 +152,6 @@ public class MostSimilarService {
         SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
                 scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
         return candidate == null ? null : new BestPair(name, candidate);
-    }
-
-    /**
-     * Orders scored pairs by descending similarity; exact ties keep the lower
-     * name id so results are reproducible across parallel runs.
-     */
-    private static Comparator<BestPair> bySimilarityThenLowerNameId() {
-        return Comparator
-                .comparingDouble((BestPair p) -> p.candidate().similarity())
-                .thenComparingLong(p -> -p.name().id());
     }
 
     /** One name's best candidate, for reduction to the global best pair. */

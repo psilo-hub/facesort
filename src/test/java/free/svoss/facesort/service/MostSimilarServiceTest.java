@@ -34,6 +34,7 @@ class MostSimilarServiceTest {
     private FaceDao faceDao;
     private NameDao nameDao;
     private NotMatchDao notMatchDao;
+    private ConfigStore configStore;
     private FakeFaceAiEngine engine;
     private MostSimilarService service;
 
@@ -43,7 +44,7 @@ class MostSimilarServiceTest {
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
         notMatchDao = new NotMatchDao(db.getConnection());
-        ConfigStore configStore = new ConfigStore(ConfigModel.defaults());
+        configStore = new ConfigStore(ConfigModel.defaults());
         configStore.updateAndGet(config -> config.withMinNameSimilarity(0.0)); // no cutoff in these tests
         engine = new FakeFaceAiEngine();
         FaceAiService faceAiService = new FaceAiService(engine);
@@ -507,5 +508,50 @@ class MostSimilarServiceTest {
                 db.getTransactionRunner());
         assertTrue(fresh.findBestSuggestion().isPresent(),
                 "a fresh session must not know about this session's skips");
+    }
+
+    @Test
+    void findBestSuggestion_earlyExitAtThreshold_stopsScanning() throws SQLException {
+        configStore.updateAndGet(config -> config.withMinEarlyExitSimilarity(0.99));
+
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long forAlice = addImageAndFace("imgU1", xLike(), null);
+
+        int callsBefore = engine.similarityCalls();
+        Optional<MostSimilarService.Suggestion> best = service.findBestSuggestion();
+
+        assertTrue(best.isPresent(), "a library with a qualifying pair must yield a pair");
+        assertEquals("Alice", best.get().name().name(),
+                "the only name must win");
+        assertEquals(1.0, best.get().nameSimilarity(), 1e-9,
+                "the candidate is identical to the average");
+        // One name, one candidate: one similarity call for scoring, one for
+        // the representative, one for the shown pair = 3 total.
+        assertEquals(callsBefore + 3, engine.similarityCalls(),
+                "early exit means only the winning name is scored");
+    }
+
+    @Test
+    void findBestSuggestion_earlyExitThresholdOne_fullScan() throws SQLException {
+        configStore.updateAndGet(config -> config.withMinEarlyExitSimilarity(1.0));
+
+        float near = 0.9f;
+        float side = (float) Math.sqrt(1.0 - near * near);
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        // Neither candidate reaches similarity above 1.0, so no early exit.
+        addImageAndFace("imgU1", new float[]{near, side, 0, 0, 0, 0, 0, 0}, null);
+        addImageAndFace("imgU2", new float[]{0, 1, 0, 0, 0, 0, 0, 0}, null);
+
+        Optional<MostSimilarService.Suggestion> best = service.findBestSuggestion();
+
+        assertTrue(best.isPresent());
+        assertEquals("Bob", best.get().name().name(),
+                "Bob's candidate at 1.0 beats Alice's at 0.9");
+        assertEquals(1.0, best.get().nameSimilarity(), 1e-9,
+                "Bob's candidate is identical to his average");
     }
 }

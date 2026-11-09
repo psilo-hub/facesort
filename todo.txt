@@ -27,10 +27,13 @@ In progress
 
 Done
 ----
+- Item 6: Configurable early-exit threshold for the "Most similar" scan
+  (minEarlyExitSimilarity in ConfigModel, default 1.0 = no early exit,
+  Settings tab UI, i18n strings, docs)
 - Item 14: Batch review of the top-K pairs in the "Most similar" tab
   (toggle between single-pair and batch grid, batch tag/reject/skip in one
   transaction, i18n strings, docs updated)
 
 Open items
 ----------
-- Items 6, 9, 10, 12, 13, 15 from suggestions_most_similar.md
+- Items 9, 10, 12, 13, 15 from suggestions_most_similar.md

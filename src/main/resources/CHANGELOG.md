@@ -4,6 +4,11 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" scan now stops early when a pair reaches the configured
+  early-exit similarity threshold (default 1.0, meaning always scan every
+  name). Lower the threshold in **Settings** to stop the scan sooner when a
+  highly confident match is found; the trade-off is documented in the setting's
+  tooltip (2026-11-09)
 - The "Most similar" tab has a batch review mode: toggle it on to see the top
   12 pairs in a scrollable grid with checkboxes, then tag, reject or skip the
   selected pairs in one batch decision instead of one pair at a time
