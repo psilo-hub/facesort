@@ -56,7 +56,7 @@ class MostSimilarServiceBenchmarkTest {
         service = new MostSimilarService(
                 new FaceToNameService(ai, faceDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao);
+                ai, nameDao, notMatchDao, db.getTransactionRunner());
     }
 
     @AfterEach

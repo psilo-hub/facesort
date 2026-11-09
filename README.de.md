@@ -172,6 +172,14 @@ Reihenfolge ab:
    zurückgestellt und erscheint beim nächsten Start wieder). Nach jeder
    Entscheidung erscheint sofort das nächste Paar.
 
+   Zum schnelleren Durchgehen kannst du den **Stapelprüfung**-Modus mit dem
+   Umschalter oben auf dem Tab aktivieren. Die App zeigt dann die 12 besten
+   Paare als scrollbares Raster mit Kontrollkästchen an: wähle die Karten, die
+   du gemeinsam bearbeiten möchtest, und drücke **Ausgewählte als dieselbe
+   Person markieren**, **Ausgewählte ablehnen** oder **Alle überspringen**. Eine
+   Stapelentscheidung ersetzt viele Einzelentscheidungen. Schalte den Umschalter
+   aus, um zum Einzelschritt-Verfahren zurückzukehren.
+
 6. **Duplikate entfernen** – drücke **Start**, um Namenpaare nach Ähnlichkeit zu
    vergleichen. Entscheide bei jedem Paar: *Das sind Duplikate* (wähle dann,
    welcher Name überlebt – alle Gesichter werden zusammengeführt), *Das sind keine

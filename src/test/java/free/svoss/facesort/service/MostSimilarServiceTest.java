@@ -50,7 +50,8 @@ class MostSimilarServiceTest {
         FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao,
                 nameDao, notMatchDao, new ImageDao(db.getConnection()),
                 new VideoDao(db.getConnection()), configStore);
-        service = new MostSimilarService(faceToNameService, faceAiService, nameDao, notMatchDao);
+        service = new MostSimilarService(faceToNameService, faceAiService, nameDao, notMatchDao,
+                db.getTransactionRunner());
     }
 
     @AfterEach
@@ -128,7 +129,7 @@ class MostSimilarServiceTest {
         MostSimilarService countingService = new MostSimilarService(
                 new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao);
+                ai, nameDao, notMatchDao, db.getTransactionRunner());
 
         MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
 
@@ -152,7 +153,7 @@ class MostSimilarServiceTest {
         MostSimilarService countingService = new MostSimilarService(
                 new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao);
+                ai, nameDao, notMatchDao, db.getTransactionRunner());
 
         MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
 
@@ -302,7 +303,8 @@ class MostSimilarServiceTest {
                         nameDao, notMatchDao, new ImageDao(db.getConnection()),
                         new VideoDao(db.getConnection()),
                         new ConfigStore(ConfigModel.defaults())),
-                new FaceAiService(new FakeFaceAiEngine()), nameDao, notMatchDao);
+                new FaceAiService(new FakeFaceAiEngine()), nameDao, notMatchDao,
+                db.getTransactionRunner());
         assertEquals("Alice", fresh.findBestSuggestion().orElseThrow().name().name(),
                 "a skipped pair must come back in a new session");
     }
@@ -407,5 +409,103 @@ class MostSimilarServiceTest {
                 "exact tie on similarity must keep the lower name id");
         assertEquals(shared, best.candidate().id());
         assertEquals(1.0, best.nameSimilarity(), 1e-9);
+    }
+
+    @Test
+    void tagSelected_tagsEverySelectedFaceWithItsName() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        long forAlice = addImageAndFace("imgU1", xLike(), null);
+        long forBob = addImageAndFace("imgU2", yLike(), null);
+
+        MostSimilarService.Suggestion alicePair = new MostSimilarService.Suggestion(
+                nameDao.findById(alice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(), 1.0, 1.0);
+        MostSimilarService.Suggestion bobPair = new MostSimilarService.Suggestion(
+                nameDao.findById(bob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(), 1.0, 1.0);
+
+        service.tagSelected(List.of(alicePair, bobPair));
+
+        assertEquals(Long.valueOf(alice), faceDao.findById(forAlice).orElseThrow().nameId(),
+                "every selected face must be tagged with its suggested name");
+        assertEquals(Long.valueOf(bob), faceDao.findById(forBob).orElseThrow().nameId(),
+                "every selected face must be tagged with its suggested name");
+        assertTrue(service.findBestSuggestion().isEmpty(),
+                "tagged faces must leave the unnamed pool");
+    }
+
+    @Test
+    void rejectSelected_recordsEveryRejection() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        long forAlice = addImageAndFace("imgU1", xLike(), null);
+        long forBob = addImageAndFace("imgU2", yLike(), null);
+
+        MostSimilarService.Suggestion alicePair = new MostSimilarService.Suggestion(
+                nameDao.findById(alice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(), 1.0, 1.0);
+        MostSimilarService.Suggestion bobPair = new MostSimilarService.Suggestion(
+                nameDao.findById(bob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(), 1.0, 1.0);
+
+        service.rejectSelected(List.of(alicePair, bobPair));
+
+        assertTrue(notMatchDao.isNotMatch(forAlice, alice),
+                "every selected pair must be recorded as a rejection");
+        assertTrue(notMatchDao.isNotMatch(forBob, bob),
+                "every selected pair must be recorded as a rejection");
+        Optional<MostSimilarService.Suggestion> best = service.findBestSuggestion();
+        best.ifPresent(suggestion -> {
+            assertFalse(suggestion.candidate().id() == forAlice && suggestion.name().id() == alice,
+                    "a rejected pair must not be offered again");
+            assertFalse(suggestion.candidate().id() == forBob && suggestion.name().id() == bob,
+                    "a rejected pair must not be offered again");
+        });
+    }
+
+    @Test
+    void skipAll_hidesPairsForThisSessionWithoutWritingToDatabase() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        long forAlice = addImageAndFace("imgU1", xLike(), null);
+        long forBob = addImageAndFace("imgU2", yLike(), null);
+
+        MostSimilarService.Suggestion alicePair = new MostSimilarService.Suggestion(
+                nameDao.findById(alice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(),
+                faceDao.findById(forAlice).orElseThrow(), 1.0, 1.0);
+        MostSimilarService.Suggestion bobPair = new MostSimilarService.Suggestion(
+                nameDao.findById(bob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(),
+                faceDao.findById(forBob).orElseThrow(), 1.0, 1.0);
+
+        service.skipAll(List.of(alicePair, bobPair));
+
+        assertTrue(notMatchDao.findFaceIdsByNameId(alice).isEmpty(),
+                "skipping must not write to the database");
+        assertTrue(notMatchDao.findFaceIdsByNameId(bob).isEmpty(),
+                "skipping must not write to the database");
+
+        // The skipped pairs are hidden while the session lasts.
+        MostSimilarService fresh = new MostSimilarService(
+                new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao,
+                        nameDao, notMatchDao, new ImageDao(db.getConnection()),
+                        new VideoDao(db.getConnection()),
+                        new ConfigStore(ConfigModel.defaults())),
+                new FaceAiService(new FakeFaceAiEngine()), nameDao, notMatchDao,
+                db.getTransactionRunner());
+        assertTrue(fresh.findBestSuggestion().isPresent(),
+                "a fresh session must not know about this session's skips");
     }
 }

@@ -170,6 +170,14 @@ este orden:
    *Omitir* (el par se aparta durante esta sesión y reaparece en el próximo
    inicio). El siguiente par aparece justo después de cada decisión.
 
+   Para revisar más rápido, activa el modo **Revisión por lotes** con el
+   interruptor en la parte superior de la pestaña. La aplicación muestra entonces
+   los 12 mejores pares como una cuadrícula desplazable con casillas: selecciona
+   las tarjetas que quieras procesar juntas y pulsa **Etiquetar seleccionados
+   como misma persona**, **Rechazar seleccionados** u **Omitir todo**. Una
+   decisión por lote reemplaza muchas decisiones una por una. Desactiva el
+   interruptor para volver al flujo individual.
+
 6. **Eliminar duplicados**: pulsa **Iniciar** para comparar pares de nombres por
    similitud. En cada par decide: *Son duplicados* (a continuación, elige qué
    nombre sobrevive: todas las caras se fusionan), *No son duplicados* (se

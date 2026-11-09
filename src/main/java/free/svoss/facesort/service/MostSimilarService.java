@@ -1,7 +1,9 @@
 package free.svoss.facesort.service;
 
+import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotMatchDao;
+import free.svoss.facesort.db.TransactionRunner;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
@@ -36,6 +38,7 @@ public class MostSimilarService {
     private final FaceAiService faceAiService;
     private final NameDao nameDao;
     private final NotMatchDao notMatchDao;
+    private final TransactionRunner transactionRunner;
     private final Set<MatchKey> skipped =
             Collections.synchronizedSet(new HashSet<>());
 
@@ -46,13 +49,16 @@ public class MostSimilarService {
      * @param faceAiService     engine for embedding math; must not be null
      * @param nameDao           data access for names; must not be null
      * @param notMatchDao       data access for rejected face/name combinations; must not be null
+     * @param transactionRunner runs batch decisions as one atomic transaction; must not be null
      */
     public MostSimilarService(FaceToNameService faceToNameService, FaceAiService faceAiService,
-                              NameDao nameDao, NotMatchDao notMatchDao) {
+                              NameDao nameDao, NotMatchDao notMatchDao,
+                              TransactionRunner transactionRunner) {
         this.faceToNameService = Objects.requireNonNull(faceToNameService, "faceToNameService");
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
+        this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
     }
 
     /**
@@ -306,6 +312,60 @@ public class MostSimilarService {
      */
     public void markDifferentPerson(long faceId, long nameId) throws SQLException {
         notMatchDao.insert(faceId, nameId);
+    }
+
+    /**
+     * Tags every selected candidate with its suggested name in a single
+     * transaction, so one batch decision replaces K full rescans with roughly
+     * one. Each candidate leaves the unnamed pool and the name-average cache
+     * invalidates itself through {@link FaceDao#writeVersion()}, so the next
+     * scan picks up the new averages. Session-only skips for the same pairs
+     * are dropped as well, since they are superseded by the tag.
+     *
+     * @param selections the pairs to tag; each candidate is tagged with its name
+     * @throws SQLException on database error
+     */
+    public void tagSelected(List<Suggestion> selections) throws SQLException {
+        Objects.requireNonNull(selections, "selections");
+        transactionRunner.inTransaction(() -> {
+            for (Suggestion selection : selections) {
+                faceToNameService.tagFace(selection.candidate().id(), selection.name().id());
+            }
+            return null;
+        });
+        skipped.removeIf(key -> selections.stream()
+                .anyMatch(s -> s.candidate().id() == key.faceId() && s.name().id() == key.nameId()));
+    }
+
+    /**
+     * Records that every selected candidate is not its suggested person, in a
+     * single transaction. The rejections persist so neither naming tab offers
+     * those combinations again; each face stays a candidate for other names.
+     *
+     * @param selections the pairs to reject
+     * @throws SQLException on database error
+     */
+    public void rejectSelected(List<Suggestion> selections) throws SQLException {
+        Objects.requireNonNull(selections, "selections");
+        transactionRunner.inTransaction(() -> {
+            for (Suggestion selection : selections) {
+                notMatchDao.insert(selection.candidate().id(), selection.name().id());
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Hides every selected pair for the current session only; nothing is
+     * written to the database. A later run may offer the pairs again.
+     *
+     * @param selections the pairs to skip
+     */
+    public void skipAll(List<Suggestion> selections) {
+        Objects.requireNonNull(selections, "selections");
+        for (Suggestion selection : selections) {
+            skipped.add(new MatchKey(selection.candidate().id(), selection.name().id()));
+        }
     }
 
     /**

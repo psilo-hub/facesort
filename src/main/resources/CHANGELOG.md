@@ -4,6 +4,10 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" tab has a batch review mode: toggle it on to see the top
+  12 pairs in a scrollable grid with checkboxes, then tag, reject or skip the
+  selected pairs in one batch decision instead of one pair at a time
+  (2026-11-08)
 - Tagging a face with a name in "Put a name to a face" or "Tag random face" now
   selects that name when you switch to the "Add faces to a name" tab, so you can
   keep tagging the same person right away (2026-10-26)

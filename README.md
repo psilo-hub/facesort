@@ -161,6 +161,13 @@ The main window is a set of tabs. Work through them roughly in this order:
    session and comes back on the next start). The next best pair appears right
    after every decision.
 
+   For faster reviewing, switch on **Batch review** with the toggle at the top
+   of the tab. The app then shows the top 12 pairs as a scrollable grid with
+   checkboxes: select any cards you want to act on together and press
+   **Tag selected as same person**, **Reject selected** or **Skip all**. One
+   batch decision replaces many one-by-one decisions. Switch the toggle off to
+   return to the single-pair flow.
+
 6. **Deduplicate** — press **Start** to compare name pairs by similarity. For
    each pair decide: *These are dupes* (then choose which name survives — all
    faces are merged), *These are not dupes* (remembered permanently), or

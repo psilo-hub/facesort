@@ -10,14 +10,23 @@ import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The "Most similar" tab.
@@ -40,8 +49,11 @@ public class MostSimilarView extends BorderPane implements Refreshable {
 
     private static final double THUMBNAIL_SIZE = 170.0;
     private static final double PLACEHOLDER_MAX_WIDTH = 420.0;
+    private static final double BATCH_THUMBNAIL_SIZE = 95.0;
+    private static final int BATCH_SIZE = 12;
     private static final String LOADER_THREAD = "most-similar-loader";
     private static final String PREFETCH_THREAD = "most-similar-prefetcher";
+    private static final String BATCH_THREAD = "most-similar-batch";
 
     private final MostSimilarService mostSimilarService;
     private final FaceToNameService faceToNameService;
@@ -56,6 +68,22 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     private final Button differentButton = new Button(I18n.get("ui.mostSimilar.different"));
     private final Button skipButton = new Button(I18n.get("ui.mostSimilar.skip"));
     private final Label statusLabel = new Label("");
+
+    // Batch review mode
+    private final ToggleButton batchToggle = new ToggleButton(I18n.get("ui.mostSimilar.batchMode"));
+    private final FlowPane batchGrid = new FlowPane(12, 12);
+    private final ScrollPane batchScroll = new ScrollPane(batchGrid);
+    private final Button tagBatchButton = new Button(I18n.get("ui.mostSimilar.tagBatch"));
+    private final Button rejectBatchButton = new Button(I18n.get("ui.mostSimilar.rejectBatch"));
+    private final Button skipAllButton = new Button(I18n.get("ui.mostSimilar.skipAll"));
+    private final HBox singleButtons = new HBox(10);
+    private final HBox batchButtons = new HBox(10);
+    private final VBox singleBottom = new VBox();
+    private final VBox batchBottom = new VBox();
+
+    private boolean batchMode = false;
+    private List<MostSimilarService.Suggestion> batchSuggestions = List.of();
+    private final Set<Long> selectedFaces = new HashSet<>();
 
     private final TaskRunner taskRunner = new TaskRunner();
     private final FaceUi.FaceActions faceActions;
@@ -90,6 +118,11 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         introLabel.setWrapText(true);
         introLabel.setPadding(new Insets(10, 10, 0, 10));
 
+        batchToggle.setOnAction(e -> setBatchMode(batchToggle.isSelected()));
+        HBox modeBar = new HBox(10, batchToggle);
+        modeBar.setAlignment(Pos.CENTER_LEFT);
+        modeBar.setPadding(new Insets(10, 10, 0, 10));
+
         titleLabel.getStyleClass().add("frame-title");
         similarityLabel.getStyleClass().add("secondary-text");
         faceSimilarityLabel.getStyleClass().add("secondary-text");
@@ -103,17 +136,68 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         sameButton.setOnAction(e -> onSamePerson());
         differentButton.setOnAction(e -> onDifferentPerson());
         skipButton.setOnAction(e -> onSkip());
-        HBox buttons = new HBox(10, sameButton, differentButton, skipButton);
-        buttons.setAlignment(Pos.CENTER);
-        buttons.setPadding(new Insets(10));
+        HBox singleButtons = new HBox(10, sameButton, differentButton, skipButton);
+        singleButtons.setAlignment(Pos.CENTER);
+        singleButtons.setPadding(new Insets(10));
+
+        tagBatchButton.getStyleClass().add("primary");
+        tagBatchButton.setOnAction(e -> onTagBatch());
+        rejectBatchButton.setOnAction(e -> onRejectBatch());
+        skipAllButton.setOnAction(e -> onSkipAll());
+        batchButtons.getChildren().addAll(tagBatchButton, rejectBatchButton, skipAllButton);
+        batchButtons.setAlignment(Pos.CENTER);
+        batchButtons.setPadding(new Insets(10));
+
+        batchGrid.setPadding(new Insets(10));
+        batchScroll.setFitToWidth(true);
+
+        singleButtons.getChildren().addAll(sameButton, differentButton, skipButton);
+        singleButtons.setAlignment(Pos.CENTER);
+        singleButtons.setPadding(new Insets(10));
+
+        singleBottom.getChildren().addAll(singleButtons, statusLabel);
+        batchBottom.getChildren().addAll(batchButtons, statusLabel);
 
         statusLabel.setWrapText(true);
         statusLabel.setPadding(new Insets(0, 10, 10, 10));
 
-        setTop(introLabel);
+        setTop(new VBox(introLabel, modeBar));
         setCenter(pairBox);
-        setBottom(new VBox(buttons, statusLabel));
+        setBottom(singleBottom);
         setBusy(true);
+    }
+
+    /**
+     * Switches between the single-pair view and the batch review grid.
+     *
+     * @param batch {@code true} to show the batch grid, {@code false} for the
+     *              single pair
+     */
+    private void setBatchMode(boolean batch) {
+        batchMode = batch;
+        batchGrid.getChildren().clear();
+        selectedFaces.clear();
+        updateBatchButtonState();
+        if (batch) {
+            setCenter(batchScroll);
+            setBottom(batchBottom);
+            loadBatchSuggestions();
+        } else {
+            setCenter(pairBox);
+            setBottom(singleBottom);
+            loadNextSuggestion();
+        }
+    }
+
+    /**
+     * Enables or disables the batch action buttons depending on whether any
+     * card is selected.
+     */
+    private void updateBatchButtonState() {
+        boolean anySelected = !selectedFaces.isEmpty();
+        tagBatchButton.setDisable(batchMode && !anySelected);
+        rejectBatchButton.setDisable(batchMode && !anySelected);
+        skipAllButton.setDisable(batchMode && !anySelected);
     }
 
     /**
@@ -123,15 +207,22 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     @Override
     public void refresh() {
         queue.clear();
-        loadNextSuggestion();
+        if (batchMode) {
+            loadBatchSuggestions();
+        } else {
+            loadNextSuggestion();
+        }
     }
 
     /**
      * Shows the next prefetched pair, or loads one when the queue is empty, and
      * refills the queue in the background. The loading placeholder appears only
-     * when no pair is ready.
+     * when no pair is ready. No-op in batch mode.
      */
     private void loadNextSuggestion() {
+        if (batchMode) {
+            return;
+        }
         taskRunner.cancel(PREFETCH_THREAD);
         boolean queued = queue.hasQueued();
         setBusy(true);
@@ -179,11 +270,15 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     }
 
     /**
-     * Renders the given pair, or the empty state when there is none.
+     * Renders the given pair, or the empty state when there is none. No-op in
+     * batch mode.
      *
      * @param suggestion the pair to show, or empty when nothing is left
      */
     private void showSuggestion(Optional<MostSimilarService.Suggestion> suggestion) {
+        if (batchMode) {
+            return;
+        }
         current = suggestion.orElse(null);
         pairBox.getChildren().clear();
         if (current == null) {
@@ -292,6 +387,185 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     }
 
     /**
+     * Loads the top {@link #BATCH_SIZE} pairs in the background and renders
+     * them as a selectable grid for batch review.
+     */
+    private void loadBatchSuggestions() {
+        setBusy(true);
+        batchGrid.getChildren().clear();
+        selectedFaces.clear();
+        statusLabel.setText(I18n.get("ui.mostSimilar.loadingBatch"));
+
+        Task<List<MostSimilarService.Suggestion>> task = new Task<>() {
+            @Override
+            protected List<MostSimilarService.Suggestion> call() throws SQLException {
+                return mostSimilarService.findBestSuggestions(BATCH_SIZE);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            batchSuggestions = task.getValue();
+            renderBatch(batchSuggestions);
+            setBusy(false);
+            if (batchSuggestions.isEmpty()) {
+                statusLabel.setText(I18n.get("ui.mostSimilar.empty"));
+            } else {
+                statusLabel.setText(I18n.format("ui.mostSimilar.batchCount", batchSuggestions.size()));
+            }
+        });
+        task.setOnFailed(e -> {
+            setBusy(false);
+            handleFailure(I18n.get("ui.mostSimilar.loadFailed"), task.getException());
+        });
+
+        taskRunner.start(task, BATCH_THREAD);
+    }
+
+    /**
+     * Renders the given pairs as batch cards, each with a checkbox for
+     * selection.
+     *
+     * @param suggestions the pairs to render
+     */
+    private void renderBatch(List<MostSimilarService.Suggestion> suggestions) {
+        batchGrid.getChildren().clear();
+        for (MostSimilarService.Suggestion suggestion : suggestions) {
+            batchGrid.getChildren().add(batchCard(suggestion));
+        }
+        updateBatchButtonState();
+    }
+
+    /**
+     * Builds one batch card: a checkbox, the tagged face with its name, the
+     * unnamed candidate, and both similarity scores.
+     *
+     * @param suggestion the pair to render
+     * @return the card node
+     */
+    private VBox batchCard(MostSimilarService.Suggestion suggestion) {
+        VBox card = new VBox(6);
+        card.setAlignment(Pos.TOP_CENTER);
+        card.setPadding(new Insets(6));
+        card.getStyleClass().add("candidate-card");
+
+        CheckBox select = new CheckBox();
+        select.setOnAction(e -> {
+            if (select.isSelected()) {
+                selectedFaces.add(suggestion.candidate().id());
+            } else {
+                selectedFaces.remove(suggestion.candidate().id());
+            }
+            updateBatchButtonState();
+        });
+
+        ImageView taggedThumb = FaceUi.thumb(suggestion.tagged(), BATCH_THUMBNAIL_SIZE);
+        ImageView candidateThumb = FaceUi.thumb(suggestion.candidate(), BATCH_THUMBNAIL_SIZE);
+
+        Label nameLabel = new Label(suggestion.name().name());
+        nameLabel.getStyleClass().add("secondary-text");
+        nameLabel.setWrapText(true);
+        nameLabel.setMaxWidth(BATCH_THUMBNAIL_SIZE);
+
+        Label simLabel = new Label(I18n.percent(suggestion.nameSimilarity()));
+        simLabel.getStyleClass().add("secondary-text");
+
+        card.getChildren().addAll(select, taggedThumb, nameLabel, candidateThumb, simLabel);
+        return card;
+    }
+
+    /**
+     * Applies the "same person" decision to every selected pair in a single
+     * transaction, then reloads the batch.
+     */
+    private void onTagBatch() {
+        if (batchSuggestions.isEmpty() || selectedFaces.isEmpty()) {
+            return;
+        }
+        List<MostSimilarService.Suggestion> selected = batchSuggestions.stream()
+                .filter(s -> selectedFaces.contains(s.candidate().id()))
+                .toList();
+
+        setBusy(true);
+        statusLabel.setText(I18n.format("ui.mostSimilar.taggingBatch", selected.size()));
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                mostSimilarService.tagSelected(selected);
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            selectedFaces.clear();
+            statusLabel.setText(I18n.format("ui.mostSimilar.taggedBatch", selected.size()));
+            loadBatchSuggestions();
+        });
+
+        task.setOnFailed(e -> {
+            setBusy(false);
+            handleFailure(I18n.get("ui.mostSimilar.tagFailed"), task.getException());
+        });
+
+        taskRunner.start(task, "most-similar-batch-tagger");
+    }
+
+    /**
+     * Records that every selected candidate is not its suggested person, in a
+     * single transaction, then reloads the batch.
+     */
+    private void onRejectBatch() {
+        if (batchSuggestions.isEmpty() || selectedFaces.isEmpty()) {
+            return;
+        }
+        List<MostSimilarService.Suggestion> selected = batchSuggestions.stream()
+                .filter(s -> selectedFaces.contains(s.candidate().id()))
+                .toList();
+
+        setBusy(true);
+        statusLabel.setText(I18n.format("ui.mostSimilar.rejectingBatch", selected.size()));
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws SQLException {
+                mostSimilarService.rejectSelected(selected);
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            selectedFaces.clear();
+            statusLabel.setText(I18n.format("ui.mostSimilar.rejectedBatch", selected.size()));
+            loadBatchSuggestions();
+        });
+
+        task.setOnFailed(e -> {
+            setBusy(false);
+            handleFailure(I18n.get("ui.mostSimilar.rejectFailed"), task.getException());
+        });
+
+        taskRunner.start(task, "most-similar-batch-rejecter");
+    }
+
+    /**
+     * Hides every selected pair for the current session only, then reloads the
+     * batch.
+     */
+    private void onSkipAll() {
+        if (batchSuggestions.isEmpty() || selectedFaces.isEmpty()) {
+            return;
+        }
+        List<MostSimilarService.Suggestion> selected = batchSuggestions.stream()
+                .filter(s -> selectedFaces.contains(s.candidate().id()))
+                .toList();
+
+        mostSimilarService.skipAll(selected);
+        selectedFaces.clear();
+        statusLabel.setText(I18n.format("ui.mostSimilar.skippedBatch", selected.size()));
+        loadBatchSuggestions();
+    }
+
+    /**
      * Records that the given face is not a face after all, so it is left out of
      * every naming tab from now on, then loads the next pair.
      *
@@ -349,6 +623,12 @@ public class MostSimilarView extends BorderPane implements Refreshable {
      * @param busy {@code true} while a background operation runs
      */
     private void setBusy(boolean busy) {
+        if (batchMode) {
+            tagBatchButton.setDisable(busy || selectedFaces.isEmpty());
+            rejectBatchButton.setDisable(busy || selectedFaces.isEmpty());
+            skipAllButton.setDisable(busy || selectedFaces.isEmpty());
+            return;
+        }
         boolean disabled = busy || current == null;
         sameButton.setDisable(disabled);
         differentButton.setDisable(disabled);

@@ -21,8 +21,16 @@ Items from further_improvements.txt — all done:
 3. Tab switching does not interrupt running tasks (ImportView task runs on its
    own daemon thread; MainWindow only touches the newly selected tab)
 
+In progress
+-----------
+- None
+
+Done
+----
+- Item 14: Batch review of the top-K pairs in the "Most similar" tab
+  (toggle between single-pair and batch grid, batch tag/reject/skip in one
+  transaction, i18n strings, docs updated)
 
 Open items
 ----------
-
-None — pick up work from `suggestions.md`.
+- Items 6, 9, 10, 12, 13, 15 from suggestions_most_similar.md

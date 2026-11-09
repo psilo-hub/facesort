@@ -46,7 +46,7 @@ and the UI appears frozen between decisions.
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
 | 12 | Scan progress indicator and cancel                | 4          | [ ]    |
 | 13 | Backlog counter                                   | 4 (or 7)   | [ ]    |
-| 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [ ]    |
+| 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [x] ~~Batch review of the top-K pairs~~ |
 | 15 | Persist name averages across restarts (optional)  | 3          | [ ]    |
 
 Suggested order: 1 → 2 → 3 → 4 → 5 → 7 → 6 → 11 → 12 → 13 → 8 → 9 → 14 → 10 → 15.
@@ -382,7 +382,7 @@ serving a queued pair issues no new unnamed-pool query.
 - Add the strings to every `I18n` resource bundle.
 - Test: counts match the database after tagging/rejecting.
 
-### 14. [ ] Batch review of the top-K pairs
+### 14. [x] ~~Batch review of the top-K pairs~~
 
 **Depends on:** 3, 4, 5 (cheap scoring so a top-K list is affordable).
 
@@ -401,6 +401,19 @@ serving a queued pair issues no new unnamed-pool query.
   `FaceUi.faceCard` for the cards.
 - Add strings to every `I18n` resource bundle; update `README.md` and all five
   translated READMEs, `CHANGELOG.md` and `todo.txt` when done.
+
+**Done (2026-11-08):** The "Most similar" tab has a toggle between the single-pair
+flow and a batch review grid. `MostSimilarView` shows up to 12 pairs per batch
+in a scrollable grid with per-card checkboxes, reusing `FaceUi.faceCard` for the
+thumbnails. "Tag selected as same person" tags every selected face with its
+suggested name in one database transaction; "Reject selected" records the
+rejections in one transaction; "Skip all" hides the selected pairs for the
+session. The `MostSimilarService.tagSelected`, `rejectSelected` and `skipAll`
+batch methods apply the decisions atomically via `TransactionRunner`, and the
+name-average cache invalidates itself through `FaceDao.writeVersion()`. The
+single-pair flow remains the default; the batch mode is opt-in via a toggle.
+`findBestSuggestions(int k)` already existed from item 11 and is reused by the
+batch grid. i18n strings were added to all six message bundles.
 
 ---
 

@@ -180,6 +180,14 @@ ordre :
    *Passer* (la paire est mise de côté pour cette session et revient au prochain
    démarrage). La paire suivante apparaît juste après chaque décision.
 
+   Pour réviser plus rapidement, activez le mode **Révision par lots** avec le
+   bouton bascule en haut de l'onglet. L'application affiche alors les 12
+   meilleures paires dans une grille défilable avec cases à cocher :
+   sélectionnez les cartes sur lesquelles agir ensemble et cliquez sur
+   **Taguer la sélection comme même personne**, **Rejeter la sélection** ou
+   **Ignorer tout**. Une décision par lot remplace plusieurs décisions une par
+   une. Désactivez le bascule pour revenir au flux individuel.
+
 6. **Supprimer les doublons** — appuyez sur **Démarrer** pour comparer les paires
    de noms par similitude. Pour chaque paire, décidez : *Ce sont des doublons*
    (choisissez alors quel nom survit — tous les visages sont fusionnés),
