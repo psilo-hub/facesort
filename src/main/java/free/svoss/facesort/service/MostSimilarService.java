@@ -20,7 +20,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.stream.IntStream;
 
 /**
@@ -45,6 +48,12 @@ public class MostSimilarService {
     private final UnnamedFacePool pool;
     private final Set<MatchKey> skipped =
             Collections.synchronizedSet(new HashSet<>());
+    /**
+     * Cancellation flag for in-progress scans. Set by {@link #cancel()},
+     * checked between names in the scoring loop, and reset at the start of
+     * every scan so a cancelled scan does not poison later ones.
+     */
+    private final AtomicBoolean cancelled = new AtomicBoolean();
 
     /**
      * Creates the service.
@@ -69,6 +78,25 @@ public class MostSimilarService {
     }
 
     /**
+     * Cancels any in-progress scan. The scoring loop checks this flag between
+     * names and returns empty promptly. The flag is reset at the start of the
+     * next scan, so a cancellation does not affect later scans.
+     */
+    public void cancel() {
+        cancelled.set(true);
+    }
+
+    /**
+     * Tells whether the current scan has been cancelled.
+     *
+     * @return {@code true} when {@link #cancel()} has been called and the
+     *         current scan has not been reset yet
+     */
+    public boolean isCancelled() {
+        return cancelled.get();
+    }
+
+    /**
      * Returns the most similar (name, unnamed face) pair of the whole library,
      * or empty when nothing is left to decide: no names, no unnamed faces, or
      * every combination rejected or skipped.
@@ -90,21 +118,47 @@ public class MostSimilarService {
      * @throws SQLException on database error
      */
     public Optional<Suggestion> findBestSuggestion() throws SQLException {
+        return findBestSuggestion(null);
+    }
+
+    /**
+     * Returns the most similar (name, unnamed face) pair of the whole library,
+     * reporting scan progress through {@code progress} and honouring
+     * {@link #cancel()}.
+     *
+     * <p>{@code progress.accept(scanned, total)} is called after each name is
+     * processed, so a UI can show {@code "scanning 120 / 480 names"}. When the
+     * scan is cancelled, the method returns empty promptly.</p>
+     *
+     * @param progress callback receiving (names scanned, total names), or
+     *                 {@code null} for no progress reporting
+     * @return the best pair still on offer, or empty when there is none or the
+     *         scan was cancelled
+     * @throws SQLException on database error
+     */
+    public Optional<Suggestion> findBestSuggestion(BiConsumer<Integer, Integer> progress)
+            throws SQLException {
+        cancelled.set(false);
         Scan scan = loadScan();
         if (scan.names().isEmpty()) {
             return Optional.empty();
         }
 
         double earlyExitThreshold = faceToNameService.minEarlyExitSimilarity();
+        int total = scan.names().size();
+        AtomicInteger scanned = new AtomicInteger();
 
         // Score every name against the shared unnamed pool in parallel. Each
         // thread skips its name when a pair above the early-exit threshold
-        // has already been found. The shared reference holds the best pair
-        // seen so far; ties keep the lower name id. All database reads
-        // happened in loadScan(), so the parallel section touches no JDBC
-        // state.
+        // has already been found, or when the scan has been cancelled. The
+        // shared reference holds the best pair seen so far; ties keep the
+        // lower name id. All database reads happened in loadScan(), so the
+        // parallel section touches no JDBC state.
         AtomicReference<BestPair> best = new AtomicReference<>(null);
         scan.names().stream().parallel().forEach(name -> {
+            if (isCancelled()) {
+                return;
+            }
             BestPair current = best.get();
             if (current != null
                     && current.candidate().similarity() > earlyExitThreshold) {
@@ -115,7 +169,15 @@ public class MostSimilarService {
                 return;
             }
             best.updateAndGet(existing -> better(existing, pair));
+            int s = scanned.incrementAndGet();
+            if (progress != null) {
+                progress.accept(s, total);
+            }
         });
+
+        if (isCancelled()) {
+            return Optional.empty();
+        }
 
         BestPair result = best.get();
         if (result == null) {
@@ -195,22 +257,59 @@ public class MostSimilarService {
      * @throws SQLException on database error
      */
     public List<Suggestion> findBestSuggestions(int limit) throws SQLException {
+        return findBestSuggestions(limit, null);
+    }
+
+    /**
+     * Returns up to {@code limit} (name, unnamed face) pairs with the highest
+     * similarity, reporting scan progress through {@code progress} and
+     * honouring {@link #cancel()}.
+     *
+     * <p>{@code progress.accept(scanned, total)} is called after each name is
+     * processed, so a UI can show {@code "scanning 120 / 480 names"}. When the
+     * scan is cancelled, the method returns an empty list promptly.</p>
+     *
+     * @param limit    maximum number of pairs; values &le; 0 yield an empty list
+     * @param progress callback receiving (names scanned, total names), or
+     *                 {@code null} for no progress reporting
+     * @return the best pairs in descending similarity order, or empty when
+     *         cancelled
+     * @throws SQLException on database error
+     */
+    public List<Suggestion> findBestSuggestions(int limit,
+                                                BiConsumer<Integer, Integer> progress)
+            throws SQLException {
         if (limit <= 0) {
             return List.of();
         }
+        cancelled.set(false);
         Scan scan = loadScan();
         if (scan.names().isEmpty()) {
             return List.of();
         }
 
-        // Score every name against the shared unnamed pool in parallel. The
-        // order field preserves the original sequence for stable tie-breaking
-        // after the parallel reduction.
+        int total = scan.names().size();
+        AtomicInteger scanned = new AtomicInteger();
+
+        // Score every name against the shared unnamed pool in parallel. Each
+        // thread skips its name when the scan has been cancelled. The order
+        // field preserves the original sequence for stable tie-breaking after
+        // the parallel reduction.
         List<RankedName> ranked = IntStream.range(0, scan.names().size()).parallel()
-                .mapToObj(order -> rankName(scan, order))
+                .mapToObj(order -> {
+                    if (isCancelled()) {
+                        return null;
+                    }
+                    RankedName entry = rankName(scan, order);
+                    int s = scanned.incrementAndGet();
+                    if (progress != null) {
+                        progress.accept(s, total);
+                    }
+                    return entry;
+                })
                 .filter(Objects::nonNull)
                 .toList();
-        if (ranked.isEmpty()) {
+        if (isCancelled() || ranked.isEmpty()) {
             return List.of();
         }
 

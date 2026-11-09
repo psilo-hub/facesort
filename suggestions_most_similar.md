@@ -44,7 +44,7 @@ and the UI appears frozen between decisions.
 | 9  | [x] ~~Keep the unnamed pool in memory between decisions~~ | 2, 4       | [x] ~~Keep the unnamed pool in memory between decisions~~ |
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
-| 12 | Scan progress indicator and cancel                | 4          | [ ]    |
+| 12 | [x] ~~Scan progress indicator and cancel~~          | 4          | [x] ~~Scan progress indicator and cancel~~          |
 | 13 | [x] ~~Backlog counter~~                                   | 4 (or 7)   | [x] ~~Backlog counter~~ |
 | 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [x] ~~Batch review of the top-K pairs~~ |
 | 15 | Persist name averages across restarts (optional)  | 3          | [ ]    |
@@ -374,7 +374,7 @@ and cancels the prefetch when a decision starts. `TaskRunner.cancel(name)` was
 added for that. Queue tests cover tag/reject/skip invalidation and assert that
 serving a queued pair issues no new unnamed-pool query.
 
-### 12. [ ] Scan progress indicator and cancel
+### 12. [x] ~~Scan progress indicator and cancel~~
 
 **Depends on:** 4 (a scan with well-defined steps to report).
 
@@ -388,6 +388,15 @@ serving a queued pair issues no new unnamed-pool query.
   The scan loop must check `Thread.interrupted()`/`isCancelled()` between names.
 - Add the new strings to every `I18n` resource bundle.
 - Test: a cancelled scan returns promptly and leaves no stale result on screen.
+
+**Done (2026-11-09):** `MostSimilarService.findBestSuggestion()` and
+`findBestSuggestions(int)` now accept an optional `BiConsumer<Integer, Integer>`
+progress callback and honour `cancel()`. `MostSimilarView` shows a Cancel
+button while a scan runs, reports progress via `Task.updateProgress` /
+`updateMessage` ("scanning N / M names"), cancels any in-progress scan before
+starting a new one, and resets the cancel flag at the start of each scan.
+i18n strings added to all six message bundles. Tests verify a cancelled scan
+returns empty and the cancel flag resets between scans.
 
 ### 13. [x] ~~Backlog counter~~
 

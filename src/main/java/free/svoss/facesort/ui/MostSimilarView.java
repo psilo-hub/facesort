@@ -67,6 +67,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
     private final Button sameButton = new Button(I18n.get("ui.mostSimilar.same"));
     private final Button differentButton = new Button(I18n.get("ui.mostSimilar.different"));
     private final Button skipButton = new Button(I18n.get("ui.mostSimilar.skip"));
+    private final Button cancelButton = new Button(I18n.get("ui.mostSimilar.cancel"));
     private final Label statusLabel = new Label("");
 
     // Batch review mode
@@ -136,7 +137,9 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         sameButton.setOnAction(e -> onSamePerson());
         differentButton.setOnAction(e -> onDifferentPerson());
         skipButton.setOnAction(e -> onSkip());
-        HBox singleButtons = new HBox(10, sameButton, differentButton, skipButton);
+        cancelButton.setOnAction(e -> onCancel());
+        HBox singleButtons = new HBox(10, sameButton, differentButton, skipButton,
+                cancelButton);
         singleButtons.setAlignment(Pos.CENTER);
         singleButtons.setPadding(new Insets(10));
 
@@ -151,7 +154,8 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         batchGrid.setPadding(new Insets(10));
         batchScroll.setFitToWidth(true);
 
-        singleButtons.getChildren().addAll(sameButton, differentButton, skipButton);
+        singleButtons.getChildren().addAll(sameButton, differentButton, skipButton,
+                cancelButton);
         singleButtons.setAlignment(Pos.CENTER);
         singleButtons.setPadding(new Insets(10));
 
@@ -224,8 +228,10 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             return;
         }
         taskRunner.cancel(PREFETCH_THREAD);
+        mostSimilarService.cancel(); // cancel any in-progress scan from a previous load
         boolean queued = queue.hasQueued();
         setBusy(true);
+        cancelButton.setDisable(false);
         if (!queued) {
             pairBox.getChildren().clear();
             showPlaceholder(I18n.get("ui.mostSimilar.loading"));
@@ -236,11 +242,15 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             @Override
             protected Optional<MostSimilarService.Suggestion> call() throws SQLException {
                 backlog[0] = mostSimilarService.getBacklogCount();
-                return queue.next();
+                return queue.next((scanned, total) -> {
+                    updateProgress(scanned, total);
+                    updateMessage(I18n.format("ui.mostSimilar.scanning", scanned, total));
+                });
             }
         };
 
         task.setOnSucceeded(e -> {
+            cancelButton.setDisable(true);
             showSuggestion(task.getValue());
             if (backlog[0] != null) {
                 statusLabel.setText(I18n.format("ui.mostSimilar.backlog",
@@ -249,6 +259,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             prefetchNext();
         });
         task.setOnFailed(e -> {
+            cancelButton.setDisable(true);
             setBusy(false);
             handleFailure(I18n.get("ui.mostSimilar.loadFailed"), task.getException());
         });
@@ -390,6 +401,16 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         queue.forgetPair(suggestion.candidate().id(), suggestion.name().id());
         statusLabel.setText(I18n.get("ui.mostSimilar.skipped"));
         loadNextSuggestion();
+    }
+
+    /**
+     * Cancels the in-progress scan. The next pair will not be shown; the user
+     * can load a fresh suggestion afterwards.
+     */
+    private void onCancel() {
+        mostSimilarService.cancel();
+        cancelButton.setDisable(true);
+        statusLabel.setText(I18n.get("ui.mostSimilar.cancelled"));
     }
 
     /**
@@ -636,12 +657,14 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             tagBatchButton.setDisable(busy || selectedFaces.isEmpty());
             rejectBatchButton.setDisable(busy || selectedFaces.isEmpty());
             skipAllButton.setDisable(busy || selectedFaces.isEmpty());
+            cancelButton.setDisable(!busy);
             return;
         }
         boolean disabled = busy || current == null;
         sameButton.setDisable(disabled);
         differentButton.setDisable(disabled);
         skipButton.setDisable(disabled);
+        cancelButton.setDisable(!busy);
     }
 
     private void handleFailure(String message, Throwable error) {

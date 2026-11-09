@@ -4,6 +4,10 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" tab now shows scan progress ("scanning N / M names") and
+  offers a Cancel button while a scan runs. Any in-progress scan is cancelled
+  automatically when a new one is requested, so scans never pile up
+  (2026-11-09)
 - The "Most similar" tab now keeps the unnamed-face pool in memory between
   decisions instead of reloading it on every scan. A cheap version stamp
   (count plus max id of unnamed faces) is checked at the start of each scan,

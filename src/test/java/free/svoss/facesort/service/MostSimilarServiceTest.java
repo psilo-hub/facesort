@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -593,5 +594,76 @@ class MostSimilarServiceTest {
         Optional<MostSimilarService.Suggestion> next = service.findBestSuggestion();
         assertTrue(next.isEmpty(),
                 "the externally tagged face should no longer be offered");
+    }
+
+    @Test
+    void cancel_stopsScanAndReturnsEmpty() throws SQLException, InterruptedException {
+        // Many names and unnamed faces so the parallel scan has work to cancel.
+        for (int i = 0; i < 100; i++) {
+            long nameId = nameDao.insert("Name " + i);
+            addImageAndFace("imgN" + i, xLike(), nameId);
+        }
+        for (int i = 0; i < 2000; i++) {
+            addImageAndFace("imgU" + i, xLike(), null);
+        }
+
+        // Cancel from a background thread after a short delay, while the scan runs.
+        CompletableFuture<Optional<MostSimilarService.Suggestion>> scan =
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return service.findBestSuggestion();
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+        Thread.sleep(20);
+        service.cancel();
+        Optional<MostSimilarService.Suggestion> result = scan.join();
+
+        assertTrue(result.isEmpty(),
+                "a cancelled scan must return empty");
+    }
+
+    @Test
+    void cancel_isResetBetweenScans() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        service.cancel();
+        assertTrue(service.isCancelled(), "cancel flag should be set");
+
+        // A new scan resets the cancel flag and works normally.
+        Optional<MostSimilarService.Suggestion> result = service.findBestSuggestion();
+        assertFalse(service.isCancelled(), "cancel flag should be reset by a new scan");
+        assertTrue(result.isPresent(), "a fresh scan after cancel should work");
+        assertEquals("Alice", result.get().name().name());
+    }
+
+    @Test
+    void findBestSuggestions_honoursCancellation() throws SQLException, InterruptedException {
+        // Many names and unnamed faces so the parallel scan has work to cancel.
+        for (int i = 0; i < 100; i++) {
+            long nameId = nameDao.insert("Name " + i);
+            addImageAndFace("imgN" + i, xLike(), nameId);
+        }
+        for (int i = 0; i < 2000; i++) {
+            addImageAndFace("imgU" + i, xLike(), null);
+        }
+
+        CompletableFuture<List<MostSimilarService.Suggestion>> scan =
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return service.findBestSuggestions(5);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+        Thread.sleep(20);
+        service.cancel();
+        List<MostSimilarService.Suggestion> result = scan.join();
+
+        assertTrue(result.isEmpty(),
+                "a cancelled scan for suggestions must return empty");
     }
 }
