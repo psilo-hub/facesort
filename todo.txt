@@ -30,6 +30,9 @@ Done
 - Item 6: Configurable early-exit threshold for the "Most similar" scan
   (minEarlyExitSimilarity in ConfigModel, default 1.0 = no early exit,
   Settings tab UI, i18n strings, docs)
+- Item 9: Keep the unnamed pool in memory between decisions
+  (UnnamedFacePool component, version-stamp reload via countUnnamed/maxUnnamedId,
+  incremental removal on tag, service-level and pool unit tests, docs)
 - Item 13: Backlog counter for the "Most similar" tab
   (FaceDao.countUnnamed + NameDao.countWithFaces, MostSimilarService.getBacklogCount,
   status bar display, i18n strings, docs)
@@ -39,4 +42,4 @@ Done
 
 Open items
 ----------
-- Items 9, 10, 12, 15 from suggestions_most_similar.md
+- Items 10, 12, 15 from suggestions_most_similar.md

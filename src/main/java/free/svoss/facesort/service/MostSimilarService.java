@@ -42,6 +42,7 @@ public class MostSimilarService {
     private final NameDao nameDao;
     private final NotMatchDao notMatchDao;
     private final TransactionRunner transactionRunner;
+    private final UnnamedFacePool pool;
     private final Set<MatchKey> skipped =
             Collections.synchronizedSet(new HashSet<>());
 
@@ -64,6 +65,7 @@ public class MostSimilarService {
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
+        this.pool = new UnnamedFacePool(faceDao);
     }
 
     /**
@@ -277,7 +279,7 @@ public class MostSimilarService {
         List<Long> nameIds = names.stream().map(NameRecord::id).toList();
         Map<Long, float[]> averages = faceToNameService.averageEmbeddingsFor(nameIds);
         Map<Long, Set<Long>> rejected = notMatchDao.findFaceIdsByNameIds(nameIds);
-        List<FaceRecord> unnamed = faceToNameService.findUnnamedCandidates();
+        List<FaceRecord> unnamed = pool.get();
         double cutoff = faceToNameService.minNameSimilarity();
         return new Scan(names, averages, rejected, unnamed, cutoff);
     }
@@ -336,6 +338,7 @@ public class MostSimilarService {
      */
     public void markSamePerson(long faceId, long nameId) throws SQLException {
         faceToNameService.tagFace(faceId, nameId);
+        pool.remove(faceId);
     }
 
     /**
@@ -370,6 +373,9 @@ public class MostSimilarService {
             }
             return null;
         });
+        for (Suggestion selection : selections) {
+            pool.remove(selection.candidate().id());
+        }
         skipped.removeIf(key -> selections.stream()
                 .anyMatch(s -> s.candidate().id() == key.faceId() && s.name().id() == key.nameId()));
     }

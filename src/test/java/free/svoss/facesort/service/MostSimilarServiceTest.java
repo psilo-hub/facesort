@@ -135,7 +135,9 @@ class MostSimilarServiceTest {
         MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
 
         assertEquals(candidate, best.candidate().id());
-        assertEquals(1, counting.queriesMatching("FROM faces WHERE name_id IS NULL"),
+        // The version stamp (COUNT + MAX) plus one slim pool load; the pool
+        // is not reloaded per name.
+        assertEquals(3, counting.queriesMatching("FROM faces WHERE name_id IS NULL"),
                 "the unnamed pool must be loaded once per scan, not once per name: "
                         + counting.statements());
     }
@@ -555,52 +557,41 @@ class MostSimilarServiceTest {
                 "Bob's candidate is identical to his average");
     }
 
-    @Test
-    void getBacklogCount_countsUnnamedAndNamedFaces() throws SQLException {
-        long alice = nameDao.insert("Alice");
-        long bob = nameDao.insert("Bob");
-        addImageAndFace("imgA1", xLike(), alice);   // tagged face
-        addImageAndFace("imgU1", xLike(), null);    // unnamed face
-        addImageAndFace("imgU2", yLike(), null);    // unnamed face
-
-        MostSimilarService.BacklogCount backlog = service.getBacklogCount();
-
-        assertEquals(2, backlog.unnamedFaces(),
-                "two unnamed faces should be counted");
-        assertEquals(1, backlog.namesWithFaces(),
-                "only Alice has a tagged face, so one name with faces");
-    }
 
     @Test
-    void getBacklogCount_updatesAfterTagging() throws SQLException {
+    void findBestSuggestion_removesTaggedFaceFromPool() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA1", xLike(), alice);
         long candidate = addImageAndFace("imgU1", xLike(), null);
+        addImageAndFace("imgU2", yLike(), null);
 
-        MostSimilarService.BacklogCount before = service.getBacklogCount();
-        assertEquals(1, before.unnamedFaces());
-        assertEquals(1, before.namesWithFaces());
+        assertEquals(2, service.getBacklogCount().unnamedFaces(),
+                "two unnamed faces should be in the backlog");
 
         service.markSamePerson(candidate, alice);
 
-        MostSimilarService.BacklogCount after = service.getBacklogCount();
-        assertEquals(0, after.unnamedFaces(),
-                "tagged face leaves the unnamed pool");
-        assertEquals(1, after.namesWithFaces(),
-                "Alice still has a tagged face");
+        assertEquals(1, service.getBacklogCount().unnamedFaces(),
+                "the tagged face should leave the unnamed pool");
+        Optional<MostSimilarService.Suggestion> next = service.findBestSuggestion();
+        assertTrue(next.isPresent(), "the other unnamed face should still be suggestable");
+        assertEquals("imgU2", next.get().candidate().imageHash(),
+                "the remaining unnamed face should be offered next");
     }
 
     @Test
-    void getBacklogCount_updatesAfterRejection() throws SQLException {
+    void findBestSuggestion_poolReloadsAfterExternalTagging() throws SQLException {
         long alice = nameDao.insert("Alice");
         addImageAndFace("imgA1", xLike(), alice);
         long candidate = addImageAndFace("imgU1", xLike(), null);
 
-        service.markDifferentPerson(candidate, alice);
+        service.findBestSuggestion();
+        assertEquals(1, service.getBacklogCount().unnamedFaces());
 
-        MostSimilarService.BacklogCount backlog = service.getBacklogCount();
-        assertEquals(1, backlog.unnamedFaces(),
-                "rejected face is still unnamed (candidate for other names)");
-        assertEquals(1, backlog.namesWithFaces());
+        // Another tab tags the face externally.
+        faceDao.assignName(candidate, alice);
+
+        Optional<MostSimilarService.Suggestion> next = service.findBestSuggestion();
+        assertTrue(next.isEmpty(),
+                "the externally tagged face should no longer be offered");
     }
 }

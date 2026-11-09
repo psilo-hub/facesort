@@ -282,6 +282,23 @@ public class FaceDao {
     }
 
     /**
+     * Returns the maximum id of unnamed faces, or {@code 0} when there are
+     * none. Used together with {@link #countUnnamed()} as a version stamp for
+     * the unnamed-face pool held in memory between scans.
+     *
+     * @return the maximum unnamed face id, or {@code 0}
+     * @throws SQLException on database error
+     */
+    public long maxUnnamedId() throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT MAX(id) FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE)) {
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
+    /**
      * Returns up to {@code limit} unnamed faces chosen at random.
      *
      * <p>Sampling happens in two steps to avoid SQLite sorting the whole

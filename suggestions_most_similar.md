@@ -41,7 +41,7 @@ and the UI appears frozen between decisions.
 | 6  | [x] ~~Configurable / adaptive early-exit threshold~~      | 5          | [x] ~~Configurable / adaptive early-exit threshold~~ |
 | 7  | Partial index for unnamed faces                   | 1          | [x]    |
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [x] ~~Parallel scoring across names~~ |
-| 9  | Keep the unnamed pool in memory between decisions | 2, 4       | [ ]    |
+| 9  | [x] ~~Keep the unnamed pool in memory between decisions~~ | 2, 4       | [x] ~~Keep the unnamed pool in memory between decisions~~ |
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
 | 12 | Scan progress indicator and cancel                | 4          | [ ]    |
@@ -287,7 +287,7 @@ multiple threads. Ties resolve deterministically: the lower name id wins, and
 `RankedName.order` preserves scan order for stable tie-breaking in the batch
 path. Determinism tests (20 repeated runs plus an exact-tie test) pass.
 
-### 9. [ ] Keep the unnamed pool in memory between decisions
+### 9. [x] ~~Keep the unnamed pool in memory between decisions~~
 
 **Depends on:** 2, 4.
 
@@ -307,6 +307,18 @@ path. Determinism tests (20 repeated runs plus an exact-tie test) pass.
   needed (see item 10 for a more compact index).
 - Test: pool stays consistent after a sequence of tag/reject/skip/not-a-face
   decisions and after an external change.
+
+**Done (2026-11-09):** `UnnamedFacePool` holds the slim unnamed faces in memory,
+populated lazily on first use. A version stamp (`COUNT(*)` + `MAX(id)` of
+unnamed faces) is checked at the start of every scan via
+`FaceDao.countUnnamed()` / `FaceDao.maxUnnamedId()`; when it changed, the pool
+is reloaded from the database. `MostSimilarService.markSamePerson()` and
+`tagSelected()` remove tagged faces from the pool immediately. External changes
+(tagging in other tabs, not-a-face dismissals, imports) are caught by the
+version stamp on the next scan. Tests cover lazy loading, reload on pool
+change, no-reload when unchanged, incremental removal, clear/reload, and
+not-a-face exclusion. Service-level tests verify the pool stays consistent
+after tagging and after external tagging by another tab.
 
 ### 10. [ ] In-memory nearest-neighbour index (HNSW)
 

@@ -4,6 +4,12 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" tab now keeps the unnamed-face pool in memory between
+  decisions instead of reloading it on every scan. A cheap version stamp
+  (count plus max id of unnamed faces) is checked at the start of each scan,
+  so the pool reloads only when it actually changed — tagging or dismissing a
+  face removes it from the pool immediately, and changes made in other tabs
+  are picked up on the next scan (2026-11-09)
 - The "Most similar" tab now shows a backlog counter in the status bar: how
   many unnamed faces remain and how many names have tagged faces, computed
   with cheap COUNT queries so the user can judge progress (2026-11-09)
