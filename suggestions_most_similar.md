@@ -45,7 +45,7 @@ and the UI appears frozen between decisions.
 | 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
 | 12 | Scan progress indicator and cancel                | 4          | [ ]    |
-| 13 | Backlog counter                                   | 4 (or 7)   | [ ]    |
+| 13 | [x] ~~Backlog counter~~                                   | 4 (or 7)   | [x] ~~Backlog counter~~ |
 | 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [x] ~~Batch review of the top-K pairs~~ |
 | 15 | Persist name averages across restarts (optional)  | 3          | [ ]    |
 
@@ -377,7 +377,7 @@ serving a queued pair issues no new unnamed-pool query.
 - Add the new strings to every `I18n` resource bundle.
 - Test: a cancelled scan returns promptly and leaves no stale result on screen.
 
-### 13. [ ] Backlog counter
+### 13. [x] ~~Backlog counter~~
 
 **Depends on:** 4 (the pool size is then known for free) or 7 (a cheap
 `COUNT(*)` of unnamed faces).
@@ -391,6 +391,13 @@ serving a queued pair issues no new unnamed-pool query.
   threshold" when the scan already computed it.
 - Add the strings to every `I18n` resource bundle.
 - Test: counts match the database after tagging/rejecting.
+
+**Done (2026-11-09):** `FaceDao.countUnnamed()` and `NameDao.countWithFaces()`
+provide cheap COUNT(*) queries. `MostSimilarService.getBacklogCount()` returns
+a `BacklogCount(unnamedFaces, namesWithFaces)` record. `MostSimilarView`
+shows the backlog in the status bar after every scan (single-pair and batch
+mode), fetched in the background task. i18n strings added to all six message
+bundles. Tests verify counts match the database after tagging and rejection.
 
 ### 14. [x] ~~Batch review of the top-K pairs~~
 

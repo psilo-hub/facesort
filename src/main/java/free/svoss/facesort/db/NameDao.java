@@ -133,6 +133,23 @@ public class NameDao {
         }
     }
 
+    /**
+     * Returns the number of names that have at least one face tagged with them.
+     * A cheap {@code COUNT(*)} subquery used for the backlog counter without
+     * loading any name rows.
+     *
+     * @return the number of names with tagged faces
+     * @throws SQLException on database error
+     */
+    public long countWithFaces() throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT COUNT(DISTINCT name_id) FROM faces WHERE name_id IS NOT NULL")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
     private NameRecord mapRow(ResultSet rs) throws SQLException {
         return new NameRecord(rs.getLong("id"), rs.getString("name"), null, rs.getInt("face_count"));
     }

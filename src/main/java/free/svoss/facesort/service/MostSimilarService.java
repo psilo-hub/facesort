@@ -1,6 +1,7 @@
 package free.svoss.facesort.service;
 
 import free.svoss.facesort.db.FaceDao;
+import free.svoss.facesort.db.FaceDao;
 import free.svoss.facesort.db.NameDao;
 import free.svoss.facesort.db.NotMatchDao;
 import free.svoss.facesort.db.TransactionRunner;
@@ -37,6 +38,7 @@ public class MostSimilarService {
 
     private final FaceToNameService faceToNameService;
     private final FaceAiService faceAiService;
+    private final FaceDao faceDao;
     private final NameDao nameDao;
     private final NotMatchDao notMatchDao;
     private final TransactionRunner transactionRunner;
@@ -48,15 +50,17 @@ public class MostSimilarService {
      *
      * @param faceToNameService ranking of candidates and tagging; must not be null
      * @param faceAiService     engine for embedding math; must not be null
+     * @param faceDao           data access for faces; must not be null
      * @param nameDao           data access for names; must not be null
      * @param notMatchDao       data access for rejected face/name combinations; must not be null
      * @param transactionRunner runs batch decisions as one atomic transaction; must not be null
      */
     public MostSimilarService(FaceToNameService faceToNameService, FaceAiService faceAiService,
-                              NameDao nameDao, NotMatchDao notMatchDao,
+                              FaceDao faceDao, NameDao nameDao, NotMatchDao notMatchDao,
                               TransactionRunner transactionRunner) {
         this.faceToNameService = Objects.requireNonNull(faceToNameService, "faceToNameService");
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
+        this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
@@ -399,6 +403,30 @@ public class MostSimilarService {
         for (Suggestion selection : selections) {
             skipped.add(new MatchKey(selection.candidate().id(), selection.name().id()));
         }
+    }
+
+    /**
+     * Returns the current backlog: how many unnamed faces are still available
+     * for tagging and how many names have tagged faces. Uses cheap
+     * {@code COUNT(*)} queries, no full similarity scan.
+     *
+     * @return the backlog count
+     * @throws SQLException on database error
+     */
+    public BacklogCount getBacklogCount() throws SQLException {
+        long unnamed = faceDao.countUnnamed();
+        long namesWithFaces = nameDao.countWithFaces();
+        return new BacklogCount(unnamed, namesWithFaces);
+    }
+
+    /**
+     * The backlog: how many unnamed faces remain and how many names have
+     * tagged faces.
+     *
+     * @param unnamedFaces   unnamed, not-dismissed faces available for tagging
+     * @param namesWithFaces names that have at least one tagged face
+     */
+    public record BacklogCount(long unnamedFaces, long namesWithFaces) {
     }
 
     /**

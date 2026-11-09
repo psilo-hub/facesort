@@ -51,7 +51,7 @@ class MostSimilarServiceTest {
         FaceToNameService faceToNameService = new FaceToNameService(faceAiService, faceDao,
                 nameDao, notMatchDao, new ImageDao(db.getConnection()),
                 new VideoDao(db.getConnection()), configStore);
-        service = new MostSimilarService(faceToNameService, faceAiService, nameDao, notMatchDao,
+        service = new MostSimilarService(faceToNameService, faceAiService, faceDao, nameDao, notMatchDao,
                 db.getTransactionRunner());
     }
 
@@ -130,7 +130,7 @@ class MostSimilarServiceTest {
         MostSimilarService countingService = new MostSimilarService(
                 new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao, db.getTransactionRunner());
+                ai, countingDao, nameDao, notMatchDao, db.getTransactionRunner());
 
         MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
 
@@ -154,7 +154,7 @@ class MostSimilarServiceTest {
         MostSimilarService countingService = new MostSimilarService(
                 new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao, db.getTransactionRunner());
+                ai, countingDao, nameDao, notMatchDao, db.getTransactionRunner());
 
         MostSimilarService.Suggestion best = countingService.findBestSuggestion().orElseThrow();
 
@@ -304,7 +304,7 @@ class MostSimilarServiceTest {
                         nameDao, notMatchDao, new ImageDao(db.getConnection()),
                         new VideoDao(db.getConnection()),
                         new ConfigStore(ConfigModel.defaults())),
-                new FaceAiService(new FakeFaceAiEngine()), nameDao, notMatchDao,
+                new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, notMatchDao,
                 db.getTransactionRunner());
         assertEquals("Alice", fresh.findBestSuggestion().orElseThrow().name().name(),
                 "a skipped pair must come back in a new session");
@@ -504,7 +504,7 @@ class MostSimilarServiceTest {
                         nameDao, notMatchDao, new ImageDao(db.getConnection()),
                         new VideoDao(db.getConnection()),
                         new ConfigStore(ConfigModel.defaults())),
-                new FaceAiService(new FakeFaceAiEngine()), nameDao, notMatchDao,
+                new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, notMatchDao,
                 db.getTransactionRunner());
         assertTrue(fresh.findBestSuggestion().isPresent(),
                 "a fresh session must not know about this session's skips");
@@ -553,5 +553,54 @@ class MostSimilarServiceTest {
                 "Bob's candidate at 1.0 beats Alice's at 0.9");
         assertEquals(1.0, best.get().nameSimilarity(), 1e-9,
                 "Bob's candidate is identical to his average");
+    }
+
+    @Test
+    void getBacklogCount_countsUnnamedAndNamedFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);   // tagged face
+        addImageAndFace("imgU1", xLike(), null);    // unnamed face
+        addImageAndFace("imgU2", yLike(), null);    // unnamed face
+
+        MostSimilarService.BacklogCount backlog = service.getBacklogCount();
+
+        assertEquals(2, backlog.unnamedFaces(),
+                "two unnamed faces should be counted");
+        assertEquals(1, backlog.namesWithFaces(),
+                "only Alice has a tagged face, so one name with faces");
+    }
+
+    @Test
+    void getBacklogCount_updatesAfterTagging() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        MostSimilarService.BacklogCount before = service.getBacklogCount();
+        assertEquals(1, before.unnamedFaces());
+        assertEquals(1, before.namesWithFaces());
+
+        service.markSamePerson(candidate, alice);
+
+        MostSimilarService.BacklogCount after = service.getBacklogCount();
+        assertEquals(0, after.unnamedFaces(),
+                "tagged face leaves the unnamed pool");
+        assertEquals(1, after.namesWithFaces(),
+                "Alice still has a tagged face");
+    }
+
+    @Test
+    void getBacklogCount_updatesAfterRejection() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);
+        long candidate = addImageAndFace("imgU1", xLike(), null);
+
+        service.markDifferentPerson(candidate, alice);
+
+        MostSimilarService.BacklogCount backlog = service.getBacklogCount();
+        assertEquals(1, backlog.unnamedFaces(),
+                "rejected face is still unnamed (candidate for other names)");
+        assertEquals(1, backlog.namesWithFaces());
     }
 }

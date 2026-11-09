@@ -4,6 +4,9 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" tab now shows a backlog counter in the status bar: how
+  many unnamed faces remain and how many names have tagged faces, computed
+  with cheap COUNT queries so the user can judge progress (2026-11-09)
 - The "Most similar" scan now stops early when a pair reaches the configured
   early-exit similarity threshold (default 1.0, meaning always scan every
   name). Lower the threshold in **Settings** to stop the scan sooner when a

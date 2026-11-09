@@ -265,6 +265,23 @@ public class FaceDao {
     }
 
     /**
+     * Counts unnamed faces (name_id IS NULL), excluding those dismissed as
+     * "not a face". A cheap {@code COUNT(*)} query used for the backlog
+     * counter without loading any rows.
+     *
+     * @return the number of unnamed faces still available for tagging
+     * @throws SQLException on database error
+     */
+    public long countUnnamed() throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT COUNT(*) FROM faces WHERE name_id IS NULL" + NOT_A_FACE_CLAUSE)) {
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
+    /**
      * Returns up to {@code limit} unnamed faces chosen at random.
      *
      * <p>Sampling happens in two steps to avoid SQLite sorting the whole

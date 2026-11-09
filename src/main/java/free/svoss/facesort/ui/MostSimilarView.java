@@ -231,15 +231,21 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             showPlaceholder(I18n.get("ui.mostSimilar.loading"));
         }
 
+        final MostSimilarService.BacklogCount[] backlog = new MostSimilarService.BacklogCount[1];
         Task<Optional<MostSimilarService.Suggestion>> task = new Task<>() {
             @Override
             protected Optional<MostSimilarService.Suggestion> call() throws SQLException {
+                backlog[0] = mostSimilarService.getBacklogCount();
                 return queue.next();
             }
         };
 
         task.setOnSucceeded(e -> {
             showSuggestion(task.getValue());
+            if (backlog[0] != null) {
+                statusLabel.setText(I18n.format("ui.mostSimilar.backlog",
+                        backlog[0].unnamedFaces(), backlog[0].namesWithFaces()));
+            }
             prefetchNext();
         });
         task.setOnFailed(e -> {
@@ -396,9 +402,11 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         selectedFaces.clear();
         statusLabel.setText(I18n.get("ui.mostSimilar.loadingBatch"));
 
+        final MostSimilarService.BacklogCount[] backlog = new MostSimilarService.BacklogCount[1];
         Task<List<MostSimilarService.Suggestion>> task = new Task<>() {
             @Override
             protected List<MostSimilarService.Suggestion> call() throws SQLException {
+                backlog[0] = mostSimilarService.getBacklogCount();
                 return mostSimilarService.findBestSuggestions(BATCH_SIZE);
             }
         };
@@ -410,7 +418,8 @@ public class MostSimilarView extends BorderPane implements Refreshable {
             if (batchSuggestions.isEmpty()) {
                 statusLabel.setText(I18n.get("ui.mostSimilar.empty"));
             } else {
-                statusLabel.setText(I18n.format("ui.mostSimilar.batchCount", batchSuggestions.size()));
+                statusLabel.setText(I18n.format("ui.mostSimilar.backlog",
+                        backlog[0].unnamedFaces(), backlog[0].namesWithFaces()));
             }
         });
         task.setOnFailed(e -> {
