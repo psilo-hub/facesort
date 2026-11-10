@@ -4,6 +4,11 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- Name average embeddings are now persisted to the database (`name_averages`
+  table via schema migration v6→7). The first "Most similar" scan after
+  startup reuses stored averages instead of rebuilding them all from tagged
+  faces; stored averages are validated against the current face count and
+  recomputed when stale (2026-11-10)
 - The "Most similar" tab can now use an HNSW (approximate nearest-neighbour)
   index for scoring very large unnamed-face pools. When the pool has at least
   5000 faces, an HNSW index is built over the unnamed embeddings and queried

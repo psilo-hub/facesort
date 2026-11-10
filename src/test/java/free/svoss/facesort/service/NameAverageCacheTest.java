@@ -34,7 +34,7 @@ class NameAverageCacheTest {
         faceDao = new FaceDao(db.getConnection());
         nameDao = new NameDao(db.getConnection());
         engine = new FakeFaceAiEngine();
-        cache = new NameAverageCache(faceDao, new FaceSelector(new FaceAiService(engine)));
+        cache = new NameAverageCache(faceDao, nameDao, new FaceSelector(new FaceAiService(engine)));
     }
 
     @AfterEach
@@ -165,5 +165,65 @@ class NameAverageCacheTest {
 
         assertTrue(average.isEmpty());
         assertEquals(0, engine.averageCalls());
+    }
+
+    @Test
+    void averageFor_storesComputedAverageToDatabase() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addFace("imgA1", xLike(), alice);
+
+        cache.averageFor(alice);
+
+        Optional<NameDao.NameAverage> stored = nameDao.loadNameAverage(alice);
+        assertTrue(stored.isPresent(), "computed average must be persisted to the database");
+        assertEquals(1, stored.get().faceCount(), "face count must match");
+        assertArrayEquals(xLike(), stored.get().embedding(), 1e-6f,
+                "stored embedding must match the computed average");
+    }
+
+    @Test
+    void averageFor_loadsFromDatabaseOnNewCacheInstance() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addFace("imgA1", xLike(), alice);
+
+        // Compute and store the average in the first cache instance.
+        float[] first = cache.averageFor(alice).orElseThrow();
+
+        // Simulate a restart: new cache instance, same database.
+        NameAverageCache restarted = new NameAverageCache(
+                faceDao, nameDao, new FaceSelector(new FaceAiService(new FakeFaceAiEngine())));
+        float[] second = restarted.averageFor(alice).orElseThrow();
+
+        assertArrayEquals(first, second, 1e-6f,
+                "restarted cache must load the same average from the database");
+    }
+
+    @Test
+    void averageFor_recomputesWhenStoredFaceCountChanged() throws SQLException {
+        long alice = nameDao.insert("Alice");
+        addFace("imgA1", xLike(), alice);
+
+        cache.averageFor(alice);
+
+        // Add another face externally, changing the face count.
+        addFace("imgA2", yLike(), alice);
+
+        // A new cache instance loads the stale stored average, detects the
+        // face-count mismatch, and recomputes.
+        NameAverageCache restarted = new NameAverageCache(
+                faceDao, nameDao, new FaceSelector(new FaceAiService(new FakeFaceAiEngine())));
+        float[] mixed = restarted.averageFor(alice).orElseThrow();
+
+        assertArrayEquals(MIXED, mixed, 1e-6f,
+                "stale stored average must be recomputed when face count changed");
+    }
+
+    @Test
+    void averageFor_doesNotStoreWhenNameHasNoFaces() throws SQLException {
+        long alice = nameDao.insert("Alice");
+
+        assertTrue(cache.averageFor(alice).isEmpty());
+        assertTrue(nameDao.loadNameAverage(alice).isEmpty(),
+                "name with no faces must not store an average");
     }
 }

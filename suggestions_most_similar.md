@@ -47,7 +47,7 @@ and the UI appears frozen between decisions.
 | 12 | [x] ~~Scan progress indicator and cancel~~          | 4          | [x] ~~Scan progress indicator and cancel~~          |
 | 13 | [x] ~~Backlog counter~~                                   | 4 (or 7)   | [x] ~~Backlog counter~~ |
 | 14 | Batch review of the top-K pairs                   | 3, 4, 5    | [x] ~~Batch review of the top-K pairs~~ |
-| 15 | Persist name averages across restarts (optional)  | 3          | [ ]    |
+| 15 | [x] ~~Persist name averages across restarts (optional)~~  | 3          | [x] ~~Persist name averages across restarts (optional)~~ |
 
 Suggested order: 1 → 2 → 3 → 4 → 5 → 7 → 6 → 11 → 12 → 13 → 8 → 9 → 14 → 10 → 15.
 Items 2 and 5 are the cheapest and most likely to give the largest speedup.
@@ -471,7 +471,7 @@ batch grid. i18n strings were added to all six message bundles.
 
 ## Data / schema
 
-### 15. [ ] Persist name average embeddings across restarts (optional)
+### 15. [x] ~~Persist name average embeddings across restarts (optional)~~
 
 **Depends on:** 3.
 
@@ -486,6 +486,18 @@ batch grid. i18n strings were added to all six message bundles.
   is stale when `face_count` or the tagged set changes), add a migration in
   `Database` without breaking existing databases, and rebuild lazily when a row
   is missing or stale.
+
+**Done (2026-11-10):** Added a `name_averages` table (`name_id`, `embedding
+BLOB`, `face_count`) via schema migration from version 6 to 7. `NameAverageCache`
+now loads stored averages from `NameDao.loadNameAverages` (batched chunked
+query) and validates them against the current face count before reuse; stale or
+missing averages are recomputed from tagged faces and re-stored via
+`NameDao.storeNameAverages`. All DB writes invalidate the cache through
+`FaceDao.writeVersion()` and clear stored averages on the first write after
+startup (preserving cross-restart data until a write actually changes the data).
+Tests cover persistence across cache instances, stale-face-count recomputation,
+and no-storage for names without faces. All `FROM faces` query counts remain
+unchanged (batched reads, no per-name COUNT queries).
 
 ---
 

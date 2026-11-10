@@ -43,7 +43,12 @@ Done
 - Item 14: Batch review of the top-K pairs in the "Most similar" tab
   (toggle between single-pair and batch grid, batch tag/reject/skip in one
   transaction, i18n strings, docs updated)
+- Item 15: Persist name average embeddings across restarts
+  (name_averages table via schema migration v6→7, NameAverageCache loads and
+  validates stored averages against face count, recomputes stale/missing ones,
+  stores computed averages, all DB writes invalidate cache, tests cover
+  persistence across instances and stale-count recomputation)
 
 Open items
 ----------
-- Item 15 from suggestions_most_similar.md
+- None

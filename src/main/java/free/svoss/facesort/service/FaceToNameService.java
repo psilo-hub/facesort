@@ -64,7 +64,7 @@ public class FaceToNameService implements MediaFileActions {
         this.faceAiService = Objects.requireNonNull(faceAiService, "faceAiService");
         this.faceSelector = new FaceSelector(faceAiService);
         this.faceDao = Objects.requireNonNull(faceDao, "faceDao");
-        this.nameAverages = new NameAverageCache(faceDao, faceSelector);
+        this.nameAverages = new NameAverageCache(faceDao, nameDao, faceSelector);
         this.nameDao = Objects.requireNonNull(nameDao, "nameDao");
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.imageDao = Objects.requireNonNull(imageDao, "imageDao");

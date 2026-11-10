@@ -21,7 +21,7 @@ public class Database implements AutoCloseable {
      * Old unversioned databases (version 0) are brought up to this version by
      * applying the idempotent baseline DDL.
      */
-    public static final int SCHEMA_VERSION = 6;
+    public static final int SCHEMA_VERSION = 7;
 
     /**
      * Milliseconds SQLite waits for a lock held by another connection before
@@ -237,6 +237,16 @@ public class Database implements AutoCloseable {
             connection.commit();
             connection.setAutoCommit(true);
         }
+
+        if (fromVersion < 7) {
+            connection.setAutoCommit(false);
+            try (Statement stmt = connection.createStatement()) {
+                createNameAveragesTable(stmt);
+                stmt.execute("PRAGMA user_version = " + 7);
+            }
+            connection.commit();
+            connection.setAutoCommit(true);
+        }
     }
 
     /**
@@ -286,6 +296,24 @@ public class Database implements AutoCloseable {
                     name_id  INTEGER NOT NULL,
                     PRIMARY KEY (face_id, name_id),
                     FOREIGN KEY (face_id) REFERENCES faces(id) ON DELETE CASCADE,
+                    FOREIGN KEY (name_id) REFERENCES names(id) ON DELETE CASCADE
+                )
+                """);
+    }
+
+    /**
+     * Creates the table that stores each name's average embedding, so the
+     * first scan after startup does not have to rebuild all averages from
+     * scratch. Rows are keyed by name id and store the embedding blob plus
+     * the face count at the time of computation, so stale rows can be
+     * detected and recomputed when the tagged set changes.
+     */
+    private static void createNameAveragesTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS name_averages (
+                    name_id    INTEGER PRIMARY KEY,
+                    embedding  BLOB NOT NULL,
+                    face_count INTEGER NOT NULL,
                     FOREIGN KEY (name_id) REFERENCES names(id) ON DELETE CASCADE
                 )
                 """);

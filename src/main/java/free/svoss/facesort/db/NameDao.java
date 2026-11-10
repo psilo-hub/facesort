@@ -5,7 +5,10 @@ import free.svoss.facesort.util.EmbeddingUtils;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -147,6 +150,114 @@ public class NameDao {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : 0;
             }
+        }
+    }
+
+    /**
+     * A name's average embedding together with the face count at the time it
+     * was computed. The face count lets callers detect when the average is
+     * stale because faces have been tagged or untagged since it was stored.
+     */
+    public record NameAverage(float[] embedding, int faceCount) {
+    }
+
+    /**
+     * Loads a name's stored average embedding, or empty when none is stored.
+     * Callers should compare {@link NameAverage#faceCount()} against the
+     * current face count for the name to detect staleness.
+     *
+     * @param nameId id of the name
+     * @return the stored average and its face count, or empty
+     * @throws SQLException on database error
+     */
+    public Optional<NameAverage> loadNameAverage(long nameId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT embedding, face_count FROM name_averages WHERE name_id = ?")) {
+            ps.setLong(1, nameId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(new NameAverage(
+                            EmbeddingUtils.bytesToFloatArray(rs.getBytes("embedding")),
+                            rs.getInt("face_count")));
+                }
+                return Optional.empty();
+            }
+        }
+    }
+
+    /**
+     * Stores a name's average embedding, replacing any existing row for the
+     * same name.
+     *
+     * @param nameId    id of the name
+     * @param embedding the average embedding; must not be null
+     * @param faceCount number of faces the average was computed over
+     * @throws SQLException on database error
+     */
+    public void storeNameAverage(long nameId, float[] embedding, int faceCount)
+            throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT OR REPLACE INTO name_averages (name_id, embedding, face_count) "
+                        + "VALUES (?, ?, ?)")) {
+            ps.setLong(1, nameId);
+            ps.setBytes(2, EmbeddingUtils.floatArrayToBytes(embedding));
+            ps.setInt(3, faceCount);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Deletes every stored average, used when a face write invalidates them all. */
+    public void deleteAllNameAverages() throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("DELETE FROM name_averages");
+        }
+    }
+
+    /**
+     * Loads stored averages for many names in one chunked query set.
+     *
+     * @param nameIds the name ids to load; must not be null
+     * @return the stored average per name id, or null when none is stored
+     * @throws SQLException on database error
+     */
+    public Map<Long, NameAverage> loadNameAverages(List<Long> nameIds) throws SQLException {
+        Map<Long, NameAverage> result = new LinkedHashMap<>();
+        for (Long nameId : nameIds) {
+            result.put(nameId, null);
+        }
+        if (nameIds.isEmpty()) {
+            return result;
+        }
+        List<Long> distinct = new ArrayList<>(new LinkedHashSet<>(nameIds));
+        for (List<Long> chunk : SqlIdChunks.partition(distinct)) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT name_id, embedding, face_count FROM name_averages WHERE name_id IN ("
+                            + SqlIdChunks.placeholders(chunk.size()) + ")")) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    ps.setLong(i + 1, chunk.get(i));
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        result.put(rs.getLong("name_id"), new NameAverage(
+                                EmbeddingUtils.bytesToFloatArray(rs.getBytes("embedding")),
+                                rs.getInt("face_count")));
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Stores averages for many names, replacing any existing rows.
+     *
+     * @param averages the averages to store, mapped by name id; must not be null
+     * @throws SQLException on database error
+     */
+    public void storeNameAverages(Map<Long, NameAverage> averages) throws SQLException {
+        for (Map.Entry<Long, NameAverage> entry : averages.entrySet()) {
+            storeNameAverage(entry.getKey(), entry.getValue().embedding(),
+                    entry.getValue().faceCount());
         }
     }
 
