@@ -34,7 +34,7 @@
 
 - [ ] Wire up or remove the unused i18n key ui.faceName.pathFilterPrompt - defined in all six bundles but never referenced in code (FaceNameView uses a label and tooltip instead of prompt text)
 - [x] Unify similarity score formatting on I18n.percent - TagWithNameDialog and DedupeView now pass I18n.percent(...) into their messages; ui.faceName.differentName.similar and ui.dedupe.round take a %s percentage in all six bundles instead of raw numbers
-- [ ] Refactor I18n to reduce global mutable state - static currentLocale/bundle fields and every lookup synchronized (I18n.java:28-94)
+- [x] Refactor I18n to reduce global mutable state - replaced two mutable static fields (currentLocale/bundle) with a single AtomicReference<BundleState> so locale and bundle are always updated atomically; readers read state once per call; coarse-grained synchronized removed
 
 ## UI / UX
 

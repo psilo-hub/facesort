@@ -1,10 +1,13 @@
-Shallow export for name faces
+Refactor I18n to reduce global mutable state
 ========================
 
-- [x] Add exportShallowForName() to FaceToNameService - exports representative face sub-image + metadata.json per name
-- [x] Add exportShallowForAllNames() - bulk export for all names
-- [x] Add cleanNameForPath() utility - replaces invalid chars, handles reserved Windows names
-- [x] Add JSON metadata with: name, imageCount, imageHashes, representativeFaceId, faceCount, exportTimestamp, appVersion
-- [x] Add tests: basic export, unknown name error, no-faces error, folder name cleaning, bulk export
-- [x] Update suggestions.md, todo.txt, CHANGELOG.md
+- [x] Write failing test for atomic locale+bundle updates
+- [x] Write failing test for thread-safe concurrent access without synchronized
+- [x] Refactor I18n: replace two mutable static fields with AtomicReference<BundleState>
+- [x] Remove synchronized keyword from methods
+- [x] Keep static API unchanged (backward compatible with all call sites)
+- [x] Run existing I18nTest + all i18n tests
+- [x] Run full mvn test suite
+- [x] Update suggestions.md to mark item as done
+- [x] Update todo.txt
 - [x] Commit changes
