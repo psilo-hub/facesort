@@ -4,6 +4,15 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- The "Most similar" tab can now use an HNSW (approximate nearest-neighbour)
+  index for scoring very large unnamed-face pools. When the pool has at least
+  5000 faces, an HNSW index is built over the unnamed embeddings and queried
+  per name instead of scanning every face, changing the scan cost from
+  O(names x unnamed) to roughly O(names x log unnamed). Results are identical
+  to the exact scan because HNSW hits are over-fetched and re-scored exactly.
+  Below the threshold, the exact scan is used (it's faster for small pools).
+  Reuses the existing hnswM / hnswEfConstruction / hnswEfSearch settings
+  (2026-11-10)
 - The "Most similar" tab now shows scan progress ("scanning N / M names") and
   offers a Cancel button while a scan runs. Any in-progress scan is cancelled
   automatically when a new one is requested, so scans never pile up

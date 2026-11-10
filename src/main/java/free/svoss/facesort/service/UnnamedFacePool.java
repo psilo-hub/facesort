@@ -73,4 +73,14 @@ final class UnnamedFacePool {
     synchronized int size() {
         return pool.size();
     }
+
+    /**
+     * Returns the current version stamp of the pool: {@code [unnamed count,
+     * max unnamed id]}. Callers (for example an HNSW index built on top of the
+     * pool) can compare this against a previously observed value to detect
+     * whether the pool was reloaded.
+     */
+    synchronized long[] versionStamp() {
+        return new long[]{unnamedCount, unnamedMaxId};
+    }
 }

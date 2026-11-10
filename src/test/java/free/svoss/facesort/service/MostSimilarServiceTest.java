@@ -59,6 +59,7 @@ class MostSimilarServiceTest {
     @AfterEach
     void tearDown() throws SQLException {
         db.close();
+        MostSimilarService.HNSW_THRESHOLD = 5000; // reset after HNSW tests
     }
 
     private long addImageAndFace(String imageHash, float[] embedding, Long nameId) throws SQLException {
@@ -665,5 +666,61 @@ class MostSimilarServiceTest {
 
         assertTrue(result.isEmpty(),
                 "a cancelled scan for suggestions must return empty");
+    }
+
+    private static void lowerHnswThreshold() {
+        MostSimilarService.HNSW_THRESHOLD = 1; // force HNSW path even for small pools
+    }
+
+    @Test
+    void findBestSuggestion_hnswReturnsSameResultAsExactScan() throws Exception {
+        lowerHnswThreshold();
+
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        addImageAndFace("imgU1", xLike(), null);
+        addImageAndFace("imgU2", new float[]{0, 0.6f, 0.8f, 0, 0, 0, 0, 0}, null);
+
+        // Exact-scan service for comparison.
+        MostSimilarService exactService = new MostSimilarService(
+                new FaceToNameService(new FaceAiService(new FakeFaceAiEngine()), faceDao,
+                        nameDao, notMatchDao, new ImageDao(db.getConnection()),
+                        new VideoDao(db.getConnection()),
+                        new ConfigStore(ConfigModel.defaults())),
+                new FaceAiService(new FakeFaceAiEngine()), faceDao, nameDao, notMatchDao,
+                db.getTransactionRunner());
+        lowerHnswThreshold();
+
+        Optional<MostSimilarService.Suggestion> hnswResult = service.findBestSuggestion();
+        Optional<MostSimilarService.Suggestion> exactResult = exactService.findBestSuggestion();
+
+        assertTrue(hnswResult.isPresent(), "HNSW scan should return a pair");
+        assertTrue(exactResult.isPresent(), "exact scan should return a pair");
+        assertEquals(exactResult.get().name().name(), hnswResult.get().name().name(),
+                "HNSW and exact scan should agree on the best name");
+        assertEquals(exactResult.get().candidate().id(), hnswResult.get().candidate().id(),
+                "HNSW and exact scan should agree on the best candidate");
+    }
+
+    @Test
+    void findBestSuggestions_hnswReturnsCorrectTopK() throws Exception {
+        lowerHnswThreshold();
+
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+        addImageAndFace("imgU1", xLike(), null);
+        addImageAndFace("imgU2", new float[]{0, 0.6f, 0.8f, 0, 0, 0, 0, 0}, null);
+
+        List<MostSimilarService.Suggestion> results = service.findBestSuggestions(2);
+
+        assertEquals(2, results.size(), "should return 2 suggestions");
+        assertEquals("Alice", results.get(0).name().name(),
+                "Alice's identical candidate should rank first");
+        assertEquals("Bob", results.get(1).name().name(),
+                "Bob's candidate should rank second");
     }
 }

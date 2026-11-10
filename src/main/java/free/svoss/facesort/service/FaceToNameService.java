@@ -271,6 +271,10 @@ public class FaceToNameService implements MediaFileActions {
         return configStore.get().minEarlyExitSimilarity();
     }
 
+    ConfigStore configStore() {
+        return configStore;
+    }
+
     /**
      * Loads the unnamed candidate pool once, without thumbnail crops, so a
      * scan can score every name against the same in-memory rows.

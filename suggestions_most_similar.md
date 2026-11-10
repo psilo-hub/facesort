@@ -42,7 +42,7 @@ and the UI appears frozen between decisions.
 | 7  | Partial index for unnamed faces                   | 1          | [x]    |
 | 8  | Parallel scoring across names                     | 3, 4, 5    | [x] ~~Parallel scoring across names~~ |
 | 9  | [x] ~~Keep the unnamed pool in memory between decisions~~ | 2, 4       | [x] ~~Keep the unnamed pool in memory between decisions~~ |
-| 10 | In-memory nearest-neighbour index (HNSW)          | 4, 9       | [ ]    |
+| 10 | [x] ~~In-memory nearest-neighbour index (HNSW)~~          | 4, 9       | [x] ~~In-memory nearest-neighbour index (HNSW)~~          |
 | 11 | Prefetch the next suggestion                      | 3, 4       | [x]    |
 | 12 | [x] ~~Scan progress indicator and cancel~~          | 4          | [x] ~~Scan progress indicator and cancel~~          |
 | 13 | [x] ~~Backlog counter~~                                   | 4 (or 7)   | [x] ~~Backlog counter~~ |
@@ -320,7 +320,7 @@ change, no-reload when unchanged, incremental removal, clear/reload, and
 not-a-face exclusion. Service-level tests verify the pool stays consistent
 after tagging and after external tagging by another tab.
 
-### 10. [ ] In-memory nearest-neighbour index (HNSW)
+### 10. [x] ~~In-memory nearest-neighbour index (HNSW)~~
 
 **Depends on:** 4, 9.
 
@@ -341,6 +341,20 @@ after tagging and after external tagging by another tab.
 - This is the only item that can change results (recall below 100 %). Validate
   against the exact scan on realistic data and document the observed recall
   before enabling it by default.
+
+**Done (2026-11-10):** `UnnamedFaceHnswIndex` builds an HNSW index over the
+unnamed face pool (built on top of item 9's `UnnamedFacePool`). The index is
+rebuilt when the pool's version stamp changes (`FaceDao.countUnnamed()` /
+`FaceDao.maxUnnamedId()`), and faces removed from the pool are tracked as dead
+and excluded from query results. `MostSimilarService.findBestSuggestion()` and
+`findBestSuggestions()` use HNSW when the unnamed pool has at least 5000 faces;
+below that threshold the exact scan is faster and is used instead. Each HNSW
+query over-fetches (up to max(50, poolSize/4), capped at 200) and re-scores
+exactly, filtering rejected, skipped and below-cutoff candidates. Tests verify
+HNSW returns the same best pair as exact scan, correct top-K ordering, dead-face
+exclusion, and pool rebuild on change. Reuse `hnswM`, `hnswEfConstruction` and
+`hnswEfSearch` from `ConfigModel`. Default threshold of 5000 means HNSW is not
+active for typical libraries (exact scan is faster), so results are unchanged.
 
 ---
 

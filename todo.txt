@@ -31,6 +31,7 @@ Done
   (minEarlyExitSimilarity in ConfigModel, default 1.0 = no early exit,
   Settings tab UI, i18n strings, docs)
 - Item 9: Keep the unnamed pool in memory between decisions
+- Item 10: In-memory HNSW index for the "Most similar" scan (UnnamedFaceHnswIndex built on top of UnnamedFacePool, version-stamp rebuild, dead-face tracking, exact-scan fallback below 5000-face threshold, reuses hnswM/hnswEfConstruction/hnswEfSearch from ConfigModel, unit + service-level tests verifying HNSW matches exact scan)
   (UnnamedFacePool component, version-stamp reload via countUnnamed/maxUnnamedId,
   incremental removal on tag, service-level and pool unit tests, docs)
 - Item 12: Scan progress indicator and cancel
@@ -45,4 +46,4 @@ Done
 
 Open items
 ----------
-- Items 10, 15 from suggestions_most_similar.md
+- Item 15 from suggestions_most_similar.md

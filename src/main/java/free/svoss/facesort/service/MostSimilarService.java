@@ -46,6 +46,7 @@ public class MostSimilarService {
     private final NotMatchDao notMatchDao;
     private final TransactionRunner transactionRunner;
     private final UnnamedFacePool pool;
+    private final UnnamedFaceHnswIndex hnswIndex;
     private final Set<MatchKey> skipped =
             Collections.synchronizedSet(new HashSet<>());
     /**
@@ -75,6 +76,7 @@ public class MostSimilarService {
         this.notMatchDao = Objects.requireNonNull(notMatchDao, "notMatchDao");
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.pool = new UnnamedFacePool(faceDao);
+        this.hnswIndex = new UnnamedFaceHnswIndex(pool, faceToNameService.configStore());
     }
 
     /**
@@ -95,6 +97,15 @@ public class MostSimilarService {
     public boolean isCancelled() {
         return cancelled.get();
     }
+
+    /**
+     * Threshold (number of unnamed faces) above which the HNSW index is used
+     * for scoring instead of an exact full-pool scan. Below it, building the
+     * index costs more than it saves. Tuned so HNSW only kicks in for large
+     * libraries where O(names x log unnamed) beats O(names x unnamed).
+     * Mutable for tests.
+     */
+    static int HNSW_THRESHOLD = 5000;
 
     /**
      * Returns the most similar (name, unnamed face) pair of the whole library,
@@ -148,6 +159,17 @@ public class MostSimilarService {
         int total = scan.names().size();
         AtomicInteger scanned = new AtomicInteger();
 
+        // Build the HNSW index when the unnamed pool is large enough that an
+        // approximate index beats an exact full-pool scan per name. The index
+        // is read-only during the parallel section, so it's safe to share.
+        final UnnamedFaceHnswIndex hnsw;
+        if (scan.unnamed().size() >= HNSW_THRESHOLD) {
+            hnswIndex.ensureBuilt();
+            hnsw = hnswIndex;
+        } else {
+            hnsw = null;
+        }
+
         // Score every name against the shared unnamed pool in parallel. Each
         // thread skips its name when a pair above the early-exit threshold
         // has already been found, or when the scan has been cancelled. The
@@ -164,7 +186,9 @@ public class MostSimilarService {
                     && current.candidate().similarity() > earlyExitThreshold) {
                 return;
             }
-            BestPair pair = bestPairFor(scan, name);
+            BestPair pair = hnsw != null
+                    ? bestPairForHnsw(scan, name, hnsw)
+                    : bestPairFor(scan, name);
             if (pair == null) {
                 return;
             }
@@ -222,6 +246,57 @@ public class MostSimilarService {
         return candidate == null ? null : new BestPair(name, candidate);
     }
 
+    /**
+     * Scores one name against the shared unnamed pool using the HNSW index for
+     * approximate nearest-neighbour search, then re-scores the top candidates
+     * exactly and filters rejected/skipped/below-cutoff ones.
+     *
+     * @param scan    the shared scan data
+     * @param name    the name to score candidates for
+     * @param hnsw    the HNSW index over the unnamed pool; must not be null
+     * @return the name's best qualifying candidate, or null when the name has
+     *         none left to offer
+     */
+    private BestPair bestPairForHnsw(Scan scan, NameRecord name,
+                                     UnnamedFaceHnswIndex hnsw) {
+        float[] average = scan.averages().get(name.id());
+        if (average == null) {
+            return null;
+        }
+        int poolSize = scan.unnamed().size();
+        // Over-fetch: query more candidates than needed so that after
+        // filtering (rejected, skipped, below-cutoff) we still have a good
+        // candidate. Cap at MAX_K to bound the exact re-scoring cost.
+        int k = Math.min(poolSize, Math.max(50, poolSize / 4));
+        List<Long> candidateIds = hnsw.query(average, k);
+        if (candidateIds.isEmpty()) {
+            return null;
+        }
+        Set<Long> rejected = scan.rejected().getOrDefault(name.id(), Set.of());
+        double cutoff = scan.cutoff();
+        SimilarityResult best = null;
+        for (Long faceId : candidateIds) {
+            FaceRecord face = scan.unnamedById().get(faceId);
+            if (face == null) {
+                continue; // no longer in the pool
+            }
+            if (rejected.contains(faceId)) {
+                continue;
+            }
+            if (skipped.contains(new MatchKey(face.id(), name.id()))) {
+                continue;
+            }
+            double similarity = faceAiService.calcSimilarity(average, face.embedding());
+            if (similarity < cutoff) {
+                continue;
+            }
+            if (best == null || similarity > best.similarity()) {
+                best = new SimilarityResult(face, similarity);
+            }
+        }
+        return best == null ? null : new BestPair(name, best);
+    }
+
     /** One name's best candidate, for reduction to the global best pair. */
     private record BestPair(NameRecord name, SimilarityResult candidate) {
     }
@@ -240,6 +315,22 @@ public class MostSimilarService {
         SimilarityResult candidate = bestNotSkipped(name.id(), average, scan.unnamed(),
                 scan.rejected().getOrDefault(name.id(), Set.of()), scan.cutoff());
         return candidate == null ? null : new RankedName(order, name, candidate);
+    }
+
+    /**
+     * Scores one name against the shared unnamed pool using the HNSW index for
+     * approximate nearest-neighbour search, returning its best qualifying
+     * candidate tagged with the name's scan order for stable tie-breaking.
+     */
+    private RankedName rankNameHnsw(Scan scan, int order,
+                                    UnnamedFaceHnswIndex hnsw) {
+        NameRecord name = scan.names().get(order);
+        float[] average = scan.averages().get(name.id());
+        if (average == null) {
+            return null;
+        }
+        BestPair pair = bestPairForHnsw(scan, name, hnsw);
+        return pair == null ? null : new RankedName(order, pair.name(), pair.candidate());
     }
 
     /**
@@ -291,6 +382,15 @@ public class MostSimilarService {
         int total = scan.names().size();
         AtomicInteger scanned = new AtomicInteger();
 
+        // Build the HNSW index when the unnamed pool is large enough.
+        final UnnamedFaceHnswIndex hnsw;
+        if (scan.unnamed().size() >= HNSW_THRESHOLD) {
+            hnswIndex.ensureBuilt();
+            hnsw = hnswIndex;
+        } else {
+            hnsw = null;
+        }
+
         // Score every name against the shared unnamed pool in parallel. Each
         // thread skips its name when the scan has been cancelled. The order
         // field preserves the original sequence for stable tie-breaking after
@@ -300,7 +400,9 @@ public class MostSimilarService {
                     if (isCancelled()) {
                         return null;
                     }
-                    RankedName entry = rankName(scan, order);
+                    RankedName entry = hnsw != null
+                            ? rankNameHnsw(scan, order, hnsw)
+                            : rankName(scan, order);
                     int s = scanned.incrementAndGet();
                     if (progress != null) {
                         progress.accept(s, total);
@@ -373,14 +475,18 @@ public class MostSimilarService {
     private Scan loadScan() throws SQLException {
         List<NameRecord> names = nameDao.findAll();
         if (names.isEmpty()) {
-            return new Scan(names, Map.of(), Map.of(), List.of(), 0.0);
+            return new Scan(names, Map.of(), Map.of(), List.of(), Map.of(), 0.0);
         }
         List<Long> nameIds = names.stream().map(NameRecord::id).toList();
         Map<Long, float[]> averages = faceToNameService.averageEmbeddingsFor(nameIds);
         Map<Long, Set<Long>> rejected = notMatchDao.findFaceIdsByNameIds(nameIds);
         List<FaceRecord> unnamed = pool.get();
+        Map<Long, FaceRecord> unnamedById = new HashMap<>();
+        for (FaceRecord face : unnamed) {
+            unnamedById.put(face.id(), face);
+        }
         double cutoff = faceToNameService.minNameSimilarity();
-        return new Scan(names, averages, rejected, unnamed, cutoff);
+        return new Scan(names, averages, rejected, unnamed, unnamedById, cutoff);
     }
 
     /**
@@ -438,6 +544,7 @@ public class MostSimilarService {
     public void markSamePerson(long faceId, long nameId) throws SQLException {
         faceToNameService.tagFace(faceId, nameId);
         pool.remove(faceId);
+        hnswIndex.markDead(faceId);
     }
 
     /**
@@ -474,6 +581,7 @@ public class MostSimilarService {
         });
         for (Suggestion selection : selections) {
             pool.remove(selection.candidate().id());
+            hnswIndex.markDead(selection.candidate().id());
         }
         skipped.removeIf(key -> selections.stream()
                 .anyMatch(s -> s.candidate().id() == key.faceId() && s.name().id() == key.nameId()));
@@ -598,7 +706,7 @@ public class MostSimilarService {
     /** The shared data one scan scores every name against. */
     private record Scan(List<NameRecord> names, Map<Long, float[]> averages,
                         Map<Long, Set<Long>> rejected, List<FaceRecord> unnamed,
-                        double cutoff) {
+                        Map<Long, FaceRecord> unnamedById, double cutoff) {
     }
 
     /** A name's best candidate, with the name's order in the scan for stable ties. */
