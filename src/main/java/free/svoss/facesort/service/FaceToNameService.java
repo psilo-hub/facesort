@@ -1,5 +1,8 @@
 package free.svoss.facesort.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.FaceDao;
@@ -16,11 +19,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -756,5 +761,207 @@ public class FaceToNameService implements MediaFileActions {
      *                       name's average embedding, in [0, 1]
      */
     public record NamePreview(FaceRecord representative, double similarity) {
+    }
+
+    /**
+     * Summary of a shallow export run for a single name: copies only the
+     * representative face sub-image plus a JSON metadata file.
+     *
+     * @param name          the person's name
+     * @param outputDir     the folder where the shallow export was written
+     * @param imageCount    number of distinct images containing the person
+     * @param imageHashes   hashes of those images
+     * @param representativeFaceId id of the face closest to the name's average
+     * @param faceCount     number of faces tagged with the name
+     */
+    public record ShallowExportResult(
+            String name,
+            Path outputDir,
+            int imageCount,
+            List<String> imageHashes,
+            long representativeFaceId,
+            int faceCount
+    ) {
+    }
+
+    /**
+     * Exports a shallow representation of a single name: copies only the
+     * face sub-image closest to the name's average embedding (the
+     * representative face) into a folder named after the cleaned name, plus a
+     * JSON metadata file with information about the person.
+     *
+     * <p>The output folder contains exactly one image file and one
+     * {@code metadata.json} file.</p>
+     *
+     * @param nameId    id of the person to export
+     * @param outputDir the parent folder to create the name-specific folder in
+     * @return the export summary
+     * @throws IllegalArgumentException if the name does not exist
+     * @throws IllegalStateException  if the name has no faces
+     * @throws SQLException           on database access failure
+     * @throws IOException            if a file cannot be written
+     */
+    public ShallowExportResult exportShallowForName(long nameId, Path outputDir)
+            throws SQLException, IOException {
+        Optional<NameRecord> nameOpt = nameDao.findById(nameId);
+        if (nameOpt.isEmpty()) {
+            throw new IllegalArgumentException("Name not found: " + nameId);
+        }
+        NameRecord name = nameOpt.get();
+
+        Optional<float[]> average = nameAverages.averageFor(nameId);
+        if (average.isEmpty()) {
+            throw new IllegalStateException(
+                    "Name '" + name.name() + "' has no faces with embeddings");
+        }
+
+        List<FaceRecord> namedFaces = faceDao.findByNameId(nameId);
+        if (namedFaces.isEmpty()) {
+            throw new IllegalStateException(
+                    "Name '" + name.name() + "' has no tagged faces");
+        }
+
+        // Find the face closest to the name's average embedding
+        FaceRecord representative = faceSelector.mostSimilarTo(average.get(), namedFaces);
+
+        // Clean the name for OS path compatibility
+        String folderName = cleanNameForPath(name.name());
+
+        // Create the name-specific output folder
+        Path nameDir = outputDir.resolve(folderName);
+        Files.createDirectories(nameDir);
+
+        // Copy the representative face's sub-image JPEG
+        byte[] faceImage = representative.subImageJpg();
+        if (faceImage == null || faceImage.length == 0) {
+            throw new IOException(
+                    "Representative face has no sub-image JPEG: " + representative.id());
+        }
+        Path faceImagePath = nameDir.resolve("face.jpg");
+        Files.write(faceImagePath, faceImage);
+
+        // Collect image hashes for this person
+        List<String> hashes = faceDao.findImageHashesByNameId(nameId);
+
+        // Write JSON metadata
+        Path jsonPath = nameDir.resolve("metadata.json");
+        ObjectNode metadata = createShallowExportMetadata(
+                name.name(), hashes, representative.id(), namedFaces.size());
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writerWithDefaultPrettyPrinter().writeValue(jsonPath.toFile(), metadata);
+
+        return new ShallowExportResult(
+                name.name(),
+                nameDir,
+                hashes.size(),
+                hashes,
+                representative.id(),
+                namedFaces.size()
+        );
+    }
+
+    /**
+     * Exports shallow representations of all names: one folder per name, each
+     * containing the representative face sub-image and a JSON metadata file.
+     *
+     * @param outputDir the parent folder to create name-specific folders in
+     * @return the export summaries, one per name
+     * @throws SQLException on database access failure
+     * @throws IOException  if a file cannot be written
+     */
+    public List<ShallowExportResult> exportShallowForAllNames(Path outputDir)
+            throws SQLException, IOException {
+        List<NameRecord> names = nameDao.findAll();
+        List<ShallowExportResult> results = new ArrayList<>();
+        for (NameRecord name : names) {
+            // Skip names with no faces
+            Optional<float[]> average = nameAverages.averageFor(name.id());
+            if (average.isEmpty()) {
+                continue;
+            }
+            results.add(exportShallowForName(name.id(), outputDir));
+        }
+        return results;
+    }
+
+    /**
+     * Cleans a display name for use as an OS folder name: replaces invalid
+     * characters ({@code / \\ ? * : | " &lt; &gt;}), trims leading/trailing
+     * dots and spaces, and handles Windows reserved names (CON, AUX, etc.).
+     *
+     * @param name the display name to clean
+     * @return a safe folder name
+     */
+    private static String cleanNameForPath(String name) {
+        if (name == null || name.isBlank()) {
+            return "unnamed";
+        }
+
+        // Replace invalid Windows/Unix filename characters with underscore
+        String cleaned = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+
+        // Trim leading/trailing dots and spaces
+        cleaned = cleaned.replaceAll("^[. ]+|[. ]+$", "");
+
+        // Handle Windows reserved names (case-insensitive)
+        String upper = cleaned.toUpperCase(Locale.ROOT);
+        String[] reserved = {
+                "CON", "PRN", "AUX", "NUL",
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+        };
+        boolean isReserved = false;
+        for (String reservedName : reserved) {
+            if (upper.equals(reservedName)) {
+                isReserved = true;
+                break;
+            }
+        }
+        if (isReserved) {
+            cleaned = "_" + cleaned;
+        }
+
+        // Fallback if cleaning produced an empty string
+        if (cleaned.isBlank()) {
+            return "unnamed";
+        }
+
+        return cleaned;
+    }
+
+    /**
+     * Creates the JSON metadata object for a shallow export.
+     *
+     * @param name           the person's name
+     * @param imageHashes    hashes of images containing the person
+     * @param representativeFaceId id of the representative face
+     * @param faceCount      number of faces tagged with the name
+     * @return the JSON metadata object node
+     */
+    private static ObjectNode createShallowExportMetadata(
+            String name, List<String> imageHashes,
+            long representativeFaceId, int faceCount) {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode node = mapper.createObjectNode();
+        node.put("name", name);
+        node.put("imageCount", imageHashes.size());
+        ArrayNode hashesArray = node.putArray("imageHashes");
+        for (String hash : imageHashes) {
+            hashesArray.add(hash);
+        }
+        node.put("representativeFaceId", representativeFaceId);
+        node.put("faceCount", faceCount);
+        node.put("exportTimestamp", Instant.now().toString());
+        node.put("appVersion", appVersion());
+        return node;
+    }
+
+    /**
+     * Returns the application version for metadata, or a fallback constant.
+     */
+    private static String appVersion() {
+        String version = FaceToNameService.class.getPackage()
+                .getImplementationVersion();
+        return version != null ? version : "1.0-SNAPSHOT";
     }
 }

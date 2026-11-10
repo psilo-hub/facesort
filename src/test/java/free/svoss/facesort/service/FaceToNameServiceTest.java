@@ -1,5 +1,7 @@
 package free.svoss.facesort.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import free.svoss.facesort.config.ConfigModel;
 import free.svoss.facesort.config.ConfigStore;
 import free.svoss.facesort.db.Database;
@@ -14,13 +16,18 @@ import free.svoss.facesort.model.SimilarityResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * similarity to a name's average embedding, and batch tagging.
  */
 class FaceToNameServiceTest {
+
+    @TempDir
+    Path tempDir;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private Database db;
     private FaceDao faceDao;
@@ -566,5 +578,109 @@ class FaceToNameServiceTest {
         long candidate = addImageAndFace("imgU1", xLike(), null);
 
         assertTrue(service.previewTagWithName("Alice", candidate).isEmpty());
+    }
+
+    @Test
+    void exportShallowForName_exportsClosestFaceAndMetadata() throws Exception {
+        long alice = nameDao.insert("Alice");
+        addImageAndFace("imgA1", xLike(), alice);      // face closest to average
+        addImageAndFace("imgA2", yLike(), alice);
+        addImageAndFace("imgA3", new float[]{0.5f, 0.5f, 0, 0, 0, 0, 0, 0}, alice);
+
+        Path outputDir = tempDir.resolve("export");
+        FaceToNameService.ShallowExportResult result = service.exportShallowForName(alice, outputDir);
+
+        // Verify result object
+        assertEquals("Alice", result.name());
+        assertEquals(3, result.imageCount());
+        assertEquals(3, result.faceCount());
+        assertNotNull(result.outputDir());
+        assertEquals(3, result.imageHashes().size());
+
+        // Verify folder created with cleaned name
+        Path aliceDir = outputDir.resolve("Alice");
+        assertTrue(Files.isDirectory(aliceDir), "export folder must exist");
+
+        // Verify exactly one image file (the closest face sub-image)
+        List<Path> imageFiles = Files.list(aliceDir)
+                .filter(p -> p.getFileName().toString().endsWith(".jpg"))
+                .toList();
+        assertEquals(1, imageFiles.size(), "shallow export must contain exactly one face image");
+
+        // Verify JSON metadata file exists
+        Path jsonFile = aliceDir.resolve("metadata.json");
+        assertTrue(Files.isRegularFile(jsonFile), "metadata.json must exist");
+
+        // Verify JSON content
+        JsonNode json = JSON.readTree(jsonFile.toFile());
+        assertEquals("Alice", json.get("name").asText(), "JSON name field");
+        assertEquals(3, json.get("imageCount").asInt(), "JSON imageCount field");
+        assertEquals(3, json.get("faceCount").asInt(), "JSON faceCount field");
+        assertNotNull(json.get("imageHashes"), "JSON imageHashes field");
+        assertEquals(3, json.get("imageHashes").size(), "JSON imageHashes length");
+        assertNotNull(json.get("representativeFaceId"), "JSON representativeFaceId field");
+        assertNotNull(json.get("exportTimestamp"), "JSON exportTimestamp field");
+        assertNotNull(json.get("appVersion"), "JSON appVersion field");
+    }
+
+    @Test
+    void exportShallowForName_unknownName_throws() throws Exception {
+        Path outputDir = tempDir.resolve("export");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.exportShallowForName(999L, outputDir),
+                "exporting an unknown name must throw");
+    }
+
+    @Test
+    void exportShallowForName_nameWithNoFaces_throws() throws Exception {
+        long alice = nameDao.insert("Alice"); // name with no tagged faces
+        Path outputDir = tempDir.resolve("export");
+
+        assertThrows(IllegalStateException.class,
+                () -> service.exportShallowForName(alice, outputDir),
+                "exporting a name with no faces must throw");
+    }
+
+    @Test
+    void exportShallowForName_cleansFolderName() throws Exception {
+        long alice = nameDao.insert("Alice/Bad:Name");
+        addImageAndFace("imgA1", xLike(), alice);
+
+        Path outputDir = tempDir.resolve("export");
+        service.exportShallowForName(alice, outputDir);
+
+        // Folder name should have invalid chars replaced
+        Path aliceDir = outputDir.resolve("Alice_Bad_Name");
+        assertTrue(Files.isDirectory(aliceDir),
+                "folder name must be cleaned for OS path compatibility");
+    }
+
+    @Test
+    void exportShallowForName_bulkExportsAllNames() throws Exception {
+        long alice = nameDao.insert("Alice");
+        long bob = nameDao.insert("Bob");
+        addImageAndFace("imgA1", xLike(), alice);
+        addImageAndFace("imgB1", yLike(), bob);
+
+        Path outputDir = tempDir.resolve("export");
+        List<FaceToNameService.ShallowExportResult> results =
+                service.exportShallowForAllNames(outputDir);
+
+        assertEquals(2, results.size(), "bulk export must process all names");
+
+        Path aliceDir = outputDir.resolve("Alice");
+        Path bobDir = outputDir.resolve("Bob");
+        assertTrue(Files.isDirectory(aliceDir), "Alice folder must exist");
+        assertTrue(Files.isDirectory(bobDir), "Bob folder must exist");
+
+        assertTrue(Files.list(aliceDir)
+                .filter(p -> p.getFileName().toString().endsWith(".jpg"))
+                .findFirst().isPresent(),
+                "Alice folder must contain face image");
+        assertTrue(Files.list(bobDir)
+                .filter(p -> p.getFileName().toString().endsWith(".jpg"))
+                .findFirst().isPresent(),
+                "Bob folder must contain face image");
     }
 }
