@@ -4,6 +4,7 @@ All notable changes to Face Sort will be documented in this file.
 ## [1.0-SNAPSHOT]
 
 ### Added
+- New shallow export for names: export a single representative face sub-image (closest to the name's average embedding) plus a JSON metadata file per name. Available per-name and as a bulk operation for all names. Folder names are cleaned for OS path compatibility (2026-11-10)
 - Name average embeddings are now persisted to the database (`name_averages`
   table via schema migration v6→7). The first "Most similar" scan after
   startup reuses stored averages instead of rebuilding them all from tagged

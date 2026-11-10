@@ -1,10 +1,10 @@
-EXIF orientation handling in ImageUtils.readImage
+Shallow export for name faces
 ========================
 
-- [ ] Add EXIF orientation reading from JPEG IIOMetadata
-- [ ] Add rotate/flip logic for all 8 orientation values (1=normal, 2=flip-h, 3=rot180, 4=flip-v, 5=transpose, 6=rot90cw, 7=transverse, 8=rot90ccw)
-- [ ] Apply orientation in readImage/readLargestImage after loading
-- [ ] Add tests for orientation 3, 6, 8 (the most common phone photo values)
-- [ ] Update suggestions.md to mark EXIF orientation as done
-- [ ] Update todo.txt if needed
-- [ ] Commit changes
+- [x] Add exportShallowForName() to FaceToNameService - exports representative face sub-image + metadata.json per name
+- [x] Add exportShallowForAllNames() - bulk export for all names
+- [x] Add cleanNameForPath() utility - replaces invalid chars, handles reserved Windows names
+- [x] Add JSON metadata with: name, imageCount, imageHashes, representativeFaceId, faceCount, exportTimestamp, appVersion
+- [x] Add tests: basic export, unknown name error, no-faces error, folder name cleaning, bulk export
+- [x] Update suggestions.md, todo.txt, CHANGELOG.md
+- [x] Commit changes

@@ -43,7 +43,7 @@
 
 ## Features
 
-- [ ] Add a library backup/export action that snapshots facesort.db (plus its WAL sidecar) or exports faces/names/images to a user-chosen folder - only per-name image export exists today (FaceToNameService.exportImagesForName)
+- [x] Add shallow export for name faces: exports only the representative face sub-image (closest to name's average embedding) plus a JSON metadata file per name, available per-name and as bulk operation (FaceToNameService.exportShallowForName/exportShallowForAllNames)
 - [ ] Expose a GPU inference option in settings once the FaceAI library supports device selection
 - [ ] Add the ability to re-detect faces after detection settings change
 - [ ] Add a single-level undo buffer for the last tagging and dedupe actions (dedupService.merge has no reversal path, DedupeView.java:245)
