@@ -51,7 +51,7 @@ class MostSimilarQueueTest {
         service = new MostSimilarService(
                 new FaceToNameService(ai, countingDao, nameDao, notMatchDao,
                         new ImageDao(db.getConnection()), new VideoDao(db.getConnection()), configStore),
-                ai, nameDao, notMatchDao, db.getTransactionRunner());
+                ai, countingDao, nameDao, notMatchDao, db.getTransactionRunner());
     }
 
     @AfterEach

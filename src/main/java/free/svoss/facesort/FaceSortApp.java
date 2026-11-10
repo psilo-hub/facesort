@@ -302,7 +302,7 @@ public class FaceSortApp extends Application {
         faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao,
                 notMatchDao, imageDao, videoDao, configStore);
         mostSimilarService = new MostSimilarService(faceToNameService, faceAiService,
-                nameDao, notMatchDao, database.getTransactionRunner());
+                faceDao, nameDao, notMatchDao, database.getTransactionRunner());
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
         viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
