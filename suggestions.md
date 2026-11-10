@@ -47,5 +47,5 @@
 - [ ] Expose a GPU inference option in settings once the FaceAI library supports device selection
 - [ ] Add the ability to re-detect faces after detection settings change
 - [ ] Add a single-level undo buffer for the last tagging and dedupe actions (dedupService.merge has no reversal path, DedupeView.java:245)
-- [ ] Add EXIF orientation handling in ImageUtils.readImage so phone photos import upright - no exif/orientation handling exists anywhere in src/main/java (ImageUtils.java:107-140)
+- [x] Add EXIF orientation handling in ImageUtils.readImage so phone photos import upright - reads EXIF orientation tag from JPEG APP1 segment and rotates/flips accordingly
 - [ ] Document the video import feature in the translated READMEs (de, es, fr, ru, zh) - only README.md mentions MP4/MKV/MOV/AVI; every translation still says photos only

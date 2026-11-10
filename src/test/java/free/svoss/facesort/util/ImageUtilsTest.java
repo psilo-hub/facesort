@@ -172,4 +172,126 @@ class ImageUtilsTest {
         Files.write(file, Arrays.asList("plain text, not an image"), StandardCharsets.UTF_8);
         assertThrows(IOException.class, () -> ImageUtils.readImage(file));
     }
+
+    @Test
+    void readImage_exifOrientation1_normal() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient1.jpg"), 100, 50, 1);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(100, img.getWidth(), "orientation 1: width unchanged");
+        assertEquals(50, img.getHeight(), "orientation 1: height unchanged");
+    }
+
+    @Test
+    void readImage_exifOrientation3_rotate180() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient3.jpg"), 100, 50, 3);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(100, img.getWidth(), "orientation 3: width unchanged");
+        assertEquals(50, img.getHeight(), "orientation 3: height unchanged");
+    }
+
+    @Test
+    void readImage_exifOrientation6_rotate90CW() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient6.jpg"), 100, 50, 6);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(50, img.getWidth(), "orientation 6: width and height swapped");
+        assertEquals(100, img.getHeight(), "orientation 6: width and height swapped");
+    }
+
+    @Test
+    void readImage_exifOrientation8_rotate90CCW() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient8.jpg"), 100, 50, 8);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(50, img.getWidth(), "orientation 8: width and height swapped");
+        assertEquals(100, img.getHeight(), "orientation 8: width and height swapped");
+    }
+
+    @Test
+    void readImage_exifOrientation2_flipHorizontal() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient2.jpg"), 100, 50, 2);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(100, img.getWidth(), "orientation 2: width unchanged");
+        assertEquals(50, img.getHeight(), "orientation 2: height unchanged");
+    }
+
+    @Test
+    void readImage_exifOrientation4_flipVertical() throws Exception {
+        Path file = writeJpegWithOrientation(tempDir.resolve("orient4.jpg"), 100, 50, 4);
+        BufferedImage img = ImageUtils.readImage(file);
+        assertEquals(100, img.getWidth(), "orientation 4: width unchanged");
+        assertEquals(50, img.getHeight(), "orientation 4: height unchanged");
+    }
+
+    private static Path writeJpegWithOrientation(Path file, int width, int height, int orientation) throws IOException {
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        try {
+            g.setColor(java.awt.Color.RED);
+            g.fillRect(0, 0, width, height);
+        } finally {
+            g.dispose();
+        }
+
+        // Write JPEG to byte array
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(img, "jpg", baos);
+        byte[] jpegBytes = baos.toByteArray();
+
+        // Build EXIF APP1 segment with orientation tag (TIFF little-endian)
+        ByteArrayOutputStream exif = new ByteArrayOutputStream();
+        exif.write(new byte[]{0x45, 0x78, 0x69, 0x66, 0x00, 0x00});
+        // TIFF header: little-endian byte order, magic 42, offset to IFD0 = 8
+        exif.write(new byte[]{(byte) 0x49, (byte) 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00});
+        // IFD0: 1 entry
+        exif.write(new byte[]{0x01, 0x00});
+        // Entry: tag=0x0112 (orientation), type=3 (SHORT), count=1, value=orientation
+        exif.write(new byte[]{(byte) 0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00});
+        exif.write(orientation & 0xFF);
+        exif.write((orientation >> 8) & 0xFF);
+        exif.write(0);
+        exif.write(0);
+        // Offset to next IFD = 0
+        exif.write(new byte[]{0x00, 0x00, 0x00, 0x00});
+
+        byte[] exifBytes = exif.toByteArray();
+
+        // Insert APP1 segment after APP0 (JFIF must be first after SOI)
+        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        result.write(jpegBytes, 0, 2); // SOI
+
+        // Find APP0 marker (FF E0) after SOI
+        int app0Pos = 2;
+        while (app0Pos < jpegBytes.length - 1) {
+            if (jpegBytes[app0Pos] == (byte) 0xFF && jpegBytes[app0Pos + 1] == (byte) 0xE0) {
+                break;
+            }
+            app0Pos++;
+        }
+
+        // Copy everything up to and including APP0 segment
+        if (app0Pos < jpegBytes.length - 1) {
+            // APP0 segment: 2 bytes marker + 2 bytes length + data
+            int app0Len = ((jpegBytes[app0Pos + 2] & 0xFF) << 8) | (jpegBytes[app0Pos + 3] & 0xFF);
+            int app0End = app0Pos + 2 + app0Len;
+            result.write(jpegBytes, 2, app0End - 2);
+        } else {
+            result.write(jpegBytes, 2, jpegBytes.length - 2);
+        }
+
+        // APP1 marker
+        result.write(0xFF);
+        result.write(0xE1);
+        result.write((exifBytes.length + 2) >> 8);
+        result.write((exifBytes.length + 2) & 0xFF); // length including this field
+        result.write(exifBytes);
+
+        // Rest of JPEG after APP0
+        if (app0Pos < jpegBytes.length - 1) {
+            int app0Len = ((jpegBytes[app0Pos + 2] & 0xFF) << 8) | (jpegBytes[app0Pos + 3] & 0xFF);
+            int app0End = app0Pos + 2 + app0Len;
+            result.write(jpegBytes, app0End, jpegBytes.length - app0End);
+        }
+
+        Files.write(file, result.toByteArray());
+        return file;
+    }
 }

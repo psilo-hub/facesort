@@ -1,54 +1,10 @@
-FaceSort — project todo
+EXIF orientation handling in ImageUtils.readImage
 ========================
 
-State as of 2026-11-08. `mvn test` is green: 688 tests / 70 test classes,
-0 failures, 0 skipped (TaskRunnerTest's 5 tests need a JavaFX display; the
-other 683 tests pass headless in this environment). GitHub Actions runs the
-full suite under Xvfb on every push and pull request, and releases depend on
-that job.
-
-All work is tracked in `suggestions.md` (29 items, with the rationale and the
-file/line references; finished items are crossed off) and in
-`suggestions_most_similar.md` (15 performance/UX items for the "Most similar"
-tab). This file keeps no separate backlog: every item it used to carry is done,
-superseded, or already one of those items. Keep the files in sync in the same
-commit (see `AGENTS.md`).
-
-Items from further_improvements.txt — all done:
-1. Name tagged in "Put a name to a face" / "Tag random face" is selected when
-   switching to "Add faces to a name" (TabState + FaceNameView.selectPendingTaggedName)
-2. Path filter is shared across tabs via TabState; restoring on tab switch
-3. Tab switching does not interrupt running tasks (ImportView task runs on its
-   own daemon thread; MainWindow only touches the newly selected tab)
-
-In progress
------------
-- None
-
-Done
-----
-- Item 6: Configurable early-exit threshold for the "Most similar" scan
-  (minEarlyExitSimilarity in ConfigModel, default 1.0 = no early exit,
-  Settings tab UI, i18n strings, docs)
-- Item 9: Keep the unnamed pool in memory between decisions
-- Item 10: In-memory HNSW index for the "Most similar" scan (UnnamedFaceHnswIndex built on top of UnnamedFacePool, version-stamp rebuild, dead-face tracking, exact-scan fallback below 5000-face threshold, reuses hnswM/hnswEfConstruction/hnswEfSearch from ConfigModel, unit + service-level tests verifying HNSW matches exact scan)
-  (UnnamedFacePool component, version-stamp reload via countUnnamed/maxUnnamedId,
-  incremental removal on tag, service-level and pool unit tests, docs)
-- Item 12: Scan progress indicator and cancel
-  (progress callback + cancel() on MostSimilarService, Cancel button and
-  Task.updateProgress/updateMessage in MostSimilarView, i18n strings, docs)
-- Item 13: Backlog counter for the "Most similar" tab
-  (FaceDao.countUnnamed + NameDao.countWithFaces, MostSimilarService.getBacklogCount,
-  status bar display, i18n strings, docs)
-- Item 14: Batch review of the top-K pairs in the "Most similar" tab
-  (toggle between single-pair and batch grid, batch tag/reject/skip in one
-  transaction, i18n strings, docs updated)
-- Item 15: Persist name average embeddings across restarts
-  (name_averages table via schema migration v6→7, NameAverageCache loads and
-  validates stored averages against face count, recomputes stale/missing ones,
-  stores computed averages, all DB writes invalidate cache, tests cover
-  persistence across instances and stale-count recomputation)
-
-Open items
-----------
-- None
+- [ ] Add EXIF orientation reading from JPEG IIOMetadata
+- [ ] Add rotate/flip logic for all 8 orientation values (1=normal, 2=flip-h, 3=rot180, 4=flip-v, 5=transpose, 6=rot90cw, 7=transverse, 8=rot90ccw)
+- [ ] Apply orientation in readImage/readLargestImage after loading
+- [ ] Add tests for orientation 3, 6, 8 (the most common phone photo values)
+- [ ] Update suggestions.md to mark EXIF orientation as done
+- [ ] Update todo.txt if needed
+- [ ] Commit changes

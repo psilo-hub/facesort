@@ -394,6 +394,7 @@ All notable changes to Face Sort will be documented in this file.
   existing databases migrate automatically (2026-09-23)
 
 ### Fixed
+- Phone photos taken sideways or upside down now import upright: EXIF orientation tags are read from JPEG files and the image is rotated or flipped accordingly (2026-11-10)
 - Switching tabs no longer interrupts running background tasks: an import
   started in the Import tab keeps running until it finishes, even if you switch
   away (2026-10-26)
