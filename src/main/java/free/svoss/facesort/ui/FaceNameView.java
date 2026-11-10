@@ -5,7 +5,7 @@ import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
 import free.svoss.facesort.model.NameRecord;
 import free.svoss.facesort.model.SimilarityResult;
-import free.svoss.facesort.service.FaceToNameService;
+import free.svoss.facesort.service.FaceNameService;
 
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -49,7 +49,7 @@ import java.util.Optional;
  * with the selected name.</p>
  *
  * <p>The view owns no business logic; all ranking and tagging is delegated to
- * {@link FaceToNameService}. Queries run on background {@link Task}s so the
+ * {@link FaceNameService}. Queries run on background {@link Task}s so the
  * UI stays responsive.</p>
  */
 public class FaceNameView extends BorderPane implements Refreshable, TaggedFacePresenter, NotAFacePresenter {
@@ -57,7 +57,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
     private static final double THUMBNAIL_SIZE = 110.0;
     private static final int NAMED_LIMIT = 5;
 
-    private final FaceToNameService faceToNameService;
+    private final FaceNameService faceToNameService;
     private final ConfigStore configStore;
     private final TabState tabState;
 
@@ -88,7 +88,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
      * @param configStore       the application settings; must not be null
      * @param tabState          shared cross-tab state; must not be null
      */
-    public FaceNameView(FaceToNameService faceToNameService, ConfigStore configStore,
+    public FaceNameView(FaceNameService faceToNameService, ConfigStore configStore,
                         TabState tabState) {
         this.faceToNameService = faceToNameService;
         this.configStore = configStore;
@@ -742,15 +742,15 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
         NameRecord name = activeName;
 
         statusLabel.setText(I18n.format("ui.faceName.exporting", name.name()));
-        Task<FaceToNameService.ExportResult> task = new Task<>() {
+        Task<FaceNameService.ExportResult> task = new Task<>() {
             @Override
-            protected FaceToNameService.ExportResult call() throws Exception {
+            protected FaceNameService.ExportResult call() throws Exception {
                 return faceToNameService.exportImagesForName(name.id(), outputDir);
             }
         };
 
         task.setOnSucceeded(e -> {
-            FaceToNameService.ExportResult result = task.getValue();
+            FaceNameService.ExportResult result = task.getValue();
             if (result.images() == 0) {
                 statusLabel.setText(I18n.format("ui.faceName.exportNone", name.name()));
             } else {

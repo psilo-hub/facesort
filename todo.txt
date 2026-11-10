@@ -1,15 +1,15 @@
-Refactor I18n to reduce global mutable state
+Refactor views to depend on narrow service interfaces instead of concrete fat services
 ========================
 
-- [x] Write failing test for atomic locale+bundle updates
-- [x] Write failing test for thread-safe concurrent access without synchronized
-- [x] Refactor I18n: replace two mutable static fields with AtomicReference<BundleState>
-- [x] Remove synchronized keyword from methods
-- [x] Keep static API unchanged (backward compatible with all call sites)
-- [x] Run existing I18nTest + all i18n tests
+- [x] Create DedupeService interface (DedupeView dependencies: reset, nextPair, merge, markNotDupes, skip + MediaFileActions)
+- [x] Create FaceNameService interface (FaceNameView dependencies: getAllNames, findMostSimilarNamed, findUnnamedForName, markNotAFace, previewTagWithName, createOrFindName, tagFaces, renameName, exportImagesForName, resolveFilterPath + MediaFileActions)
+- [x] Create NamingService interface (NameFaceView + RandomNameView dependencies: getClusters, findImagePaths, resolveFilterPath, createOrFindName, tagFace, findSimilarUnnamed, rankSimilar, markNotAFace, findName, findRandomUnnamedThumbs + MediaFileActions)
+- [x] Create ViewService interface (ViewView dependencies: getNameSummaries, getImagesForName, untagFacesFromImage + MediaFileActions)
+- [x] Make concrete service classes implement their interfaces
+- [x] Change view constructors to accept interfaces instead of concrete classes
+- [x] Update FaceSortApp to pass concrete services (they implement interfaces)
+- [ ] Write headless tests for DedupeView, NameFaceView, RandomNameView, FaceNameView, ViewView
 - [x] Run full mvn test suite
 - [x] Update suggestions.md to mark item as done
 - [x] Update todo.txt
-- [x] Commit changes
-
-- [x] Add i18n bundle-consistency tests - I18nTest.bundleKeysAreConsistentAcrossAllLanguages() scans all Java source files for I18n.get/format/percent() calls and verifies every referenced key exists in the base bundle and all five translation bundles
+- [ ] Commit changes

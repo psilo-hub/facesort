@@ -31,7 +31,7 @@ import java.util.Set;
  * There is no similarity cutoff; the session continues until the user stops
  * or no pairs are left.</p>
  */
-public class DeduplicationService implements MediaFileActions {
+public class DeduplicationService implements DedupeService {
 
     private final FaceAiService faceAiService;
     private final FaceSelector faceSelector;
@@ -78,23 +78,6 @@ public class DeduplicationService implements MediaFileActions {
     }
 
     /**
-     * A pair of names that may be duplicates, with their similarity and a
-     * representative face for each name to display to the user.
-     *
-     * @param nameIdA    id of the first name
-     * @param nameIdB    id of the second name
-     * @param similarity similarity between the two average embeddings
-     * @param nameA      display name of the first name
-     * @param nameB      display name of the second name
-     * @param repFaceA   face closest to the first name's average embedding
-     * @param repFaceB   face closest to the second name's average embedding
-     */
-    public record DupeCandidate(long nameIdA, long nameIdB, double similarity,
-                                String nameA, String nameB,
-                                FaceRecord repFaceA, FaceRecord repFaceB) {
-    }
-
-    /**
      * Returns the next most similar name pair not already marked as distinct
      * and not skipped this run.
      *
@@ -114,7 +97,7 @@ public class DeduplicationService implements MediaFileActions {
         }
         while (nextIndex < candidates.size()) {
             DupeCandidate candidate = candidates.get(nextIndex++);
-            if (!skippedThisRun.contains(key(candidate.nameIdA, candidate.nameIdB))) {
+            if (!skippedThisRun.contains(key(candidate.nameIdA(), candidate.nameIdB()))) {
                 return Optional.of(candidate);
             }
         }

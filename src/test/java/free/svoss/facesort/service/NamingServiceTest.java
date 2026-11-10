@@ -44,7 +44,7 @@ class NamingServiceTest {
         config = config.withHnswEfSearch(100);
         config = config.withKnnK(20);
 
-        service = new NamingService(
+        service = new NamingServiceImpl(
                 new ClusteringService(new FaceAiService(new FakeFaceAiEngine()), faceDao,
                         new ConfigStore(config)),
                 new FaceAiService(new FakeFaceAiEngine()),

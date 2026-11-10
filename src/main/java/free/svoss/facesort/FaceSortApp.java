@@ -23,8 +23,10 @@ import free.svoss.facesort.service.FeedbackService;
 import free.svoss.facesort.service.ImportService;
 import free.svoss.facesort.service.MostSimilarService;
 import free.svoss.facesort.service.NamingService;
+import free.svoss.facesort.service.NamingServiceImpl;
 import free.svoss.facesort.service.VideoImportService;
 import free.svoss.facesort.service.ViewService;
+import free.svoss.facesort.service.ViewServiceImpl;
 import free.svoss.facesort.ui.DedupeView;
 import free.svoss.facesort.ui.FaceNameView;
 import free.svoss.facesort.ui.FeedbackView;
@@ -298,14 +300,14 @@ public class FaceSortApp extends Application {
         videoImportService = new VideoImportService(imageDao, faceDao, videoDao,
                 importAiServices, configStore, database.getTransactionRunner());
         clusteringService = new ClusteringService(faceAiService, faceDao, configStore);
-        namingService = new NamingService(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao);
+        namingService = new NamingServiceImpl(clusteringService, faceAiService, faceDao, nameDao, imageDao, videoDao);
         faceToNameService = new FaceToNameService(faceAiService, faceDao, nameDao,
                 notMatchDao, imageDao, videoDao, configStore);
         mostSimilarService = new MostSimilarService(faceToNameService, faceAiService,
                 faceDao, nameDao, notMatchDao, database.getTransactionRunner());
         dedupService = new DeduplicationService(faceAiService, faceDao, nameDao, notDupeDao,
                 imageDao, videoDao, database.getTransactionRunner());
-        viewService = new ViewService(faceAiService, faceDao, nameDao, imageDao, videoDao);
+        viewService = new ViewServiceImpl(faceAiService, faceDao, nameDao, imageDao, videoDao);
         dataRemovalService = new DataRemovalService(
                 new DataRemovalDao(connection), database.getTransactionRunner());
         // One instance for the whole process: an HttpClient cannot be closed

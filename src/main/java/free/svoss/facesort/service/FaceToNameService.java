@@ -38,7 +38,7 @@ import java.util.Set;
  * similarity to the average embedding of the faces already tagged with that
  * name, so the user can batch-tag the most similar ones without searching.</p>
  */
-public class FaceToNameService implements MediaFileActions {
+public class FaceToNameService implements FaceNameService {
 
     private final FaceAiService faceAiService;
     private final FaceSelector faceSelector;
@@ -517,7 +517,7 @@ public class FaceToNameService implements MediaFileActions {
      * @throws IllegalArgumentException if {@code candidateFaceId} is unknown
      * @throws SQLException             if the database operation fails
      */
-    public Optional<NamePreview> previewTagWithName(String name, long candidateFaceId) throws SQLException {
+    public Optional<FaceNameService.NamePreview> previewTagWithName(String name, long candidateFaceId) throws SQLException {
         String trimmed = name == null ? "" : name.trim();
         if (trimmed.isEmpty()) {
             return Optional.empty();
@@ -534,7 +534,7 @@ public class FaceToNameService implements MediaFileActions {
         FaceRecord representative = faceSelector.mostSimilarTo(average.get(), namedFaces);
         FaceRecord candidate = faceDao.findById(candidateFaceId)
                 .orElseThrow(() -> new IllegalArgumentException("Face not found: " + candidateFaceId));
-        return Optional.of(new NamePreview(representative,
+        return Optional.of(new FaceNameService.NamePreview(representative,
                 faceAiService.calcSimilarity(average.get(), candidate.embedding())));
     }
 
@@ -639,7 +639,7 @@ public class FaceToNameService implements MediaFileActions {
      * @throws SQLException         when the database access fails
      * @throws IOException          when a file cannot be copied or written
      */
-    public ExportResult exportImagesForName(long nameId, Path outputDir)
+    public FaceNameService.ExportResult exportImagesForName(long nameId, Path outputDir)
             throws SQLException, IOException {
         Files.createDirectories(Objects.requireNonNull(outputDir, "outputDir"));
 
@@ -681,7 +681,7 @@ public class FaceToNameService implements MediaFileActions {
             thumbnailsCopied++;
         }
 
-        return new ExportResult(distinctImages, originalsCopied, thumbnailsCopied, missing);
+        return new FaceNameService.ExportResult(distinctImages, originalsCopied, thumbnailsCopied, missing);
     }
 
     /**
@@ -738,29 +738,6 @@ public class FaceToNameService implements MediaFileActions {
             }
         }
         return hash + ".jpg";
-    }
-
-    /**
-     * Summary of an export run.
-     *
-     * @param images           distinct images that contain the person
-     * @param originalsCopied  images whose original file was copied
-     * @param thumbnailsCopied images exported as a stored thumbnail instead
-     * @param missing          images that could not be exported at all
-     */
-    public record ExportResult(int images, int originalsCopied,
-                               int thumbnailsCopied, int missing) {
-    }
-
-    /**
-     * Preview of what tagging a face with an already-existing name entails.
-     *
-     * @param representative the face tagged with the name that is closest to
-     *                       its average embedding
-     * @param similarity     similarity between the candidate face and the
-     *                       name's average embedding, in [0, 1]
-     */
-    public record NamePreview(FaceRecord representative, double similarity) {
     }
 
     /**

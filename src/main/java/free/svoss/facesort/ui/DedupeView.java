@@ -1,7 +1,7 @@
 package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
-import free.svoss.facesort.service.DeduplicationService;
+import free.svoss.facesort.service.DedupeService;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  * user can merge duplicates, mark pairs as distinct, or skip them.
  *
  * <p>The view owns no business logic; every decision is delegated to
- * {@link DeduplicationService}. Pair ranking can be expensive on large
+ * {@link DedupeService}. Pair ranking can be expensive on large
  * databases, so {@link #loadNextPair()} runs on a background {@link Task}.
  * The decision handlers run on the JavaFX thread and surface database errors
  * in an error dialog.</p>
@@ -33,7 +33,7 @@ public class DedupeView extends BorderPane {
     private static final Logger LOG = Logger.getLogger(DedupeView.class.getName());
     private static final double THUMBNAIL_SIZE = 200.0;
 
-    private final DeduplicationService dedupService;
+    private final DedupeService dedupService;
 
     private final Button startButton = new Button(I18n.get("ui.dedupe.start"));
     private final Button dupesButton = new Button(I18n.get("ui.dedupe.dupes"));
@@ -60,7 +60,7 @@ public class DedupeView extends BorderPane {
 
     private final TaskRunner taskRunner = new TaskRunner();
     private final FaceUi.FaceActions faceActions;
-    private DeduplicationService.DupeCandidate current;
+    private DedupeService.DupeCandidate current;
     private int round;
     private boolean sessionActive;
 
@@ -69,7 +69,7 @@ public class DedupeView extends BorderPane {
      *
      * @param dedupService the deduplication service; must not be null
      */
-    public DedupeView(DeduplicationService dedupService) {
+    public DedupeView(DedupeService dedupService) {
         this.dedupService = dedupService;
         this.faceActions = FaceUi.faceActions(dedupService, statusLabel::setText,
                 this::handleFailure);
@@ -143,9 +143,9 @@ public class DedupeView extends BorderPane {
         }
         setDecisionEnabled(false);
 
-        Task<Optional<DeduplicationService.DupeCandidate>> task = new Task<>() {
+        Task<Optional<DedupeService.DupeCandidate>> task = new Task<>() {
             @Override
-            protected Optional<DeduplicationService.DupeCandidate> call() throws SQLException {
+            protected Optional<DedupeService.DupeCandidate> call() throws SQLException {
                 return dedupService.nextPair();
             }
         };
@@ -154,7 +154,7 @@ public class DedupeView extends BorderPane {
             if (!sessionActive) {
                 return;
             }
-            Optional<DeduplicationService.DupeCandidate> next = task.getValue();
+            Optional<DedupeService.DupeCandidate> next = task.getValue();
             if (next.isEmpty()) {
                 endSession(I18n.get("ui.dedupe.noneLeft"));
             } else {
@@ -179,7 +179,7 @@ public class DedupeView extends BorderPane {
      *
      * @param candidate the pair to show
      */
-    private void showPair(DeduplicationService.DupeCandidate candidate) {
+    private void showPair(DedupeService.DupeCandidate candidate) {
         current = candidate;
         round++;
         pairLabel.setText(I18n.format("ui.dedupe.comparing",
@@ -226,7 +226,7 @@ public class DedupeView extends BorderPane {
         if (current == null) {
             return;
         }
-        DeduplicationService.DupeCandidate pair = current;
+        DedupeService.DupeCandidate pair = current;
         setDecisionEnabled(false);
         Task<Void> task = new Task<>() {
             @Override

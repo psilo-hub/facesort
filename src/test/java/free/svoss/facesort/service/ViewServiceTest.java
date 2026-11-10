@@ -52,7 +52,7 @@ class ViewServiceTest {
         nameDao = new NameDao(db.getConnection());
         imageDao = new ImageDao(db.getConnection());
         videoDao = new VideoDao(db.getConnection());
-        service = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+        service = new ViewServiceImpl(new FaceAiService(new FakeFaceAiEngine()),
                 faceDao, nameDao, imageDao, videoDao);
         resolver = new MediaFileResolver(imageDao, videoDao);
         tempVideo = Files.createTempFile("facesort-open-original-", ".mp4");
@@ -119,7 +119,7 @@ class ViewServiceTest {
      * view, so the queries of one call can be counted.
      */
     private ViewService countingService(QueryCountingConnection counting) {
-        return new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+        return new ViewServiceImpl(new FaceAiService(new FakeFaceAiEngine()),
                 new FaceDao(counting.connection()), new NameDao(counting.connection()), imageDao, videoDao);
     }
 
@@ -128,7 +128,7 @@ class ViewServiceTest {
      * the given counter, so every query of a name's image grid is counted.
      */
     private ViewService countingImageService(QueryCountingConnection counting) {
-        return new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+        return new ViewServiceImpl(new FaceAiService(new FakeFaceAiEngine()),
                 new FaceDao(counting.connection()), nameDao, new ImageDao(counting.connection()), videoDao);
     }
 
@@ -342,7 +342,7 @@ class ViewServiceTest {
                 return List.of();
             }
         };
-        ViewService degradedService = new ViewService(new FaceAiService(new FakeFaceAiEngine()),
+        ViewService degradedService = new ViewServiceImpl(new FaceAiService(new FakeFaceAiEngine()),
                 vanishingDao, nameDao, imageDao, videoDao);
 
         List<ViewService.NameSummary> summaries = degradedService.getNameSummaries();

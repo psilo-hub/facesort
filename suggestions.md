@@ -8,7 +8,7 @@
 - [x] Extract shared UI helpers: FaceUi now owns toImage(FaceRecord), wrappedTooltip with a named TOOLTIP_MAX_WIDTH and applyFilterPath(TextField, TabState, Path); TagWithNameDialog, SettingsView, RandomNameView and FaceNameView delegate to them, so the duplicated decode, tooltip and path-filter code is gone (FaceUiTest covers the missing-crop guards)
 - [x] Clean up small code smells - removed the unused .grid-of-faces and .candidate-check CSS rules, dropped the copied handleFailure Javadoc from all six views, simplified every TextField.getText() null check (getText is never null), named MostSimilarView's placeholder width, and gave all service constructors the same Objects.requireNonNull checks (ClusteringService.faceDao was unchecked and message wording is now consistent); ClusteringServiceTest covers the new null check (644 → 645 headless tests)
 - [x] Reduce ConfigModel's 21 with* copy-method fan-out with a toBuilder() while keeping the record immutable - adding one config field now touches the Builder once instead of every with* method
-- [ ] Refactor views to depend on narrow service interfaces instead of concrete fat services for testability (DedupeView uses DeduplicationService, NameFaceView/RandomNameView use NamingService, ViewView uses ViewService, FaceNameView uses FaceToNameService)
+- [x] Refactor views to depend on narrow service interfaces instead of concrete fat services for testability: DedupeView depends on DedupeService, FaceNameView depends on FaceNameService, NameFaceView/RandomNameView depend on NamingService, ViewView depends on ViewService. Concrete services implement the interfaces; view constructors accept the interface types.
 
 ## Robustness
 

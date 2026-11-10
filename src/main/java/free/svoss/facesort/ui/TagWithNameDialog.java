@@ -2,7 +2,7 @@ package free.svoss.facesort.ui;
 
 import free.svoss.facesort.i18n.I18n;
 import free.svoss.facesort.model.FaceRecord;
-import free.svoss.facesort.service.FaceToNameService;
+import free.svoss.facesort.service.FaceNameService;
 
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -65,7 +65,7 @@ public class TagWithNameDialog extends Dialog<String> {
          * @return the preview for an existing name, empty for a new name
          * @throws SQLException on database access failure
          */
-        Optional<FaceToNameService.NamePreview> lookup(String name) throws SQLException;
+        Optional<FaceNameService.NamePreview> lookup(String name) throws SQLException;
     }
 
     /**
@@ -152,9 +152,9 @@ public class TagWithNameDialog extends Dialog<String> {
             return;
         }
         final long generation = ++lookupGeneration;
-        Task<Optional<FaceToNameService.NamePreview>> task = new Task<>() {
+        Task<Optional<FaceNameService.NamePreview>> task = new Task<>() {
             @Override
-            protected Optional<FaceToNameService.NamePreview> call() throws SQLException {
+            protected Optional<FaceNameService.NamePreview> call() throws SQLException {
                 return lookup.lookup(name);
             }
         };
@@ -162,13 +162,13 @@ public class TagWithNameDialog extends Dialog<String> {
             if (generation != lookupGeneration) {
                 return; // the field changed again; ignore the stale result
             }
-            Optional<FaceToNameService.NamePreview> preview = task.getValue();
+            Optional<FaceNameService.NamePreview> preview = task.getValue();
             if (preview.isEmpty()) {
                 hintLabel.setText(I18n.get("ui.faceName.differentName.newName"));
                 FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_NEW);
                 previewBox.setVisible(false);
             } else {
-                FaceToNameService.NamePreview p = preview.get();
+                FaceNameService.NamePreview p = preview.get();
                 hintLabel.setText(I18n.get("ui.faceName.differentName.exists"));
                 FaceUi.setStatusClass(hintLabel, FaceUi.NAME_STATUS_EXISTS);
                 previewThumb.setImage(FaceUi.toImage(p.representative()));
