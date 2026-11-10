@@ -138,7 +138,7 @@ public class MostSimilarView extends BorderPane implements Refreshable {
         differentButton.setOnAction(e -> onDifferentPerson());
         skipButton.setOnAction(e -> onSkip());
         cancelButton.setOnAction(e -> onCancel());
-        HBox singleButtons = new HBox(10, sameButton, differentButton, skipButton,
+        singleButtons.getChildren().addAll(sameButton, differentButton, skipButton,
                 cancelButton);
         singleButtons.setAlignment(Pos.CENTER);
         singleButtons.setPadding(new Insets(10));
@@ -153,11 +153,6 @@ public class MostSimilarView extends BorderPane implements Refreshable {
 
         batchGrid.setPadding(new Insets(10));
         batchScroll.setFitToWidth(true);
-
-        singleButtons.getChildren().addAll(sameButton, differentButton, skipButton,
-                cancelButton);
-        singleButtons.setAlignment(Pos.CENTER);
-        singleButtons.setPadding(new Insets(10));
 
         singleBottom.getChildren().addAll(singleButtons, statusLabel);
         batchBottom.getChildren().addAll(batchButtons, statusLabel);
