@@ -3,6 +3,8 @@ All notable changes to Face Sort will be documented in this file.
 
 ## [1.0-SNAPSHOT]
 
+- Added static analysis and CI guardrails: Maven Enforcer plugin requires Java 17+, Maven 3.6+, and bans duplicate/snapshot dependencies; JaCoCo plugin measures test coverage and fails the build if line/instruction/class coverage falls below 50% (2026-11-10)
+
 ### Added
 - New shallow export for names: export a single representative face sub-image (closest to the name's average embedding) plus a JSON metadata file per name. Available per-name and as a bulk operation for all names. Folder names are cleaned for OS path compatibility (2026-11-10)
 - Name average embeddings are now persisted to the database (`name_averages`

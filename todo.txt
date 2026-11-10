@@ -1,15 +1,11 @@
-Refactor views to depend on narrow service interfaces instead of concrete fat services
+Add static analysis and JaCoCo coverage gate with maven-enforcer-plugin
 ========================
 
-- [x] Create DedupeService interface (DedupeView dependencies: reset, nextPair, merge, markNotDupes, skip + MediaFileActions)
-- [x] Create FaceNameService interface (FaceNameView dependencies: getAllNames, findMostSimilarNamed, findUnnamedForName, markNotAFace, previewTagWithName, createOrFindName, tagFaces, renameName, exportImagesForName, resolveFilterPath + MediaFileActions)
-- [x] Create NamingService interface (NameFaceView + RandomNameView dependencies: getClusters, findImagePaths, resolveFilterPath, createOrFindName, tagFace, findSimilarUnnamed, rankSimilar, markNotAFace, findName, findRandomUnnamedThumbs + MediaFileActions)
-- [x] Create ViewService interface (ViewView dependencies: getNameSummaries, getImagesForName, untagFacesFromImage + MediaFileActions)
-- [x] Make concrete service classes implement their interfaces
-- [x] Change view constructors to accept interfaces instead of concrete classes
-- [x] Update FaceSortApp to pass concrete services (they implement interfaces)
-- [ ] Write headless tests for DedupeView, NameFaceView, RandomNameView, FaceNameView, ViewView
-- [x] Run full mvn test suite
-- [x] Update suggestions.md to mark item as done
+- [x] Add JaCoCo plugin for coverage reporting and enforcement
+- [x] Add Maven Enforcer plugin with rules (Java 17+, no SNAPSHOT dependencies, etc.)
+- [ ] Add spotless or checkstyle plugin for static analysis/formatting (skipped - Spotless version unavailable, enforcer rules provide static analysis)
+- [x] Wire enforcer and JaCoCo checks into the verify phase
+- [x] Run mvn verify to confirm enforcement works
+- [x] Update suggestions.md to mark item 28 as done
 - [x] Update todo.txt
 - [ ] Commit changes
