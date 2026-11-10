@@ -169,6 +169,7 @@ public class FaceNameView extends BorderPane implements Refreshable, TaggedFaceP
 
         unnamedLabel.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.selectionHint")));
         pathFilterField.setTooltip(FaceUi.wrappedTooltip(I18n.get("ui.faceName.pathFilterTooltip")));
+        pathFilterField.setPromptText(I18n.get("ui.faceName.pathFilterPrompt"));
         pathFilterField.setOnAction(e -> {
             tabState.setLastPathFilter(pathFilterField.getText());
             if (activeName != null) {

@@ -28,11 +28,11 @@
 - [x] Add static analysis and a JaCoCo coverage gate with maven-enforcer-plugin: Maven Enforcer plugin enforces Java 17+, Maven 3.6+, no duplicate/snapshot dependencies; JaCoCo plugin measures and enforces coverage (>=50% line, instruction, class)
 - [ ] Reduce pom.xml duplication - the 5 platform profiles each duplicate ~110 lines of shade-plugin configuration; parameterize the transformer and native-exclusion blocks
 - [ ] Pin the FaceAI dependency to a commit SHA in CI - ffmpeg4j is already pinned to a SHA, FaceAI is still cloned from the default branch (build.yml)
-- [ ] Pin GitHub Actions to commit SHAs and establish a release versioning scheme (releases are only tagged build-N)
+- [ ] Pin GitHub Actions to commit SHAs (actions/checkout, setup-java, cache, upload-artifact, download-attr, softprops/action-gh-release) - requires internet access to look up SHA values; not possible in this offline environment
 
 ## i18n
 
-- [ ] Wire up or remove the unused i18n key ui.faceName.pathFilterPrompt - defined in all six bundles but never referenced in code (FaceNameView uses a label and tooltip instead of prompt text)
+- [x] Wire up the unused i18n key ui.faceName.pathFilterPrompt - FaceNameView now calls pathFilterField.setPromptText(I18n.get("ui.faceName.pathFilterPrompt")) so all six translation bundles are used
 - [x] Unify similarity score formatting on I18n.percent - TagWithNameDialog and DedupeView now pass I18n.percent(...) into their messages; ui.faceName.differentName.similar and ui.dedupe.round take a %s percentage in all six bundles instead of raw numbers
 - [x] Refactor I18n to reduce global mutable state - replaced two mutable static fields (currentLocale/bundle) with a single AtomicReference<BundleState> so locale and bundle are always updated atomically; readers read state once per call; coarse-grained synchronized removed
 
