@@ -11,3 +11,5 @@ Refactor I18n to reduce global mutable state
 - [x] Update suggestions.md to mark item as done
 - [x] Update todo.txt
 - [x] Commit changes
+
+- [x] Add i18n bundle-consistency tests - I18nTest.bundleKeysAreConsistentAcrossAllLanguages() scans all Java source files for I18n.get/format/percent() calls and verifies every referenced key exists in the base bundle and all five translation bundles
