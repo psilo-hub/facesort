@@ -2,50 +2,48 @@
 
 ## Clean code
 
-- [x] Remove the 8 test-only DAO methods: NotDupeDao.isNotDupe/findByNameId/deleteForName, FaceDao.findAll/delete, VideoDao.findByHash, ImageDao.findByHash/getAllHashes are gone from src/main (NotDupeDao.findAll kept). Tests that needed the removed reads now use shared queries: DbTestQueries.allImageHashes for the image-hash list, countRows for face/not-dupe counting, notDupeDao.findAll for the stored-pair check; the 7 test methods that tested the deleted methods themselves were dropped (652 → 645 tests)
-- [x] Extract the duplicated FaceUi.FaceActions.Source bridge, handleFailure and originalCheckFailed error lambda shared by all six views - the four-method contract moved to service.MediaFileActions (implemented by NamingService, FaceToNameService, DeduplicationService and ViewService), FaceUi.faceActions wires the shared status/error handling, and FaceUi.handleFailure owns the status-bar-plus-dialog logic; the six views now pass their service and handleFailure reference instead of anonymous Source classes (FaceUiTest covers the availability checks and the shared originalCheckFailed status)
-- [x] Consolidate ViewService's duplicated path resolution and extract MediaFileResolver shared with StoredFaceImageSource.firstReadableFile - resolveOriginalFile/resolveFilterPath/openInDefaultViewer/openContainingFolder/resolveContainingFolder/firstExistingPath now live in MediaFileResolver; ViewService, DeduplicationService, FaceToNameService, NamingService and StoredFaceImageSource all delegate to it
-- [x] Extract shared UI helpers: FaceUi now owns toImage(FaceRecord), wrappedTooltip with a named TOOLTIP_MAX_WIDTH and applyFilterPath(TextField, TabState, Path); TagWithNameDialog, SettingsView, RandomNameView and FaceNameView delegate to them, so the duplicated decode, tooltip and path-filter code is gone (FaceUiTest covers the missing-crop guards)
-- [x] Clean up small code smells - removed the unused .grid-of-faces and .candidate-check CSS rules, dropped the copied handleFailure Javadoc from all six views, simplified every TextField.getText() null check (getText is never null), named MostSimilarView's placeholder width, and gave all service constructors the same Objects.requireNonNull checks (ClusteringService.faceDao was unchecked and message wording is now consistent); ClusteringServiceTest covers the new null check (644 → 645 headless tests)
-- [x] Reduce ConfigModel's 21 with* copy-method fan-out with a toBuilder() while keeping the record immutable - adding one config field now touches the Builder once instead of every with* method
-- [x] Refactor views to depend on narrow service interfaces instead of concrete fat services for testability: DedupeView depends on DedupeService, FaceNameView depends on FaceNameService, NameFaceView/RandomNameView depend on NamingService, ViewView depends on ViewService. Concrete services implement the interfaces; view constructors accept the interface types.
+- [ ] Reduce pom.xml duplication - the 5 platform profiles each duplicate ~110 lines of shade-plugin configuration; parameterize the transformer and native-exclusion blocks
+- [ ] Pin GitHub Actions to commit SHAs (actions/checkout, setup-java, cache, upload-artifact, download-attr, softprops/action-gh-release) - requires internet access to look up SHA values; not possible in this offline environment
 
 ## Robustness
 
-- [x] Make offline startup work when FaceAI models are already cached - FaceSortApp.start() wraps FaceAiService.modelsDownloaded() in try/catch so a network failure during the check no longer crashes startup; on download failure offline, modelsDownloaded() is re-checked before giving up so a previously downloaded library starts without internet (FaceSortApp.java:149-160, FaceAiService.java:58-81)
-- [x] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - Cancel is enabled during removal, progress is reported in the result label, and cancelling rolls back the transaction
+- [ ] Make offline startup work when FaceAI models are already cached - FaceSortApp.start() wraps FaceAiService.modelsDownloaded() in try/catch so a network failure during the check no longer crashes startup; on download failure offline, modelsDownloaded() is re-checked before giving up so a previously downloaded library starts without internet (FaceSortApp.java:149-160, FaceAiService.java:58-81)
+- [ ] Add progress reporting and cancel to large removals in RemoveByPrefixDialog - Cancel is enabled during removal, progress is reported in the result label, and cancelling rolls back the transaction
 
 ## Testing / TDD
 
 - [ ] Extend headless test seams for SettingsView, DedupeView, NameFaceView and RandomNameView - none of the four has a test class and all build JavaFX controls inline
 - [ ] Add headless test seams for TagWithNameDialog, ImportView, MostSimilarView and MainWindow - none has a test class and all build JavaFX controls inline
-- [x] Add i18n bundle-consistency tests - I18nTest.bundleKeysAreConsistentAcrossAllLanguages() scans all Java source files for I18n.get/format/percent() calls and verifies every referenced key exists in the base bundle and all five translation bundles
-- [x] Add a headless TaskRunnerTest with a runLater/executor seam covering success, failure propagation and cancellation before/after start (TaskRunner has no direct test; bugs in this area were found twice already)
 
 ## Build / CI
 
-- [x] Add a CI test job running mvn test on pull requests and make the release job depend on it - build.yml has a test job that installs the FaceAI/ffmpeg4j dependencies, installs JavaFX system libraries and runs the full suite under Xvfb on every push and pull request; release now needs test as well as the two build jobs
-- [x] Add static analysis and a JaCoCo coverage gate with maven-enforcer-plugin: Maven Enforcer plugin enforces Java 17+, Maven 3.6+, no duplicate/snapshot dependencies; JaCoCo plugin measures and enforces coverage (>=50% line, instruction, class)
+- [ ] Add a CI test job running mvn test on pull requests and make the release job depend on it - build.yml has a test job that installs the FaceAI/ffmpeg4j dependencies, installs JavaFX system libraries and runs the full suite under Xvfb on every push and pull request; release now needs test as well as the two build jobs
 - [ ] Reduce pom.xml duplication - the 5 platform profiles each duplicate ~110 lines of shade-plugin configuration; parameterize the transformer and native-exclusion blocks
 - [ ] Pin the FaceAI dependency to a commit SHA in CI - ffmpeg4j is already pinned to a SHA, FaceAI is still cloned from the default branch (build.yml)
 - [ ] Pin GitHub Actions to commit SHAs (actions/checkout, setup-java, cache, upload-artifact, download-attr, softprops/action-gh-release) - requires internet access to look up SHA values; not possible in this offline environment
 
-## i18n
-
-- [x] Wire up the unused i18n key ui.faceName.pathFilterPrompt - FaceNameView now calls pathFilterField.setPromptText(I18n.get("ui.faceName.pathFilterPrompt")) so all six translation bundles are used
-- [x] Unify similarity score formatting on I18n.percent - TagWithNameDialog and DedupeView now pass I18n.percent(...) into their messages; ui.faceName.differentName.similar and ui.dedupe.round take a %s percentage in all six bundles instead of raw numbers
-- [x] Refactor I18n to reduce global mutable state - replaced two mutable static fields (currentLocale/bundle) with a single AtomicReference<BundleState> so locale and bundle are always updated atomically; readers read state once per call; coarse-grained synchronized removed
-
 ## UI / UX
 
 - [ ] Add keyboard shortcuts, mnemonics and accessible text - no accelerator, mnemonic or setAccessibleText call exists anywhere in the UI today
-- [x] Add sorting to ViewView and FaceNameView by name, count or recency - sort dropdown added to both views (name ascending via Collator, face count ascending/descending); recency not available since NameRecord has no timestamp field
 
 ## Features
 
-- [x] Add shallow export for name faces: exports only the representative face sub-image (closest to name's average embedding) plus a JSON metadata file per name, available per-name and as bulk operation (FaceToNameService.exportShallowForName/exportShallowForAllNames)
 - [ ] Expose a GPU inference option in settings once the FaceAI library supports device selection
 - [ ] Add the ability to re-detect faces after detection settings change
 - [ ] Add a single-level undo buffer for the last tagging and dedupe actions (dedupService.merge has no reversal path, DedupeView.java:245)
-- [x] Add EXIF orientation handling in ImageUtils.readImage so phone photos import upright - reads EXIF orientation tag from JPEG APP1 segment and rotates/flips accordingly
 - [ ] Document the video import feature in the translated READMEs (de, es, fr, ru, zh) - only README.md mentions MP4/MKV/MOV/AVI; every translation still says photos only
+
+## Pending from further_improvements.txt
+
+1. When tagging an image or images with a name (in the "Put a name to a face" and the "Tag random face" tab) that name should be selected or jumped to when switching to the "add faces to a name" tab.
+2. Whenever a path filter is set in a tab, that path is stored somewhere in a global variable. When switching to a tab with a path filter, the stored value is set as the path filter.
+3. Switching tabs shouldn't interrupt running tasks. For example, if I switch from the "Import images" tab to another tab, a running import task should keep running until it's finished.
+
+## New Suggestions
+
+- [ ] Add keyboard shortcuts, mnemonics and accessible text - implement accelerators for common actions (tag, skip, reject), mnemonics for menu items, and setAccessibleText on all JavaFX controls to support screen readers
+- [ ] Add a single-level undo buffer for the last tagging and dedupe actions - provide a reversal path for dedupService.merge and tagging actions, allowing users to undo the last operation
+- [ ] Expose a GPU inference option in settings once the FaceAI library supports device selection - add a settings entry to select between CPU and GPU inference, with appropriate fallbacks
+- [ ] Add the ability to re-detect faces after detection settings change - provide a mechanism to re-run face detection on imported images when detection parameters (threshold, minimum face size) are adjusted
+- [ ] Add batch review of the top-K most similar pairs - enable reviewing and deciding on multiple name-face pairs in one session, replacing K full rescans with roughly one
+- [ ] Wire up the video import feature in the translated READMEs (de, es, fr, ru, zh) - update all translation bundles to mention MP4/MKV/MOV/AVI video support alongside photos
